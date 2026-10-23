@@ -39,6 +39,7 @@ FRONTEND_PORT=$(envget FRONTEND_PORT); FRONTEND_PORT=${FRONTEND_PORT:-5280}
 KAFKA_UI_PORT=$(envget KAFKA_UI_PORT); KAFKA_UI_PORT=${KAFKA_UI_PORT:-8191}
 PROMETHEUS_PORT=$(envget PROMETHEUS_PORT); PROMETHEUS_PORT=${PROMETHEUS_PORT:-9390}
 GRAFANA_PORT=$(envget GRAFANA_PORT); GRAFANA_PORT=${GRAFANA_PORT:-3300}
+MAILPIT_UI_PORT=$(envget MAILPIT_UI_PORT); MAILPIT_UI_PORT=${MAILPIT_UI_PORT:-8626}
 PUBLIC_URL=$(envget APP_REDIRECT_BASE_URL); PUBLIC_URL=${PUBLIC_URL%/}
 NGROK_DOMAIN=${PUBLIC_URL#https://}
 BILLPAY_URL=$(envget BILLPAY_BASE_URL); BILLPAY_URL=${BILLPAY_URL:-https://sandbox.api.billpay.et}
@@ -102,8 +103,8 @@ prereqs() {
 
 # ---------- start ----------
 start_infra() {
-  step "Docker: Postgres, Kafka, Kafka UI, media (photos), Prometheus, Grafana"
-  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media prometheus grafana >/dev/null 2>"$RUN/docker.log") \
+  step "Docker: Postgres, Kafka, Kafka UI, media (photos), Mailpit (email), Prometheus, Grafana"
+  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media mailpit prometheus grafana >/dev/null 2>"$RUN/docker.log") \
     || { bad "docker compose up" "see .run/docker.log"; return; }
   local i; for i in $(seq 1 40); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-postgres-1 2>/dev/null)" = healthy ] &&
@@ -164,6 +165,7 @@ checks() {
   [ "$(http_code "http://localhost:$KAFKA_UI_PORT/")" = 200 ] && ok "Kafka UI" "http://localhost:$KAFKA_UI_PORT" || warn "Kafka UI" "not answering yet"
   [ "$(http_code "http://localhost:$PROMETHEUS_PORT/-/ready")" = 200 ] && ok "Prometheus :$PROMETHEUS_PORT" "alerts http://localhost:$PROMETHEUS_PORT/alerts" || warn "Prometheus" "not answering yet"
   [ "$(http_code "http://localhost:$GRAFANA_PORT/api/health")" = 200 ] && ok "Grafana :$GRAFANA_PORT" "dashboards http://localhost:$GRAFANA_PORT" || warn "Grafana" "not answering yet"
+  [ "$(http_code "http://localhost:$MAILPIT_UI_PORT/livez")" = 200 ] && ok "Mailpit (email) :$MAILPIT_UI_PORT" "customer emails land here" || warn "Mailpit" "not answering yet"
 
   local health; health=$(curl -s -m 5 "http://localhost:$BACKEND_PORT/actuator/health" 2>/dev/null)
   # The overall status is only UP when the database and Kafka checks are UP too.
@@ -217,6 +219,7 @@ summary() {
   printf "  Kafka UI     http://localhost:%s\n" "$KAFKA_UI_PORT"
   printf "  Grafana      http://localhost:%s   (dashboards; sign in as admin to edit)\n" "$GRAFANA_PORT"
   printf "  Prometheus   http://localhost:%s/alerts\n" "$PROMETHEUS_PORT"
+  printf "  Emails       http://localhost:%s   (test inbox: every customer email)\n" "$MAILPIT_UI_PORT"
   [ -n "$PUBLIC_URL" ] && printf "  Public URL   %s  (webhook: %s/api/webhooks/billpay)\n" "$PUBLIC_URL" "$PUBLIC_URL"
   echo
   if [ "$FAILS" -eq 0 ]; then printf "${G}${B}All good.${N} Logs: scripts/dev.sh logs backend|frontend|ngrok\n"

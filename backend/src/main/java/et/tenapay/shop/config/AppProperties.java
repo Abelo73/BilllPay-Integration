@@ -16,7 +16,12 @@ public record AppProperties(
 		String adminEmail,
 		String adminPassword,
 		String jwtSecret,
-		Delivery delivery) {
+		Delivery delivery,
+		Mail mail) {
+
+	/** Customer emails: on/off, sender, and the dev inbox link for the admin. */
+	public record Mail(boolean enabled, String from, String inboxUrl) {
+	}
 
 	/** Flat delivery fee, waived when the cart subtotal reaches freeOver. */
 	public record Delivery(java.math.BigDecimal flatFee, java.math.BigDecimal freeOver) {

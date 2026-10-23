@@ -113,6 +113,7 @@ Record for each run: date, order number, BillPay payment ID, observed result, pa
 | Accounts | Guest / customer / support / admin access; weak password; 5 wrong passwords lock; log out everywhere; disabled staff lose access at once; unknown route → 404 | |
 | Catalog | Hide product / category; photos resized, served, reordered, max 5; fake and tiny images refused; stock can't go below held units; duplicate; change history; unique slugs | |
 | Delivery (P3) | Fee added below 3,000 ETB and charged through BillPay, free above; address required; paid order → processing → shipped (rider note) → delivered, no going back; unpaid orders can't be fulfilled; support can't change delivery; customer cancels unpaid order (stock returns, can't be paid); payment after cancel → REVIEW_REQUIRED; address book (default, no duplicates, staff refused) | |
+| Emails (P4) | Order placed → paid → on the way (rider note) → delivered, read from a real Mailpit inbox; BillPay re-delivery sends no second email; names HTML-escaped; payment failed (reason) and cancel emails; same Kafka event twice → one email; password change email; admin email log | |
 | Monitoring (P2b) | `/actuator/prometheus` refused through a proxy; payment, BillPay, webhook and order metrics move after a paid checkout | |
 
 Bugs these tests found (fixed): a forged webhook sent before the genuine one made the genuine one look like a duplicate; every missing route returned 403 instead of 404.

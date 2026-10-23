@@ -67,6 +67,7 @@ public class AdminController {
 	private final WebhookPublisher webhookPublisher;
 	private final BillPayProperties billPay;
 	private final AppProperties app;
+	private final et.tenapay.shop.notification.NotificationRepository notificationRepo;
 
 	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
 			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
@@ -139,7 +140,8 @@ public class AdminController {
 	}
 
 	public record OrderDetail(OrderRow order, String customerEmail, DeliveryDetail delivery, List<ItemRow> items,
-			List<OrderEvent> timeline, List<AttemptView> attempts, List<RefundView> refunds, List<WebhookView> webhooks) {
+			List<OrderEvent> timeline, List<AttemptView> attempts, List<RefundView> refunds, List<WebhookView> webhooks,
+			List<NotificationAdminController.NotificationRow> emails) {
 	}
 
 	public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -221,7 +223,9 @@ public class AdminController {
 				list.stream().map(a -> AttemptView.from(a, o.getOrderNumber(), refunds.refundable(a))).toList(),
 				refundRepo.findByOrderIdOrderByCreatedAtAsc(o.getId()).stream()
 						.map(r -> RefundView.from(r, o.getOrderNumber())).toList(),
-				hooks);
+				hooks,
+				notificationRepo.findByOrderNumberOrderByCreatedAtAsc(o.getOrderNumber()).stream()
+						.map(NotificationAdminController.NotificationRow::of).toList());
 	}
 
 	@GetMapping("/payments")

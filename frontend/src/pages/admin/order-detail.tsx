@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, Loader2, MapPin, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Loader2, Mail, MapPin, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { adminApi, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
+import { adminApi, EMAIL_KIND_LABEL, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { JsonBlock, PageHeader, StatusBadge } from './shared'
 
@@ -293,6 +293,7 @@ export function AdminOrderDetailPage() {
             <TabsTrigger value="payments">Payments ({data.attempts.length})</TabsTrigger>
             <TabsTrigger value="webhooks">Webhooks ({data.webhooks.length})</TabsTrigger>
             <TabsTrigger value="refunds">Refunds ({data.refunds.length})</TabsTrigger>
+            <TabsTrigger value="emails">Emails ({data.emails.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="payments" className="space-y-4">
             {data.attempts.length === 0 && <p className="text-sm text-muted-foreground">No payment attempts.</p>}
@@ -342,6 +343,21 @@ export function AdminOrderDetailPage() {
                   </div>
                 </CardContent>
               </Card>
+            ))}
+          </TabsContent>
+          <TabsContent value="emails" className="space-y-2">
+            {data.emails.length === 0 && <p className="text-sm text-muted-foreground">No emails sent for this order.</p>}
+            {data.emails.map((n) => (
+              <div key={n.id} className="flex flex-wrap items-center gap-3 rounded-xl border bg-card px-4 py-3">
+                <Mail className="size-4 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{EMAIL_KIND_LABEL[n.kind] ?? n.kind}</p>
+                  <p className="truncate text-xs text-muted-foreground">{n.subject} · {n.recipient}</p>
+                  {n.error && <p className="text-xs text-destructive">{n.error}</p>}
+                </div>
+                <StatusBadge status={n.status} />
+                <span className="text-xs text-muted-foreground">{formatDate(n.sentAt ?? n.createdAt)}</span>
+              </div>
             ))}
           </TabsContent>
         </Tabs>

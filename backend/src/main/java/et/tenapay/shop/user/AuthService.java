@@ -34,6 +34,7 @@ public class AuthService {
 	private final PasswordEncoder passwords;
 	private final TokenService tokens;
 	private final TransactionTemplate tx;
+	private final et.tenapay.shop.notification.NotificationService notifications;
 
 	/** Burned on unknown emails so a miss takes as long as a wrong password. */
 	private String dummyHash;
@@ -140,6 +141,9 @@ public class AuthService {
 			u.revokeSessions();
 			return u;
 		});
+		// security email; sent in the background so a slow mail server doesn't hold up the response
+		java.util.concurrent.CompletableFuture.runAsync(() -> notifications.onPasswordChanged(user.getId(),
+				user.getTokenVersion(), user.getEmail(), user.getFullName()));
 		return session(user);
 	}
 

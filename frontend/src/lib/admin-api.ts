@@ -180,10 +180,23 @@ export type TimelineEvent = {
   createdAt: string
 }
 
+export type NotificationRow = {
+  id: number
+  kind: string
+  orderNumber: string | null
+  recipient: string
+  subject: string
+  status: 'SENT' | 'FAILED' | 'SKIPPED' | 'SENDING'
+  error: string | null
+  createdAt: string
+  sentAt: string | null
+}
+
 export type OrderDetail = {
   order: OrderRow
   customerEmail: string
   delivery: DeliveryDetail
+  emails: NotificationRow[]
   items: { productId: number; productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
   timeline: TimelineEvent[]
   attempts: Attempt[]
@@ -220,6 +233,8 @@ export const adminApi = {
       body: JSON.stringify(body),
     }),
   retryRefund: (id: string) => request<Refund>(`/refunds/${id}/retry`, { method: 'POST' }),
+  notifications: (p: { page?: number }) =>
+    request<{ page: Page<NotificationRow>; mailboxUrl: string | null }>(`/notifications?${qs(p)}`),
 
   users: (p: { kind?: string; q?: string; page?: number }) => request<Page<UserRow>>(`/users?${qs(p)}`),
   createStaff: (body: { email: string; fullName: string; role: 'ADMIN' | 'SUPPORT'; password: string }) =>
@@ -363,4 +378,17 @@ export const catalogApi = {
   updateCategory: (id: number, body: { name?: string; active?: boolean }) =>
     request<CategoryRow[]>(`/categories/${id}`, json('PATCH', body)),
   reorderCategories: (ids: number[]) => request<CategoryRow[]>('/categories/order', json('PUT', { ids })),
+}
+
+/** Labels for customer email kinds (notifications log). */
+export const EMAIL_KIND_LABEL: Record<string, string> = {
+  ORDER_PLACED: 'Order placed',
+  PAYMENT_CONFIRMED: 'Payment confirmed',
+  PAYMENT_FAILED: 'Payment failed',
+  SHIPPED: 'On the way',
+  DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
+  EXPIRED: 'Expired',
+  REFUNDED: 'Refunded',
+  PASSWORD_CHANGED: 'Password changed',
 }

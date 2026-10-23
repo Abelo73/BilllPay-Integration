@@ -72,14 +72,28 @@ public abstract class IntegrationTest {
 	protected static final WireMockServer billPay = new WireMockServer(options().dynamicPort().templatingEnabled(true)
 			.globalTemplating(false));
 
+	/** A real SMTP server with an inbox API, so tests read the emails customers would get. */
+	protected static final org.testcontainers.containers.GenericContainer<?> mailpit =
+			new org.testcontainers.containers.GenericContainer<>(org.testcontainers.utility.DockerImageName.parse("axllent/mailpit:v1.27"))
+					.withExposedPorts(1025, 8025)
+					.waitingFor(org.testcontainers.containers.wait.strategy.Wait.forHttp("/livez").forPort(8025));
+
 	static {
 		billPay.start();
 		Runtime.getRuntime().addShutdownHook(new Thread(billPay::stop));
+		mailpit.start();
 	}
 
 	@DynamicPropertySource
-	static void billPayUrl(DynamicPropertyRegistry registry) {
+	static void externalServices(DynamicPropertyRegistry registry) {
 		registry.add("billpay.base-url", billPay::baseUrl);
+		registry.add("spring.mail.host", mailpit::getHost);
+		registry.add("spring.mail.port", () -> mailpit.getMappedPort(1025));
+		registry.add("app.mail.inbox-url", IntegrationTest::mailpitApi);
+	}
+
+	protected static String mailpitApi() {
+		return "http://" + mailpit.getHost() + ":" + mailpit.getMappedPort(8025);
 	}
 
 	@TestConfiguration(proxyBeanMethods = false)

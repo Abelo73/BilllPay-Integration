@@ -32,6 +32,7 @@ public class CheckoutService {
 	private final OrderRepository orders;
 	private final OrderService orderService;
 	private final et.tenapay.shop.config.AppProperties app;
+	private final et.tenapay.shop.events.OrderEventPublisher publisher;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -102,6 +103,7 @@ public class CheckoutService {
 		orders.save(order);
 		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s), subtotal " + subtotal
 				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
+		publisher.publish(order, "order.placed", Map.of());
 		return order;
 	}
 

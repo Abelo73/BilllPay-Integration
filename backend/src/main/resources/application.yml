@@ -14,6 +14,16 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  # Customer emails. Locally: Mailpit in Docker (inbox at http://localhost:8626)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:2626}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
   jpa:
     open-in-view: false
     hibernate:
@@ -44,6 +54,10 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    # an email outage must not mark the shop as down
+    mail:
+      enabled: false
   metrics:
     tags:
       application: tenashop
@@ -94,6 +108,11 @@ app:
   delivery:
     flat-fee: ${DELIVERY_FLAT_FEE:150}
     free-over: ${DELIVERY_FREE_OVER:3000}
+  mail:
+    enabled: ${MAIL_ENABLED:true}
+    from: ${MAIL_FROM:TenaShop <orders@tenashop.local>}
+    # shown in the admin as "Open test inbox" (Mailpit); leave empty with a real mail server
+    inbox-url: ${MAIL_INBOX_URL:http://localhost:8626}
 
 logging:
   level:

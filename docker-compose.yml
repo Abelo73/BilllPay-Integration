@@ -1,5 +1,5 @@
 # TenaShop stack. All host ports are non-default and come from .env (see .env.example).
-#   Infra only (run apps locally):  docker compose up -d postgres kafka kafka-ui media prometheus grafana
+#   Infra only (run apps locally):  docker compose up -d postgres kafka kafka-ui media mailpit prometheus grafana
 #   Everything:                     docker compose up -d --build
 name: tenashop
 
@@ -80,6 +80,20 @@ services:
       timeout: 5s
       retries: 12
 
+  # Customer emails in development: catches everything sent over SMTP; open the inbox in the browser
+  mailpit:
+    image: axllent/mailpit:v1.27
+    environment:
+      MP_MAX_MESSAGES: 2000
+    ports:
+      - "${MAIL_PORT:-2626}:1025"          # SMTP
+      - "${MAILPIT_UI_PORT:-8626}:8025"    # inbox
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8025/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   # Monitoring: Prometheus scrapes /actuator/prometheus, Grafana shows the provisioned dashboards
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -137,6 +151,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tenashop}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MEDIA_S3_ENDPOINT: http://media:8333
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
       BACKEND_PORT: 8181
     ports:
       - "${BACKEND_PORT:-8181}:8181"

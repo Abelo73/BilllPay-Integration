@@ -69,7 +69,9 @@ Result: delivery fee 150 ETB, free from 3,000 ETB (`DELIVERY_FLAT_FEE`, `DELIVER
 - Customer: cancel unpaid orders; order detail page with fulfilment timeline
 - Delivery fee rules (flat / free over X ETB)
 
-### P4. Notifications
+### P4. Notifications ✅ Email done (2026-10-23)
+Result: emails for order placed, payment confirmed, payment failed (with the reason), on the way (rider note), delivered, cancelled, expired, refunded and password changed. Each email is logged in `notifications`; a unique key per event means Kafka re-deliveries never send twice. Admin → **Emails** lists them, and each order page has an Emails tab. Local inbox: Mailpit at http://localhost:8626. Tested with 4 end-to-end tests that read the real inbox. SMS is still open.
+
 - Email via SMTP (Mailpit in Docker for dev): order placed, payment confirmed, payment failed, shipped, password changed
 - Uses the existing `orders.events` Kafka topic (the notification stub becomes real)
 - SMS later (provider to choose)
