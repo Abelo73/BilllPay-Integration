@@ -1,0 +1,62 @@
+# Alert rules. They show in Prometheus (http://localhost:9390/alerts) and in Grafana → Alerting.
+groups:
+  - name: tenashop
+    rules:
+      - alert: BackendDown
+        expr: up{job="tenashop-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: TenaShop backend is not answering
+          description: Prometheus could not scrape the backend for 1 minute. Checkout and webhooks are down.
+
+      - alert: NoSuccessfulPayment
+        # only when people are actually trying to pay
+        expr: |
+          sum(increase(tenashop_payments_requested_total{result="created"}[30m])) > 0
+          unless sum(increase(tenashop_payments_status_total{status="SUCCEEDED"}[30m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful payment in 30 minutes
+          description: Payment links were created but none were paid. Check BillPay status and the webhook tunnel.
+
+      - alert: BillPayErrorRateHigh
+        expr: |
+          sum(rate(tenashop_billpay_requests_seconds_count{outcome=~"5xx|network"}[5m]))
+            / sum(rate(tenashop_billpay_requests_seconds_count[5m])) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 10% of BillPay calls fail
+          description: BillPay answers with 5xx or cannot be reached ({{ $value | humanizePercentage }} of calls).
+
+      - alert: WebhookSignatureFailures
+        expr: sum(increase(tenashop_webhooks_received_total{result="rejected_signature"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Webhooks with a bad signature
+          description: Someone sent webhooks that failed the HMAC check, or the webhook secret no longer matches BillPay's.
+
+      - alert: WebhookProcessingSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(tenashop_webhooks_processing_delay_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Webhooks take more than 30 s to apply
+          description: Kafka or the webhook processor is falling behind.
+
+      - alert: KafkaConsumerLagGrowing
+        expr: max by (topic) (kafka_consumer_fetch_manager_records_lag_max{topic=~".+[.].+"}) > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka consumer lag on {{ $labels.topic }}
+          description: More than 50 messages are waiting on {{ $labels.topic }} for 5 minutes.

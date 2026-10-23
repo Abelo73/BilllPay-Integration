@@ -2,6 +2,7 @@
 # TenaShop dev stack: start what isn't running, then check everything.
 #
 #   scripts/dev.sh            start everything that is down, then run all checks (default)
+#   scripts/dev.sh restart    restart the backend (even one started in another terminal) to load new code
 #   scripts/dev.sh check      only run the checks
 #   scripts/dev.sh test       checks + a quick end-to-end smoke test (catalog, sign-up, sign-in, admin)
 #   scripts/dev.sh logs [backend|frontend|ngrok]   follow a log
@@ -36,6 +37,8 @@ envget() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr 
 BACKEND_PORT=$(envget BACKEND_PORT); BACKEND_PORT=${BACKEND_PORT:-8181}
 FRONTEND_PORT=$(envget FRONTEND_PORT); FRONTEND_PORT=${FRONTEND_PORT:-5280}
 KAFKA_UI_PORT=$(envget KAFKA_UI_PORT); KAFKA_UI_PORT=${KAFKA_UI_PORT:-8191}
+PROMETHEUS_PORT=$(envget PROMETHEUS_PORT); PROMETHEUS_PORT=${PROMETHEUS_PORT:-9390}
+GRAFANA_PORT=$(envget GRAFANA_PORT); GRAFANA_PORT=${GRAFANA_PORT:-3300}
 PUBLIC_URL=$(envget APP_REDIRECT_BASE_URL); PUBLIC_URL=${PUBLIC_URL%/}
 NGROK_DOMAIN=${PUBLIC_URL#https://}
 BILLPAY_URL=$(envget BILLPAY_BASE_URL); BILLPAY_URL=${BILLPAY_URL:-https://sandbox.api.billpay.et}
@@ -99,8 +102,8 @@ prereqs() {
 
 # ---------- start ----------
 start_infra() {
-  step "Docker: Postgres, Kafka, Kafka UI, media (photos)"
-  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media >/dev/null 2>"$RUN/docker.log") \
+  step "Docker: Postgres, Kafka, Kafka UI, media (photos), Prometheus, Grafana"
+  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media prometheus grafana >/dev/null 2>"$RUN/docker.log") \
     || { bad "docker compose up" "see .run/docker.log"; return; }
   local i; for i in $(seq 1 40); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-postgres-1 2>/dev/null)" = healthy ] &&
@@ -159,6 +162,8 @@ checks() {
   [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-kafka-1 2>/dev/null)" = healthy ] && ok "Kafka :29492" || bad "Kafka" "not healthy"
   [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-media-1 2>/dev/null)" = healthy ] && ok "Photo storage (S3) :9910" "file browser http://localhost:9911" || bad "Photo storage" "media container not healthy"
   [ "$(http_code "http://localhost:$KAFKA_UI_PORT/")" = 200 ] && ok "Kafka UI" "http://localhost:$KAFKA_UI_PORT" || warn "Kafka UI" "not answering yet"
+  [ "$(http_code "http://localhost:$PROMETHEUS_PORT/-/ready")" = 200 ] && ok "Prometheus :$PROMETHEUS_PORT" "alerts http://localhost:$PROMETHEUS_PORT/alerts" || warn "Prometheus" "not answering yet"
+  [ "$(http_code "http://localhost:$GRAFANA_PORT/api/health")" = 200 ] && ok "Grafana :$GRAFANA_PORT" "dashboards http://localhost:$GRAFANA_PORT" || warn "Grafana" "not answering yet"
 
   local health; health=$(curl -s -m 5 "http://localhost:$BACKEND_PORT/actuator/health" 2>/dev/null)
   # The overall status is only UP when the database and Kafka checks are UP too.
@@ -167,6 +172,12 @@ checks() {
   elif [ -n "$health" ]; then bad "Backend health" "$(echo "$health" | grep -oE '"status":"[A-Z_]+"' | tail -1)"
   else bad "Backend" "not answering on :$BACKEND_PORT"; fi
   s=$(http_code "http://localhost:$BACKEND_PORT/api/products/featured"); [ "$s" = 200 ] && ok "Catalog API" || bad "Catalog API" "HTTP $s"
+  # Is Prometheus actually getting the backend's metrics?
+  local up; up=$(curl -s -m 5 "http://localhost:$PROMETHEUS_PORT/api/v1/query" --data-urlencode 'query=up{job="tenashop-backend"}' 2>/dev/null)
+  if echo "$up" | grep -q '"result":\[{'; then
+    echo "$up" | grep -q '"1"\]' && ok "Metrics scraped" "backend → Prometheus" \
+      || { warn "Metrics scraped" "Prometheus can't read /actuator/prometheus (scraped every 15 s)"; fix "restart the backend to load the metrics endpoint: scripts/dev.sh restart"; }
+  fi
 
   frontend_up && ok "Frontend" "http://localhost:$FRONTEND_PORT" || bad "Frontend" "not answering on :$FRONTEND_PORT"
   s=$(http_code "http://localhost:$FRONTEND_PORT/api/categories"); [ "$s" = 200 ] && ok "Frontend → API proxy" || bad "Frontend → API proxy" "HTTP $s"
@@ -204,6 +215,8 @@ summary() {
   printf "  Admin        http://localhost:%s/admin   (%s)\n" "$FRONTEND_PORT" "$(envget ADMIN_EMAIL)"
   printf "  API docs     http://localhost:%s/swagger-ui.html\n" "$BACKEND_PORT"
   printf "  Kafka UI     http://localhost:%s\n" "$KAFKA_UI_PORT"
+  printf "  Grafana      http://localhost:%s   (dashboards; sign in as admin to edit)\n" "$GRAFANA_PORT"
+  printf "  Prometheus   http://localhost:%s/alerts\n" "$PROMETHEUS_PORT"
   [ -n "$PUBLIC_URL" ] && printf "  Public URL   %s  (webhook: %s/api/webhooks/billpay)\n" "$PUBLIC_URL" "$PUBLIC_URL"
   echo
   if [ "$FAILS" -eq 0 ]; then printf "${G}${B}All good.${N} Logs: scripts/dev.sh logs backend|frontend|ngrok\n"
@@ -238,13 +251,33 @@ stop_one() {
   rm -f "$RUN/$name.pid"
 }
 
+# Stops the TenaShop backend on $BACKEND_PORT even if it was started in another terminal (./mvnw spring-boot:run).
+# Only touches a process whose command line points at this repo's backend.
+stop_backend_any() {
+  stop_one backend
+  local pid ppid i
+  pid=$(ss -ltnp 2>/dev/null | grep ":$BACKEND_PORT " | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
+  [ -z "$pid" ] && return
+  if ! tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q "$ROOT/backend"; then
+    bad "port $BACKEND_PORT" "held by something that isn't this project's backend (pid $pid); left alone"; return
+  fi
+  ppid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+  kill "$pid" 2>/dev/null
+  # the Maven process that launched it (spring-boot:run) exits by itself; stop it if it doesn't
+  for i in $(seq 1 30); do ss -ltn 2>/dev/null | grep -q ":$BACKEND_PORT " || break; sleep 1; done
+  [ -n "$ppid" ] && tr '\0' ' ' < "/proc/$ppid/cmdline" 2>/dev/null | grep -q plexus-classworlds && kill "$ppid" 2>/dev/null
+  if ss -ltn 2>/dev/null | grep -q ":$BACKEND_PORT "; then bad "backend (pid $pid)" "still running after 30 s"
+  else printf "  ${G}✔${N} %-10s stopped (pid %s)\n" "backend" "$pid"; fi
+}
+
 case "${1:-start}" in
   start)    prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
+  restart)  step "Stopping backend"; stop_backend_any; prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
   check)    use_java21 >/dev/null; checks; summary ;;
   test)     checks; smoke; summary ;;
   logs)     f="$RUN/${2:-backend}.log"; [ -f "$f" ] && tail -f "$f" || echo "no log at $f (was it started by this script?)" ;;
   stop)     step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend ;;
   stop-all) step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend; (cd "$ROOT" && docker compose stop) ;;
-  *)        sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 [ "$FAILS" -eq 0 ]

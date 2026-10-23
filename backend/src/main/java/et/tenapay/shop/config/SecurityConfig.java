@@ -46,6 +46,10 @@ public class SecurityConfig {
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+						// Spring forwards errors here; blocking it turned every 404/400 into a 403
+						.requestMatchers("/error").permitAll()
+						// metrics for Prometheus: only from this machine / the Docker network, never through a proxy
+						.requestMatchers("/actuator/prometheus").access(InternalNetwork::check)
 						.requestMatchers("/api/auth/**", "/api/admin/auth/login").permitAll()
 						// user management and login history: admins only
 						.requestMatchers("/api/admin/users/**", "/api/admin/login-events/**").hasRole("ADMIN")

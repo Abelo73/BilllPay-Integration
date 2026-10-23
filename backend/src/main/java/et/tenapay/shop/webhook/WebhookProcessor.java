@@ -37,6 +37,7 @@ public class WebhookProcessor {
 	private final OrderService orderService;
 	private final TransactionTemplate tx;
 	private final ObjectMapper json;
+	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 
 	@KafkaListener(topics = KafkaConfig.WEBHOOK_EVENTS, groupId = "tenashop-webhooks")
 	public void onMessage(String eventId) {
@@ -111,6 +112,7 @@ public class WebhookProcessor {
 			e.setStatus(status);
 			e.setError(note);
 			e.setProcessedAt(Instant.now());
+			metrics.webhookProcessed(status.name(), java.time.Duration.between(e.getReceivedAt(), e.getProcessedAt()));
 		}));
 		log.info("Webhook {} -> {}{}", eventId, status, note != null ? " (" + note + ")" : "");
 	}

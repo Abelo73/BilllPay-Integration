@@ -29,6 +29,7 @@ public class BillPayWebhookController {
 	private final WebhookEventRepository events;
 	private final WebhookPublisher publisher;
 	private final ObjectMapper json;
+	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 
 	@PostMapping("/api/webhooks/billpay")
 	public ResponseEntity<Map<String, Object>> receive(@RequestBody String body,
@@ -67,13 +68,22 @@ public class BillPayWebhookController {
 
 		if (signature == WebhookSignatureVerifier.Result.INVALID || root == null) {
 			event.setStatus(WebhookEvent.Status.REJECTED);
+			// A rejected delivery must not claim the event id: otherwise a forged copy sent first would make the
+			// genuine BillPay delivery look like a duplicate (and a second forged copy would hit the unique index).
+			if (event.getBillpayEventId() != null) {
+				event.setError("Rejected (" + (root == null ? "invalid JSON" : verification.scheme()) + "), event id "
+						+ event.getBillpayEventId());
+				event.setBillpayEventId(null);
+			}
 			events.save(event);
+			metrics.webhookReceived(root == null ? "invalid_json" : "rejected_signature");
 			log.warn("Rejected BillPay webhook {}: {}", event.getId(), root == null ? "invalid JSON" : "bad signature");
 			return ResponseEntity.status(root == null ? 400 : 401).body(Map.of("received", false));
 		}
 
 		if (event.getBillpayEventId() != null && events.existsByBillpayEventId(event.getBillpayEventId())) {
 			log.info("Duplicate BillPay webhook event {} acknowledged", event.getBillpayEventId());
+			metrics.webhookReceived("duplicate");
 			return ResponseEntity.ok(Map.of("received", true, "duplicate", true));
 		}
 
@@ -82,8 +92,10 @@ public class BillPayWebhookController {
 			events.save(event);
 		} catch (DataIntegrityViolationException e) {
 			// Two copies of the same event raced past the exists() check.
+			metrics.webhookReceived("duplicate");
 			return ResponseEntity.ok(Map.of("received", true, "duplicate", true));
 		}
+		metrics.webhookReceived("accepted");
 		log.info("Stored BillPay webhook {} (payment {}, status {})", event.getId(), event.getBillpayPaymentId(),
 				event.getReportedStatus());
 		// Publishing can block while Kafka is down; don't make BillPay wait for it.

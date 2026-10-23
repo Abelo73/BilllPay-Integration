@@ -56,6 +56,27 @@ public class Order {
 
 	private Instant paidAt;
 
+	private String deliveryAddress;
+
+	private String deliveryCity;
+
+	private String deliveryNotes;
+
+	/** Included in {@link #total}; total = subtotal + deliveryFee. */
+	private BigDecimal deliveryFee = BigDecimal.ZERO;
+
+	/** Null until the order is paid. */
+	@Enumerated(EnumType.STRING)
+	private FulfilmentStatus fulfilmentStatus;
+
+	private String trackingNote;
+
+	private Instant shippedAt;
+
+	private Instant deliveredAt;
+
+	private Instant cancelledAt;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

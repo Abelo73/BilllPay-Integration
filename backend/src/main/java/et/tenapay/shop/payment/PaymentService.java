@@ -10,6 +10,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import et.tenapay.shop.common.ApiException;
 import et.tenapay.shop.config.AppProperties;
+import et.tenapay.shop.monitoring.ShopMetrics;
 import et.tenapay.shop.order.Order;
 import et.tenapay.shop.order.OrderRepository;
 import et.tenapay.shop.order.OrderService;
@@ -35,6 +36,7 @@ public class PaymentService {
 	private final BillPayClient billPay;
 	private final AppProperties app;
 	private final TransactionTemplate tx;
+	private final ShopMetrics metrics;
 
 	/**
 	 * Returns a BillPay checkout URL for the order. Reuses a live attempt, retries a CREATED/ERROR attempt with
@@ -50,15 +52,18 @@ public class PaymentService {
 		try {
 			response = billPay.createPayment(attempt.getRequestPayload(), attempt.getIdempotencyKey());
 		} catch (BillPayException e) {
+			metrics.paymentRequested(e.getHttpStatus() >= 400 && e.getHttpStatus() < 500 ? "rejected" : "error");
 			tx.executeWithoutResult(s -> recordCreateFailure(attempt.getId(), e));
 			throw e;
 		}
 		if (response.checkoutUrl() == null) {
+			metrics.paymentRequested("error");
 			tx.executeWithoutResult(s -> recordCreateFailure(attempt.getId(),
 					new BillPayException(502, response.raw(), "No checkout URL in BillPay response", null)));
 			throw new ApiException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR",
 					"The payment provider returned an unexpected response.");
 		}
+		metrics.paymentRequested("created");
 		tx.executeWithoutResult(s -> recordCreated(attempt.getId(), response));
 		return response.checkoutUrl();
 	}
@@ -169,6 +174,7 @@ public class PaymentService {
 				Order order = orders.findById(attempt.getOrderId()).orElseThrow();
 				orderService.note(order, "PAYMENT_TRY_FAILED",
 						attempt.getMerchantReference() + " try failed: " + reason + " via " + source);
+				metrics.paymentTryFailed(reason);
 				return Outcome.APPLIED;
 			}
 			return Outcome.DUPLICATE;
@@ -189,6 +195,8 @@ public class PaymentService {
 		if (reported.reasonCode() != null) {
 			attempt.setReasonCode(reported.reasonCode());
 		}
+		metrics.paymentStatus(next.name(), attempt.getPaymentMethod(),
+				next == PaymentStatus.SUCCEEDED ? null : attempt.getReasonCode());
 
 		Order order = orders.lockById(attempt.getOrderId()).orElseThrow();
 		String detail = attempt.getMerchantReference() + " " + current + "->" + next + " via " + source
@@ -229,6 +237,7 @@ public class PaymentService {
 		if (order.getStatus().awaitingPayment()) {
 			orderService.commitStock(order);
 			order.setPaidAt(Instant.now());
+			order.setFulfilmentStatus(et.tenapay.shop.order.FulfilmentStatus.UNFULFILLED);
 			orderService.transition(order, OrderStatus.PAID, "PAID", detail);
 		} else {
 			// Late payment after expiry, or a second successful attempt: a person must decide (refund or fulfil).
@@ -264,6 +273,7 @@ public class PaymentService {
 			for (PaymentAttempt a : attempts.findByOrderIdOrderByAttemptNoAsc(orderId)) {
 				if (!a.getStatus().isFinal()) {
 					a.setStatus(PaymentStatus.EXPIRED);
+					metrics.paymentStatus(PaymentStatus.EXPIRED.name(), a.getPaymentMethod(), a.getReasonCode());
 				}
 			}
 			orderService.releaseStock(order);

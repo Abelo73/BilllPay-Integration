@@ -21,12 +21,14 @@ public class OrderService {
 	private final OrderEventRepository events;
 	private final ProductRepository products;
 	private final OrderEventPublisher publisher;
+	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 
 	public void transition(Order order, OrderStatus to, String eventType, String detail) {
 		OrderStatus from = order.getStatus();
 		order.setStatus(to);
 		events.save(new OrderEvent(order.getId(), eventType, from, to, detail));
 		log.info("Order {} {} -> {} ({})", order.getOrderNumber(), from, to, eventType);
+		metrics.orderStatus(to.name());
 		Map<String, Object> extra = new HashMap<>();
 		if (detail != null) {
 			extra.put("detail", detail);

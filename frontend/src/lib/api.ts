@@ -27,10 +27,37 @@ export type Page<T> = {
   totalPages: number
 }
 
+export type DeliveryInput = { address: string; city: string; notes?: string }
+
 export type CheckoutRequest = {
   items: { productId: number; quantity: number }[]
   customer: { name: string; phone: string; email: string }
+  delivery: DeliveryInput
+  /** Signed-in customers: also keep this address in the address book. */
+  saveAddress?: boolean
 }
+
+export type DeliveryQuote = { flatFee: number; freeOver: number; currency: string }
+
+export function deliveryFee(quote: DeliveryQuote | undefined, subtotal: number) {
+  if (!quote || quote.flatFee <= 0) return 0
+  return quote.freeOver > 0 && subtotal >= quote.freeOver ? 0 : quote.flatFee
+}
+
+export type FulfilmentStatus = 'UNFULFILLED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED'
+
+export type Address = {
+  id: number
+  label: string
+  recipientName: string
+  phone: string
+  addressLine: string
+  city: string
+  notes: string | null
+  isDefault: boolean
+}
+
+export type AddressInput = Omit<Address, 'id' | 'isDefault' | 'notes'> & { notes?: string; makeDefault?: boolean }
 
 export type CheckoutResponse = { orderNumber: string; checkoutUrl: string }
 
@@ -47,12 +74,25 @@ export type OrderStatus =
 export type OrderStatusView = {
   orderNumber: string
   status: OrderStatus
+  subtotal: number
+  deliveryFee: number
   total: number
   currency: string
   customerName: string
   items: { productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
   payment: { attemptNo: number; status: string; reasonCode: string | null; paymentMethod: string | null } | null
   canRetry: boolean
+  canCancel: boolean
+  delivery: {
+    address: string | null
+    city: string | null
+    notes: string | null
+    fulfilmentStatus: FulfilmentStatus | null
+    trackingNote: string | null
+    shippedAt: string | null
+    deliveredAt: string | null
+  }
+  timeline: { type: string; at: string }[]
   createdAt: string
   paidAt: string | null
 }
@@ -124,6 +164,18 @@ export const api = {
     request<OrderStatusView>(
       `/orders/${encodeURIComponent(orderNumber)}/status?phone=${encodeURIComponent(phone)}`,
     ),
+  cancelOrder: (orderNumber: string, phone: string, reason?: string) =>
+    request<OrderStatusView>(`/orders/${encodeURIComponent(orderNumber)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ phone, reason }),
+    }),
+  delivery: () => request<DeliveryQuote>('/delivery'),
+
+  addresses: () => request<Address[]>('/me/addresses'),
+  addAddress: (body: AddressInput) => request<Address[]>('/me/addresses', { method: 'POST', body: JSON.stringify(body) }),
+  updateAddress: (id: number, body: AddressInput) =>
+    request<Address[]>(`/me/addresses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteAddress: (id: number) => request<Address[]>(`/me/addresses/${id}`, { method: 'DELETE' }),
 
   register: (body: { fullName: string; email: string; phone: string; password: string }) =>
     request<Session>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),

@@ -37,13 +37,17 @@ Order is the recommended build order. Each milestone ends with tests and a commi
 | Roles | Admin edits; Support views only |
 | Storefront | Product page gallery; low-stock and sold-out badges |
 
-### P2. Quality gate: automated tests + CI
+### P2. Quality gate: automated tests + CI ✅ Done (2026-10-23)
+Result: 25 end-to-end scenarios + 25 unit tests, all green ([TEST_PLAN.md](TEST_PLAN.md) → *Automated suite*). Found and fixed on the way: a forged webhook sent first could block the genuine one; missing routes showed as 403; nginx refused photos over 1 MB.
+
 - Integration tests with Testcontainers (Postgres, Kafka) and **WireMock as BillPay**, replaying the real sandbox payloads we captured: create payment, `PaymentCaptured`, failed try, duplicate and forged webhooks, accounts and roles, product rules
 - GitHub Actions: backend tests and frontend type-check/lint/build on every push
 - `docker compose up --build` images verified (backend + nginx frontend)
 
-### P2b. Monitoring: Prometheus + Grafana (required)
+### P2b. Monitoring: Prometheus + Grafana ✅ Done (2026-10-23)
 **Goal:** see payment health at a glance and get alerted before customers notice.
+
+Result: three provisioned dashboards and six alert rules, checked with real traffic from a browser run ([MONITORING.md](MONITORING.md)). Loki (optional) not done.
 
 | Area | Deliverables |
 |------|--------------|
@@ -56,7 +60,9 @@ Order is the recommended build order. Each milestone ends with tests and a commi
 | Logs (optional) | Loki + log shipping, so all logs for one order number can be searched in Grafana |
 | Dev script | `scripts/dev.sh` starts and checks Prometheus and Grafana too |
 
-### P3. Order fulfilment
+### P3. Order fulfilment ✅ Done (2026-10-23)
+Result: delivery fee 150 ETB, free from 3,000 ETB (`DELIVERY_FLAT_FEE`, `DELIVERY_FREE_OVER`); 7 end-to-end tests plus a browser walkthrough. A payment arriving after a cancel goes to REVIEW_REQUIRED for a refund.
+
 - Delivery address and phone at checkout (saved address book for customers)
 - Fulfilment status separate from payment: `PAID → PROCESSING → SHIPPED → DELIVERED` (plus `CANCELLED`)
 - Admin actions: mark processing/shipped (tracking note)/delivered; cancel unpaid orders

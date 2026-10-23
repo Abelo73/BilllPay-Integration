@@ -1,17 +1,20 @@
 package et.tenapay.shop;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import static org.assertj.core.api.Assertions.assertThat;
 
-@Import(TestcontainersConfiguration.class)
-@SpringBootTest
-@Testcontainers(disabledWithoutDocker = true)
-class TenashopApplicationTests {
+import org.junit.jupiter.api.Test;
+
+import et.tenapay.shop.it.IntegrationTest;
+
+class TenashopApplicationTests extends IntegrationTest {
 
 	@Test
-	void contextLoads() {
+	void startsAndReportsHealthy() {
+		Res health = get("/actuator/health");
+		assertThat(health.status()).isEqualTo(200);
+		assertThat(health.text("status")).isEqualTo("UP");
+		// Flyway seed data is there
+		assertThat(get("/api/categories").body().size()).isGreaterThan(0);
 	}
 
 }

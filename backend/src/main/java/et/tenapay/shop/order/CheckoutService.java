@@ -31,6 +31,7 @@ public class CheckoutService {
 	private final ProductRepository products;
 	private final OrderRepository orders;
 	private final OrderService orderService;
+	private final et.tenapay.shop.config.AppProperties app;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -38,9 +39,14 @@ public class CheckoutService {
 	public record CustomerInfo(String name, String phone, String email) {
 	}
 
-	/** Creates the order with server-side prices and reserves stock. Does not call BillPay. */
+	public record DeliveryInfo(String address, String city, String notes) {
+	}
+
+	/**
+	 * Creates the order with server-side prices and the delivery fee, and reserves stock. Does not call BillPay.
+	 */
 	@Transactional
-	public Order createOrder(List<Line> lines, CustomerInfo customer, UUID userId) {
+	public Order createOrder(List<Line> lines, CustomerInfo customer, DeliveryInfo delivery, UUID userId) {
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
@@ -85,11 +91,17 @@ public class CheckoutService {
 			order.addItem(item);
 			subtotal = subtotal.add(item.getLineTotal());
 		}
+		BigDecimal fee = app.delivery().feeFor(subtotal);
 		order.setSubtotal(subtotal);
-		order.setTotal(subtotal);
+		order.setDeliveryFee(fee);
+		order.setTotal(subtotal.add(fee));
+		order.setDeliveryAddress(delivery.address().trim());
+		order.setDeliveryCity(delivery.city().trim());
+		order.setDeliveryNotes(delivery.notes() == null || delivery.notes().isBlank() ? null : delivery.notes().trim());
 		order.setCreatedAt(Instant.now());
 		orders.save(order);
-		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s), total " + subtotal + " ETB");
+		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s), subtotal " + subtotal
+				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
 		return order;
 	}
 

@@ -6,6 +6,7 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 - **Frontend:** React 19 + Vite 8 + TypeScript + Tailwind 4 + shadcn/ui, managed with **pnpm**. Lives in [frontend/](frontend/).
 - **Messaging:** Apache Kafka 3.9 (KRaft) + Kafka UI
 - **Product photos:** SeaweedFS (S3-compatible), served through the backend at `/api/media/...`
+- **Monitoring:** Prometheus + Grafana with provisioned dashboards and alerts ([docs/MONITORING.md](docs/MONITORING.md))
 - **Runtime:** Docker Compose, using **non-default ports** throughout
 
 ## Documents
@@ -34,6 +35,8 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 | Kafka (from host) | `localhost:29492` |
 | Photo storage (SeaweedFS S3 API) | `localhost:9910` (bucket `tenashop-media`) |
 | Photo storage file browser | http://localhost:9911 |
+| Grafana (dashboards) | http://localhost:3300 (view without signing in; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
+| Prometheus (metrics, alerts) | http://localhost:9390/alerts |
 
 Override any port in `.env`.
 
@@ -100,9 +103,13 @@ Without a tunnel, payments still settle: a reconciliation job asks BillPay for t
 ## Tests
 
 ```bash
-cd backend && ./mvnw test   # unit tests; the full-context test runs only when Docker is available
-cd frontend && pnpm build   # type-check + production build
+cd backend && ./mvnw verify   # unit + end-to-end tests (needs Docker: Postgres and Kafka run in Testcontainers)
+cd frontend && pnpm lint && pnpm build   # lint, type-check, production build
 ```
+
+The end-to-end tests (`backend/src/test/java/et/tenapay/shop/it/`) start the whole app with real Postgres and Kafka and a fake BillPay (WireMock) that replays the payloads captured from the sandbox: checkout, `PaymentCaptured` webhooks (genuine, duplicate, forged, tampered), failed tries, missed webhooks, amount mismatch, BillPay outages, expiry, the refund limit, accounts and roles, and catalog rules. They never call the real BillPay.
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the backend tests, frontend lint and build, and both Docker image builds on every push.
 
 ## Security notes
 

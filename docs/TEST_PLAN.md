@@ -94,6 +94,31 @@ Record for each run: date, order number, BillPay payment ID, observed result, pa
 
 ---
 
+## Automated suite (Phase 2 P2, runs on every push)
+
+`cd backend && ./mvnw verify`: the whole app with real Postgres + Kafka (Testcontainers) and WireMock as BillPay, replaying sandbox payloads. Never calls the real BillPay.
+
+| Area | Scenarios | Plan TC |
+|------|-----------|---------|
+| Payments | Checkout sends key, idempotency key, server-side total, https return link → `PaymentCaptured` webhook → PAID, stock committed | 01 |
+| | Same webhook again → acknowledged as duplicate, applied once | 31 |
+| | Forged, unsigned and tampered webhooks → 401 and REJECTED; the genuine one afterwards is still applied | 32 |
+| | Failed try (`INSUFFICIENT_FUNDS`) keeps the order open with the reason; status check then finds it paid with no webhook; late webhook → DUPLICATE | 04, 34 |
+| | Webhook with the wrong amount → REVIEW_REQUIRED, stock untouched | 33 |
+| | BillPay down (503) → order kept, 502 to shopper; retry reuses the same Idempotency-Key | |
+| | Unpaid order expires → stock released, can't be paid | 10 |
+| | Guests need the checkout phone to see an order | |
+| | Cart over stock → 409, BillPay not called | |
+| Refunds | Over-refund → 400 locally, BillPay not called; BillPay 422 refund limit → refund REFUSED with the reason | 21, 23 |
+| Accounts | Guest / customer / support / admin access; weak password; 5 wrong passwords lock; log out everywhere; disabled staff lose access at once; unknown route → 404 | |
+| Catalog | Hide product / category; photos resized, served, reordered, max 5; fake and tiny images refused; stock can't go below held units; duplicate; change history; unique slugs | |
+| Delivery (P3) | Fee added below 3,000 ETB and charged through BillPay, free above; address required; paid order → processing → shipped (rider note) → delivered, no going back; unpaid orders can't be fulfilled; support can't change delivery; customer cancels unpaid order (stock returns, can't be paid); payment after cancel → REVIEW_REQUIRED; address book (default, no duplicates, staff refused) | |
+| Monitoring (P2b) | `/actuator/prometheus` refused through a proxy; payment, BillPay, webhook and order metrics move after a paid checkout | |
+
+Bugs these tests found (fixed): a forged webhook sent before the genuine one made the genuine one look like a duplicate; every missing route returned 403 instead of 404.
+
+---
+
 ## Results: 2026-10-23 (Phase 2 P1, catalog management)
 
 API run: **47 / 47 checks passed**. Browser run (create → 3 photos → main photo → restock → store gallery): passed, no page errors.

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, Loader2, RefreshCw, RotateCcw } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Loader2, MapPin, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -71,6 +71,116 @@ function RefundDialog({ order, attempt, onClose }: { order: OrderDetail; attempt
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+const STEP_LABEL: Record<string, string> = {
+  PROCESSING: 'Start preparing',
+  SHIPPED: 'Mark shipped',
+  DELIVERED: 'Mark delivered',
+  CANCELLED: 'Cancel delivery',
+}
+
+function DeliveryCard({ data }: { data: OrderDetail }) {
+  const qc = useQueryClient()
+  const d = data.delivery
+  const orderNumber = data.order.orderNumber
+  const [note, setNote] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['admin-order', orderNumber] })
+    qc.invalidateQueries({ queryKey: ['admin-orders'] })
+  }
+  // the note travels with the click, so a note typed just before clicking is never lost
+  const fulfil = useMutation({
+    mutationFn: ({ to, note }: { to: string; note: string }) => adminApi.fulfil(orderNumber, to, note.trim() || undefined),
+    onSuccess: (r, sent) => {
+      toast.success(`Delivery: ${r.fulfilmentStatus.toLowerCase()}`)
+      // clear only the note we just sent, not one typed for the next step meanwhile
+      setNote((current) => (current === sent.note ? '' : current))
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const cancel = useMutation({
+    mutationFn: (reason: string) => adminApi.cancelOrder(orderNumber, reason.trim() || undefined),
+    onSuccess: () => {
+      toast.success('Order cancelled, stock released')
+      setConfirmCancel(false)
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const unpaid = data.order.status === 'PENDING_PAYMENT' || data.order.status === 'PAYMENT_FAILED'
+  const steps = d.nextSteps.filter((s) => s !== 'CANCELLED')
+  const canCancelDelivery = d.nextSteps.includes('CANCELLED')
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+        <CardTitle className="flex items-center gap-2 text-base"><Truck className="size-4" /> Delivery</CardTitle>
+        {d.fulfilmentStatus && <StatusBadge status={d.fulfilmentStatus} />}
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="space-y-1">
+          <p className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" /><span>{d.address ?? '—'}{d.city ? `, ${d.city}` : ''}</span></p>
+          {d.notes && <p className="pl-6 text-muted-foreground">“{d.notes}”</p>}
+        </div>
+        <div className="space-y-1 rounded-lg bg-muted/50 p-3">
+          <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="tabular-nums">{formatETB(d.subtotal)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Delivery fee</span><span className="tabular-nums">{d.deliveryFee > 0 ? formatETB(d.deliveryFee) : 'free'}</span></div>
+        </div>
+        {d.trackingNote && <p className="text-muted-foreground">Tracking: {d.trackingNote}</p>}
+        {d.shippedAt && <p className="text-xs text-muted-foreground">Shipped {formatDate(d.shippedAt)}</p>}
+        {d.deliveredAt && <p className="text-xs text-muted-foreground">Delivered {formatDate(d.deliveredAt)}</p>}
+
+        {isAdmin() && steps.length > 0 && (
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="fulfil-note">{steps.includes('SHIPPED') ? 'Rider / tracking note' : 'Note'} <span className="font-normal text-muted-foreground">(optional)</span></Label>
+            <Input id="fulfil-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={300} placeholder={steps.includes('SHIPPED') ? 'Rider Dawit, 0911 000 111' : ''} />
+            <div className="flex flex-wrap gap-2">
+              {steps.map((s) => (
+                <Button key={s} size="sm" variant={s === steps[0] ? 'default' : 'outline'} disabled={fulfil.isPending} onClick={() => fulfil.mutate({ to: s, note })}>
+                  {fulfil.isPending && fulfil.variables?.to === s && <Loader2 className="animate-spin" />} {STEP_LABEL[s] ?? s}
+                </Button>
+              ))}
+              {canCancelDelivery && (
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={fulfil.isPending} onClick={() => fulfil.mutate({ to: 'CANCELLED', note })}>
+                  {STEP_LABEL.CANCELLED}
+                </Button>
+              )}
+            </div>
+            {canCancelDelivery && <p className="text-xs text-muted-foreground">Cancelling a paid order doesn’t refund it; issue the refund from the Payments tab.</p>}
+          </div>
+        )}
+        {!d.fulfilmentStatus && !unpaid && data.order.status !== 'CANCELLED' && (
+          <p className="text-xs text-muted-foreground">Delivery starts once the order is paid.</p>
+        )}
+
+        {isAdmin() && unpaid && (
+          <div className="space-y-2 border-t pt-4">
+            {confirmCancel ? (
+              <>
+                <Label htmlFor="cancel-reason">Why cancel? <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                <Input id="cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} maxLength={300} placeholder="Customer asked by phone" />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="destructive" disabled={cancel.isPending} onClick={() => cancel.mutate(cancelReason)}>
+                    {cancel.isPending && <Loader2 className="animate-spin" />} Cancel order
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>Keep</Button>
+                </div>
+              </>
+            ) : (
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setConfirmCancel(true)}>
+                <XCircle /> Cancel unpaid order
+              </Button>
+            )}
+            <p className="text-xs text-muted-foreground">Releases the reserved stock. If the customer still pays on BillPay, the order goes to review for a refund.</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -237,6 +347,7 @@ export function AdminOrderDetailPage() {
         </Tabs>
 
         <div className="space-y-6">
+          <DeliveryCard data={data} />
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Items</CardTitle>

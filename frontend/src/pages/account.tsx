@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, KeyRound, Loader2, LogOut, Package, ShieldAlert, UserRound } from 'lucide-react'
+import { ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Trash2, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { api } from '@/lib/api'
+import { api, type Address, type AddressInput } from '@/lib/api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
@@ -69,6 +69,123 @@ function MyOrders() {
       )}
     </div>
   )
+}
+
+const EMPTY_ADDRESS: AddressInput = { label: '', recipientName: '', phone: '', addressLine: '', city: 'Addis Ababa', notes: '' }
+
+function Addresses() {
+  const qc = useQueryClient()
+  const user = useSession((s) => s.session!.user)
+  const { data, isLoading } = useQuery({ queryKey: ['addresses'], queryFn: api.addresses })
+  const [editing, setEditing] = useState<{ id: number | null; form: AddressInput } | null>(null)
+  const done = (list: Address[], msg: string) => {
+    qc.setQueryData(['addresses'], list)
+    setEditing(null)
+    toast.success(msg)
+  }
+  const save = useMutation({
+    mutationFn: ({ id, form }: { id: number | null; form: AddressInput }) => (id ? api.updateAddress(id, form) : api.addAddress(form)),
+    onSuccess: (list, v) => done(list, v.id ? 'Address updated' : 'Address saved'),
+    onError: (e) => toast.error(e.message),
+  })
+  const remove = useMutation({
+    mutationFn: api.deleteAddress,
+    onSuccess: (list) => done(list, 'Address removed'),
+    onError: (e) => toast.error(e.message),
+  })
+  const makeDefault = useMutation({
+    mutationFn: (a: Address) => api.updateAddress(a.id, { ...toInput(a), makeDefault: true }),
+    onSuccess: (list) => done(list, 'Default address changed'),
+    onError: (e) => toast.error(e.message),
+  })
+
+  if (isLoading) return <p className="py-10 text-center text-sm text-muted-foreground">Loading addresses…</p>
+  const list = data ?? []
+  const f = editing?.form
+  const set = (k: keyof AddressInput, v: string) => editing && setEditing({ ...editing, form: { ...editing.form, [k]: v } })
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {list.map((a) => (
+          <Card key={a.id} className={cn(a.isDefault && 'border-brand/50')}>
+            <CardContent className="space-y-3 pt-6">
+              <div className="flex items-center justify-between gap-2">
+                <p className="flex items-center gap-2 font-medium"><MapPin className="size-4" /> {a.label}</p>
+                {a.isDefault && <Badge variant="outline" className="border-brand/40 text-brand">Default</Badge>}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p className="text-foreground">{a.recipientName} · {a.phone}</p>
+                <p>{a.addressLine}, {a.city}</p>
+                {a.notes && <p>Note: {a.notes}</p>}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setEditing({ id: a.id, form: toInput(a) })}>Edit</Button>
+                {!a.isDefault && <Button size="sm" variant="outline" disabled={makeDefault.isPending} onClick={() => makeDefault.mutate(a)}>Make default</Button>}
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={remove.isPending} onClick={() => remove.mutate(a.id)}>
+                  <Trash2 /> Remove
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+        {!editing && list.length < 10 && (
+          <button
+            type="button"
+            onClick={() => setEditing({ id: null, form: { ...EMPTY_ADDRESS, recipientName: user.fullName, phone: user.phone ?? '', label: list.length ? '' : 'Home' } })}
+            className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-sm text-muted-foreground transition hover:border-brand/60 hover:text-foreground"
+          >
+            <Plus className="size-5" /> Add an address
+          </button>
+        )}
+      </div>
+      {list.length === 0 && !editing && <p className="text-sm text-muted-foreground">Addresses you save here, or at checkout, are offered next time you order.</p>}
+
+      {editing && f && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{editing.id ? 'Edit address' : 'New address'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); save.mutate(editing) }}>
+              <div className="space-y-2">
+                <Label htmlFor="a-label">Label</Label>
+                <Input id="a-label" className="h-10" placeholder="Home, Office…" value={f.label} onChange={(e) => set('label', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="a-name">Recipient</Label>
+                <Input id="a-name" className="h-10" required value={f.recipientName} onChange={(e) => set('recipientName', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="a-phone">Phone</Label>
+                <Input id="a-phone" className="h-10" type="tel" required placeholder="0911 234 567" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="a-city">City</Label>
+                <Input id="a-city" className="h-10" required value={f.city} onChange={(e) => set('city', e.target.value)} />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="a-line">Street, area and house / building</Label>
+                <Input id="a-line" className="h-10" required value={f.addressLine} onChange={(e) => set('addressLine', e.target.value)} />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="a-notes">Notes for the rider</Label>
+                <Input id="a-notes" className="h-10" value={f.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+              </div>
+              <div className="flex gap-2 sm:col-span-2">
+                <Button type="submit" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} Save address</Button>
+                <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function toInput(a: Address): AddressInput {
+  return { label: a.label, recipientName: a.recipientName, phone: a.phone, addressLine: a.addressLine, city: a.city, notes: a.notes ?? '' }
 }
 
 function Profile() {
@@ -201,10 +318,12 @@ export function AccountPage() {
       <Tabs value={params.get('tab') ?? 'orders'} onValueChange={(tab) => setParams(tab === 'orders' ? {} : { tab }, { replace: true })}>
         <TabsList>
           <TabsTrigger value="orders">My orders</TabsTrigger>
+          <TabsTrigger value="addresses">Addresses</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
         <TabsContent value="orders" className="pt-4"><MyOrders /></TabsContent>
+        <TabsContent value="addresses" className="pt-4"><Addresses /></TabsContent>
         <TabsContent value="profile" className="pt-4"><Profile /></TabsContent>
         <TabsContent value="security" className="pt-4"><Security /></TabsContent>
       </Tabs>

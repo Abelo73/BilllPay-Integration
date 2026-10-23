@@ -91,12 +91,28 @@ export type OrderRow = {
   id: string
   orderNumber: string
   status: string
+  fulfilmentStatus: string | null
   total: number
   currency: string
   customerName: string
   customerPhone: string
+  deliveryCity: string | null
   createdAt: string
   paidAt: string | null
+}
+
+export type DeliveryDetail = {
+  address: string | null
+  city: string | null
+  notes: string | null
+  subtotal: number
+  deliveryFee: number
+  fulfilmentStatus: string | null
+  nextSteps: string[]
+  trackingNote: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
+  cancelledAt: string | null
 }
 
 export type Attempt = {
@@ -167,6 +183,7 @@ export type TimelineEvent = {
 export type OrderDetail = {
   order: OrderRow
   customerEmail: string
+  delivery: DeliveryDetail
   items: { productId: number; productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
   timeline: TimelineEvent[]
   attempts: Attempt[]
@@ -179,8 +196,18 @@ export const adminApi = {
     request<StaffSession>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   config: () => request<AdminConfig>('/config'),
   dashboard: () => request<Dashboard>('/dashboard'),
-  orders: (p: { status?: string; q?: string; page?: number }) => request<Page<OrderRow>>(`/orders?${qs(p)}`),
+  orders: (p: { status?: string; fulfilment?: string; q?: string; page?: number }) => request<Page<OrderRow>>(`/orders?${qs(p)}`),
   order: (orderNumber: string) => request<OrderDetail>(`/orders/${encodeURIComponent(orderNumber)}`),
+  fulfil: (orderNumber: string, status: string, note?: string) =>
+    request<{ orderNumber: string; fulfilmentStatus: string }>(`/orders/${encodeURIComponent(orderNumber)}/fulfilment`, {
+      method: 'POST',
+      body: JSON.stringify({ status, note }),
+    }),
+  cancelOrder: (orderNumber: string, reason?: string) =>
+    request<{ orderNumber: string; status: string }>(`/orders/${encodeURIComponent(orderNumber)}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
   payments: (p: { status?: string; page?: number }) => request<Page<Attempt>>(`/payments?${qs(p)}`),
   reconcile: (attemptId: string) =>
     request<{ outcome: string; status: string }>(`/payments/${attemptId}/reconcile`, { method: 'POST' }),

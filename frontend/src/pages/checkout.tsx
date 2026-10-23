@@ -1,6 +1,6 @@
-import { useMutation } from '@tanstack/react-query'
-import { Loader2, Lock, ShoppingBag } from 'lucide-react'
-import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Loader2, Lock, MapPin, ShoppingBag, Truck } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -11,8 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { api, ApiError } from '@/lib/api'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
+import { api, ApiError, deliveryFee, type Address } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
 import { useSession } from '@/store/session'
 
@@ -23,18 +26,58 @@ const schema = z.object({
     .trim()
     .regex(/^\+?[0-9 ()-]{9,20}$/, 'Enter a valid phone number, e.g. 0911 234 567'),
   email: z.email('Enter a valid email address'),
+  address: z.string().trim().min(5, 'Enter the street, area and house or building').max(300),
+  city: z.string().trim().min(2, 'Enter the city').max(100),
+  notes: z.string().trim().max(300, 'Keep notes under 300 characters'),
 })
 
 type Form = z.infer<typeof schema>
 type Errors = Partial<Record<keyof Form, string>>
+
+/** Backend validation errors come back as customer.name / delivery.address; map them onto the form fields. */
+function fieldErrors(raw: Record<string, string>): Errors {
+  const out: Errors = {}
+  for (const [k, v] of Object.entries(raw)) {
+    const key = k.split('.').pop() as keyof Form
+    out[key] ??= v
+  }
+  return out
+}
 
 export function CheckoutPage() {
   const { lines, clear } = useCart()
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()
   const user = useSession((s) => s.session?.user)
-  const [form, setForm] = useState<Form>({ name: user?.fullName ?? '', phone: user?.phone ?? '', email: user?.email ?? '' })
+  const isCustomer = user?.role === 'CUSTOMER'
+  const [form, setForm] = useState<Form>({
+    name: user?.fullName ?? '',
+    phone: user?.phone ?? '',
+    email: user?.email ?? '',
+    address: '',
+    city: 'Addis Ababa',
+    notes: '',
+  })
   const [errors, setErrors] = useState<Errors>({})
+  const [saveAddress, setSaveAddress] = useState(true)
+  const [chosen, setChosen] = useState<number | null>(null)
+
+  const quote = useQuery({ queryKey: ['delivery'], queryFn: api.delivery, staleTime: 5 * 60_000 })
+  const saved = useQuery({ queryKey: ['addresses'], queryFn: api.addresses, enabled: isCustomer })
+  const fee = deliveryFee(quote.data, subtotal)
+  const toFree = quote.data && quote.data.freeOver > 0 && fee > 0 ? quote.data.freeOver - subtotal : 0
+
+  const pickAddress = (a: Address) => {
+    setChosen(a.id)
+    setForm((f) => ({ ...f, name: a.recipientName, phone: a.phone, address: a.addressLine, city: a.city, notes: a.notes ?? '' }))
+  }
+
+  // Prefill with the default saved address once it loads
+  useEffect(() => {
+    const def = saved.data?.find((a) => a.isDefault)
+    if (def && chosen === null && !form.address) pickAddress(def)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saved.data])
 
   const checkout = useMutation({
     mutationFn: api.checkout,
@@ -53,7 +96,7 @@ export function CheckoutPage() {
         return
       }
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED') {
-        setErrors((err.body.errors as Record<string, string>) ?? {})
+        setErrors(fieldErrors((err.body.errors as Record<string, string>) ?? {}))
       }
       toast.error(err.message)
     },
@@ -80,13 +123,22 @@ export function CheckoutPage() {
       const next: Errors = {}
       for (const issue of parsed.error.issues) next[issue.path[0] as keyof Form] ??= issue.message
       setErrors(next)
+      document.getElementById(String(parsed.error.issues[0].path[0]))?.focus()
       return
     }
     setErrors({})
+    const d = parsed.data
     checkout.mutate({
       items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
-      customer: parsed.data,
+      customer: { name: d.name, phone: d.phone, email: d.email },
+      delivery: { address: d.address, city: d.city, notes: d.notes || undefined },
+      saveAddress: isCustomer && chosen === null && saveAddress,
     })
+  }
+
+  const set = (key: keyof Form, value: string) => {
+    setForm({ ...form, [key]: value })
+    if (key === 'address' || key === 'city') setChosen(null)
   }
 
   const field = (key: keyof Form, label: string, props: React.ComponentProps<'input'>) => (
@@ -95,7 +147,7 @@ export function CheckoutPage() {
       <Input
         id={key}
         value={form[key]}
-        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        onChange={(e) => set(key, e.target.value)}
         aria-invalid={!!errors[key]}
         className="h-10"
         {...props}
@@ -105,32 +157,78 @@ export function CheckoutPage() {
   )
 
   const busy = checkout.isPending || checkout.isSuccess
+  const total = subtotal + fee
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Contact details</CardTitle>
-            <CardDescription>
-              BillPay uses these to send your payment request and receipt.
-              {!user && (
-                <>
-                  {' '}
-                  <Link to="/login?next=/checkout" className="font-medium text-brand hover:underline">Sign in</Link> to save this order to your account.
-                </>
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form id="checkout-form" onSubmit={submit} className="space-y-5" noValidate>
+        <form id="checkout-form" onSubmit={submit} className="space-y-6" noValidate>
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact details</CardTitle>
+              <CardDescription>
+                BillPay uses these to send your payment request and receipt.
+                {!user && (
+                  <>
+                    {' '}
+                    <Link to="/login?next=/checkout" className="font-medium text-brand hover:underline">Sign in</Link> to save this order and your address.
+                  </>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
               {field('name', 'Full name', { autoComplete: 'name', placeholder: 'Abebe Kebede' })}
-              {field('phone', 'Phone number', { autoComplete: 'tel', inputMode: 'tel', placeholder: '0911 234 567' })}
-              {field('email', 'Email', { autoComplete: 'email', type: 'email', placeholder: 'abebe@example.et' })}
-            </form>
-          </CardContent>
-        </Card>
+              <div className="grid gap-5 sm:grid-cols-2">
+                {field('phone', 'Phone number', { autoComplete: 'tel', inputMode: 'tel', placeholder: '0911 234 567' })}
+                {field('email', 'Email', { autoComplete: 'email', type: 'email', placeholder: 'abebe@example.et' })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Truck className="size-5" /> Delivery</CardTitle>
+              <CardDescription>We deliver within Addis Ababa in 2–3 days. The rider calls the phone above.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {saved.data && saved.data.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Saved addresses</Label>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {saved.data.map((a) => (
+                      <button
+                        type="button"
+                        key={a.id}
+                        onClick={() => pickAddress(a)}
+                        className={cn(
+                          'rounded-xl border p-3 text-left text-sm transition hover:border-brand/60',
+                          chosen === a.id && 'border-brand bg-brand/5 ring-1 ring-brand',
+                        )}
+                      >
+                        <span className="flex items-center gap-1.5 font-medium"><MapPin className="size-3.5" /> {a.label}{a.isDefault && <span className="text-xs font-normal text-muted-foreground">· default</span>}</span>
+                        <span className="mt-1 block text-muted-foreground">{a.addressLine}, {a.city}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {field('address', 'Street, area and house / building', { autoComplete: 'street-address', placeholder: 'Bole, near Atlas, house 12' })}
+              {field('city', 'City', { autoComplete: 'address-level2', placeholder: 'Addis Ababa' })}
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes for the rider <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                <Textarea id="notes" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Gate colour, landmark, best time to call…" aria-invalid={!!errors.notes} />
+                {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
+              </div>
+              {isCustomer && chosen === null && (
+                <label className="flex items-center justify-between gap-4 rounded-xl border p-3 text-sm">
+                  <span>Save this address to my account</span>
+                  <Switch checked={saveAddress} onCheckedChange={setSaveAddress} aria-label="Save this address" />
+                </label>
+              )}
+            </CardContent>
+          </Card>
+        </form>
 
         <Card className="h-fit lg:sticky lg:top-24">
           <CardHeader>
@@ -149,15 +247,24 @@ export function CheckoutPage() {
             ))}
             <Separator />
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Delivery</span>
-              <span>Free</span>
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="tabular-nums">{formatETB(subtotal)}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Delivery</span>
+              <span className="tabular-nums">{quote.isLoading ? '…' : fee === 0 ? 'Free' : formatETB(fee)}</span>
+            </div>
+            {toFree > 0 && (
+              <p className="rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
+                Add {formatETB(toFree)} more for free delivery.
+              </p>
+            )}
             <div className="flex justify-between text-lg font-semibold">
               <span>Total</span>
-              <span>{formatETB(subtotal)}</span>
+              <span className="tabular-nums">{formatETB(total)}</span>
             </div>
-            <Button type="submit" form="checkout-form" size="lg" className="h-11 w-full text-base" disabled={busy}>
-              {busy ? <><Loader2 className="animate-spin" /> Redirecting to BillPay…</> : <><Lock /> Pay with BillPay</>}
+            <Button type="submit" form="checkout-form" size="lg" className="h-11 w-full text-base" disabled={busy || quote.isLoading}>
+              {busy ? <><Loader2 className="animate-spin" /> Redirecting to BillPay…</> : <><Lock /> Pay {formatETB(total)} with BillPay</>}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
               You’ll finish paying on BillPay’s secure page with Wallet, Bank or Card.

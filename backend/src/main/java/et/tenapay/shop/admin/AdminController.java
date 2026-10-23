@@ -68,12 +68,28 @@ public class AdminController {
 	private final BillPayProperties billPay;
 	private final AppProperties app;
 
-	public record OrderRow(UUID id, String orderNumber, String status, BigDecimal total, String currency,
-			String customerName, String customerPhone, Instant createdAt, Instant paidAt) {
+	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
+			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
+			Instant paidAt) {
 
 		static OrderRow from(Order o) {
-			return new OrderRow(o.getId(), o.getOrderNumber(), o.getStatus().name(), o.getTotal(), o.getCurrency(),
-					o.getCustomerName(), o.getCustomerPhone(), o.getCreatedAt(), o.getPaidAt());
+			return new OrderRow(o.getId(), o.getOrderNumber(), o.getStatus().name(),
+					o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(), o.getTotal(),
+					o.getCurrency(), o.getCustomerName(), o.getCustomerPhone(), o.getDeliveryCity(), o.getCreatedAt(),
+					o.getPaidAt());
+		}
+	}
+
+	public record DeliveryDetail(String address, String city, String notes, BigDecimal subtotal, BigDecimal deliveryFee,
+			String fulfilmentStatus, List<String> nextSteps, String trackingNote, Instant shippedAt,
+			Instant deliveredAt, Instant cancelledAt) {
+
+		static DeliveryDetail from(Order o) {
+			return new DeliveryDetail(o.getDeliveryAddress(), o.getDeliveryCity(), o.getDeliveryNotes(), o.getSubtotal(),
+					o.getDeliveryFee(), o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(),
+					o.getFulfilmentStatus() == null ? List.of()
+							: o.getFulfilmentStatus().next().stream().map(Enum::name).sorted().toList(),
+					o.getTrackingNote(), o.getShippedAt(), o.getDeliveredAt(), o.getCancelledAt());
 		}
 	}
 
@@ -122,8 +138,8 @@ public class AdminController {
 		}
 	}
 
-	public record OrderDetail(OrderRow order, String customerEmail, List<ItemRow> items, List<OrderEvent> timeline,
-			List<AttemptView> attempts, List<RefundView> refunds, List<WebhookView> webhooks) {
+	public record OrderDetail(OrderRow order, String customerEmail, DeliveryDetail delivery, List<ItemRow> items,
+			List<OrderEvent> timeline, List<AttemptView> attempts, List<RefundView> refunds, List<WebhookView> webhooks) {
 	}
 
 	public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -180,10 +196,11 @@ public class AdminController {
 	@GetMapping("/orders")
 	@Transactional(readOnly = true)
 	public PageDto<OrderRow> orders(@RequestParam(required = false) OrderStatus status,
+			@RequestParam(required = false) et.tenapay.shop.order.FulfilmentStatus fulfilment,
 			@RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size) {
 		String query = q == null || q.isBlank() ? null : q.trim();
-		return PageDto.of(orders.adminSearch(status, query,
+		return PageDto.of(orders.adminSearch(status, fulfilment, query,
 				PageRequest.of(page, Math.min(size, 100), Sort.by("createdAt").descending())).map(OrderRow::from));
 	}
 
@@ -198,7 +215,8 @@ public class AdminController {
 				.sorted((a, b) -> a.getReceivedAt().compareTo(b.getReceivedAt()))
 				.map(WebhookView::from)
 				.toList();
-		return new OrderDetail(OrderRow.from(o), o.getCustomerEmail(), o.getItems().stream().map(ItemRow::from).toList(),
+		return new OrderDetail(OrderRow.from(o), o.getCustomerEmail(), DeliveryDetail.from(o),
+				o.getItems().stream().map(ItemRow::from).toList(),
 				orderEvents.findByOrderIdOrderByCreatedAtAscIdAsc(o.getId()),
 				list.stream().map(a -> AttemptView.from(a, o.getOrderNumber(), refunds.refundable(a))).toList(),
 				refundRepo.findByOrderIdOrderByCreatedAtAsc(o.getId()).stream()

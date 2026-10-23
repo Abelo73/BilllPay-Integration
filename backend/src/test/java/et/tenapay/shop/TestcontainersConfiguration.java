@@ -7,8 +7,9 @@ import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+/** Real Postgres and Kafka in throwaway containers, wired into Spring through @ServiceConnection. */
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection

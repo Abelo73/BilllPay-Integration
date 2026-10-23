@@ -41,6 +41,7 @@ public class RefundService {
 	private final OrderService orderService;
 	private final BillPayClient billPay;
 	private final TransactionTemplate tx;
+	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 
 	/** Body for POST /api/v1/checkout/payments/{id}/refunds; the payment id goes in the path. */
 	record RefundRequest(String merchantReference, BigDecimal amount, String currency, String reason) {
@@ -138,6 +139,7 @@ public class RefundService {
 		refund.setResponsePayload(e.getResponseBody());
 		boolean definite = e.getHttpStatus() >= 400 && e.getHttpStatus() < 500;
 		Order order = orders.findById(refund.getOrderId()).orElseThrow();
+		metrics.refundStatus(definite ? RefundStatus.REFUSED.name() : RefundStatus.ERROR.name());
 		if (definite) {
 			refund.setStatus(RefundStatus.REFUSED);
 			refund.setReasonCode(reasonCodeFrom(e.getResponseBody(), "REJECTED_HTTP_" + e.getHttpStatus()));
@@ -179,6 +181,7 @@ public class RefundService {
 			}
 			refund.setStatus(next);
 			refund.setError(null);
+			metrics.refundStatus(next.name());
 			if (reported.reasonCode() != null) {
 				refund.setReasonCode(reported.reasonCode());
 			}

@@ -33,11 +33,13 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 	@Query("""
 			select o from Order o
 			where (:status is null or o.status = :status)
+			  and (:fulfilment is null or o.fulfilmentStatus = :fulfilment)
 			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
 			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%'))
 			       or o.customerPhone like concat('%', cast(:q as string), '%'))
 			""")
-	Page<Order> adminSearch(@Param("status") OrderStatus status, @Param("q") String q, Pageable pageable);
+	Page<Order> adminSearch(@Param("status") OrderStatus status, @Param("fulfilment") FulfilmentStatus fulfilment,
+			@Param("q") String q, Pageable pageable);
 
 	Page<Order> findByUserId(UUID userId, Pageable pageable);
 

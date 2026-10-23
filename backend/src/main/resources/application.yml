@@ -39,10 +39,17 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # /actuator/prometheus is limited to this machine and the Docker network (SecurityConfig)
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
+  metrics:
+    tags:
+      application: tenashop
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 springdoc:
   swagger-ui:
@@ -83,6 +90,10 @@ app:
   admin-email: ${ADMIN_EMAIL:admin@tenashop.local}
   admin-password: ${ADMIN_PASSWORD:change-me}
   jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+  # Delivery inside Addis Ababa: flat fee, free from a cart subtotal (ETB)
+  delivery:
+    flat-fee: ${DELIVERY_FLAT_FEE:150}
+    free-over: ${DELIVERY_FREE_OVER:3000}
 
 logging:
   level:

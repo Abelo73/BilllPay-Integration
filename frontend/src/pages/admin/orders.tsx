@@ -12,10 +12,12 @@ import { formatDate, formatETB } from '@/lib/format'
 import { EmptyRow, PageHeader, Pager, StatusBadge } from './shared'
 
 const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_FAILED', 'PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'EXPIRED', 'CANCELLED', 'REVIEW_REQUIRED']
+const DELIVERY = ['UNFULFILLED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
 
 export function AdminOrdersPage() {
   const [params, setParams] = useSearchParams()
   const status = params.get('status') ?? ''
+  const fulfilment = params.get('fulfilment') ?? ''
   const q = params.get('q') ?? ''
   const page = Number(params.get('page') ?? 0)
   const [search, setSearch] = useState(q)
@@ -35,15 +37,15 @@ export function AdminOrdersPage() {
   }, [search])
 
   const { data } = useQuery({
-    queryKey: ['admin-orders', status, q, page],
-    queryFn: () => adminApi.orders({ status, q, page }),
+    queryKey: ['admin-orders', status, fulfilment, q, page],
+    queryFn: () => adminApi.orders({ status, fulfilment, q, page }),
     placeholderData: keepPreviousData,
     refetchInterval: 10_000,
   })
 
   return (
     <>
-      <PageHeader title="Orders" description="Every order and where its payment stands." />
+      <PageHeader title="Orders" description="Every order, where its payment stands and how far delivery got." />
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -62,6 +64,19 @@ export function AdminOrdersPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={fulfilment || 'ALL'} onValueChange={(v) => set('fulfilment', v === 'ALL' ? null : v)}>
+          <SelectTrigger className="w-full sm:w-44" aria-label="Delivery">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Any delivery</SelectItem>
+            {DELIVERY.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s.toLowerCase()}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <Card>
         <CardContent className="p-0">
@@ -70,13 +85,14 @@ export function AdminOrdersPage() {
               <TableRow>
                 <TableHead className="pl-4">Order</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Payment</TableHead>
+                <TableHead>Delivery</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="pr-4 text-right">Created</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.content.length === 0 && <EmptyRow colSpan={5} text="No orders match." />}
+              {data?.content.length === 0 && <EmptyRow colSpan={6} text="No orders match." />}
               {data?.content.map((o) => (
                 <TableRow key={o.id}>
                   <TableCell className="pl-4">
@@ -90,6 +106,10 @@ export function AdminOrdersPage() {
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={o.status} />
+                  </TableCell>
+                  <TableCell>
+                    {o.fulfilmentStatus ? <StatusBadge status={o.fulfilmentStatus} /> : <span className="text-xs text-muted-foreground">—</span>}
+                    {o.deliveryCity && <div className="mt-1 text-xs text-muted-foreground">{o.deliveryCity}</div>}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatETB(o.total)}</TableCell>
                   <TableCell className="pr-4 text-right text-xs text-muted-foreground">{formatDate(o.createdAt)}</TableCell>
