@@ -1,0 +1,73 @@
+spring:
+  application:
+    name: tenashop
+  # Lets a local run pick up the repo-root .env (ignored when the file is absent, e.g. in Docker)
+  config:
+    import:
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:${POSTGRES_HOST_PORT:5544}/${POSTGRES_DB:tenashop}}
+    username: ${POSTGRES_USER:tenashop}
+    password: ${POSTGRES_PASSWORD:change-me}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:${KAFKA_HOST_PORT:29492}}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      properties:
+        max.block.ms: 5000
+    consumer:
+      group-id: tenashop
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+server:
+  port: ${BACKEND_PORT:8181}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+billpay:
+  base-url: ${BILLPAY_BASE_URL:https://sandbox.api.billpay.et}
+  api-key: ${BILLPAY_API_KEY:}
+  create-payment-path: /api/v1/checkout/payments
+  # Unconfirmed with BillPay (open question Q5)
+  payment-status-path: /api/v1/checkout/payments/{id}
+  # Unconfirmed with BillPay (open question Q6)
+  refund-path: /api/v1/refunds
+  timeout: ${BILLPAY_TIMEOUT_MS:10000}ms
+  webhook:
+    # NONE until BillPay confirms its signature scheme (open question Q3)
+    verification: ${BILLPAY_WEBHOOK_VERIFICATION:NONE}
+    secret: ${BILLPAY_WEBHOOK_SECRET:}
+    signature-header: ${BILLPAY_WEBHOOK_SIGNATURE_HEADER:X-BillPay-Signature}
+
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5280}
+  cors-origins: ${APP_CORS_ORIGINS:http://localhost:5280}
+  reconcile-after: ${RECONCILE_AFTER:PT3M}
+  payment-expiry: ${PAYMENT_EXPIRY:PT30M}
+  admin-username: ${ADMIN_USERNAME:admin}
+  admin-password: ${ADMIN_PASSWORD:change-me}
+  jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+
+logging:
+  level:
+    et.tenapay.shop: DEBUG

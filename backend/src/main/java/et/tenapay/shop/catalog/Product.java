@@ -1,0 +1,87 @@
+package et.tenapay.shop.catalog;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+
+import org.hibernate.annotations.UpdateTimestamp;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "products")
+@Getter
+@Setter
+@NoArgsConstructor
+public class Product {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	@ManyToOne(fetch = FetchType.LAZY, optional = false)
+	@JoinColumn(name = "category_id")
+	private Category category;
+
+	private String name;
+
+	private String slug;
+
+	private String description;
+
+	private BigDecimal price;
+
+	private String currency;
+
+	private int stock;
+
+	/** Units held by unpaid orders; available = stock - reserved. */
+	private int reserved;
+
+	private String imageUrl;
+
+	private boolean featured;
+
+	private boolean active;
+
+	@Column(updatable = false, insertable = false)
+	private Instant createdAt;
+
+	@UpdateTimestamp
+	private Instant updatedAt;
+
+	@Version
+	private Integer version;
+
+	public int available() {
+		return stock - reserved;
+	}
+
+	public void reserve(int qty) {
+		if (available() < qty) {
+			throw new IllegalStateException("Insufficient stock for " + slug);
+		}
+		reserved += qty;
+	}
+
+	public void releaseReservation(int qty) {
+		reserved = Math.max(0, reserved - qty);
+	}
+
+	/** Turns a reservation into a sale once the order is paid. */
+	public void commitReservation(int qty) {
+		releaseReservation(qty);
+		stock = Math.max(0, stock - qty);
+	}
+}
