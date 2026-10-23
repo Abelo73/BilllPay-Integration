@@ -19,18 +19,18 @@ Test results: [TEST_PLAN.md](TEST_PLAN.md) → *Results: 2026-10-23*.
 
 ---
 
-## Phase 2: grow the store (planned)
+## Phase 2: grow the store (in progress)
 
 Order is the recommended build order. Each milestone ends with tests and a commit.
 
-### P1. Catalog management: products, categories, images ⭐ next
+### P1. Catalog management: products, categories, images ✅ Done (2026-10-23)
 **Goal:** run the store from the admin, with no SQL or file copying.
 
 | Area | Deliverables |
 |------|--------------|
 | Products | Admin list (photo, name, category, price, stock, status, search/filter); create/edit form (name, slug, description, category, price ETB, stock, featured, active); duplicate; hide/show instead of delete (old orders keep their own copy) |
-| Images | Upload JPG/PNG/WebP ≤ 5 MB, content-checked, resized to 1200 px + 400 px thumbnail, stored as WebP; **up to 5 photos per product** with drag-to-reorder and a main photo; served at `/media/...` |
-| Storage | `MediaStorage` interface: **local disk** (Docker volume `uploads/`) now, S3-compatible later through one setting |
+| Images | Upload JPG/PNG/WebP ≤ 5 MB, content-checked, resized to 1200 px + 400 px square thumbnail, stored as JPEG; **up to 5 photos per product** with drag-to-reorder and a main photo; served by the backend at `/api/media/...` (bucket stays private) |
+| Storage | `MediaStorage` interface over S3; **SeaweedFS** in Docker (S3 API 9910, file browser 9911). AWS S3 / R2 / MinIO is a config change |
 | Stock | Adjust ±, low-stock threshold and badge, can't go below reserved units; stock history (who, why, when) |
 | Categories | Create, rename, reorder, hide; product counts |
 | Audit | `catalog_changes` log: "price 650 → 700 by admin@…" |
@@ -41,6 +41,20 @@ Order is the recommended build order. Each milestone ends with tests and a commi
 - Integration tests with Testcontainers (Postgres, Kafka) and **WireMock as BillPay**, replaying the real sandbox payloads we captured: create payment, `PaymentCaptured`, failed try, duplicate and forged webhooks, accounts and roles, product rules
 - GitHub Actions: backend tests and frontend type-check/lint/build on every push
 - `docker compose up --build` images verified (backend + nginx frontend)
+
+### P2b. Monitoring: Prometheus + Grafana (required)
+**Goal:** see payment health at a glance and get alerted before customers notice.
+
+| Area | Deliverables |
+|------|--------------|
+| Metrics | `micrometer-registry-prometheus`; expose `/actuator/prometheus` (internal only, not public) |
+| Custom metrics | Payments created / paid / failed by method and reason; BillPay API latency and errors; webhooks received / rejected (bad signature) / duplicates; webhook processing delay; orders expired; refunds |
+| Prometheus | In Docker Compose on port **9390** (default 9090), scrapes the backend every 15 s |
+| Grafana | In Docker Compose on port **3300** (default 3000); datasource and dashboards provisioned from files in the repo |
+| Dashboards | **Payments** (success rate, failures by reason, BillPay latency); **Webhooks & Kafka** (throughput, rejections, consumer lag on `orders.events` / webhook topic); **App** (HTTP errors, JVM, DB pool) |
+| Alerts | No successful payment in 30 min; BillPay error rate > 10 %; webhook signature failures; Kafka consumer lag growing; backend down |
+| Logs (optional) | Loki + log shipping, so all logs for one order number can be searched in Grafana |
+| Dev script | `scripts/dev.sh` starts and checks Prometheus and Grafana too |
 
 ### P3. Order fulfilment
 - Delivery address and phone at checkout (saved address book for customers)
@@ -74,6 +88,6 @@ Order is the recommended build order. Each milestone ends with tests and a commi
 ---
 
 ## Decisions for P1 (2026-10-23)
-1. **Image storage: MinIO in Docker** (S3-compatible). Code talks plain S3, so AWS S3 / Cloudflare R2 / SeaweedFS later is a config change. MinIO stopped publishing new community images in late 2025, so the image is pinned to a last published release; SeaweedFS (already pulled locally) is the fallback. New ports: S3 API **9910**, console **9911**.
+1. **Image storage: S3-compatible store in Docker.** MinIO was the first choice, but its community images are no longer published (Docker Hub 404), so **SeaweedFS 4.48** is used. Code talks plain S3, so MinIO / AWS S3 / Cloudflare R2 later is a config change. Ports: S3 API **9910**, file browser **9911**.
 2. **Photos per product: up to 5**, with a main photo and drag-to-reorder; gallery on the product page.
 3. **Delete = hide only.** Products stay in the database, so orders and reports stay intact; they can be shown again.

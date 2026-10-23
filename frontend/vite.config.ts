@@ -5,7 +5,8 @@ import { defineConfig, loadEnv } from 'vite'
 
 // Ports are non-default on purpose; see ../.env.example
 export default defineConfig(({ mode }) => {
-  const env = { ...process.env, ...loadEnv(mode, path.resolve(import.meta.dirname, '..'), '') }
+  // Real environment variables win over ../.env (e.g. BACKEND_PORT=8182 pnpm dev)
+  const env = { ...loadEnv(mode, path.resolve(import.meta.dirname, '..'), ''), ...process.env }
   const port = Number(env.FRONTEND_PORT ?? 5280)
   const backend = `http://localhost:${env.BACKEND_PORT ?? 8181}`
   // Running from WSL on a Windows drive (/mnt/c/...): file events don't arrive, so poll for edits

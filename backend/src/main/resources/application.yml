@@ -10,6 +10,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:${POSTGRES_HOST_PORT:5544}/${POSTGRES_DB:tenashop}}
     username: ${POSTGRES_USER:tenashop}
     password: ${POSTGRES_PASSWORD:change-me}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     open-in-view: false
     hibernate:
@@ -58,6 +62,16 @@ billpay:
     verification: ${BILLPAY_WEBHOOK_VERIFICATION:NONE}
     secret: ${BILLPAY_WEBHOOK_SECRET:}
     signature-header: ${BILLPAY_WEBHOOK_SIGNATURE_HEADER:X-BillPay-Signature}
+
+# Product photos: any S3-compatible store (SeaweedFS in Docker locally; AWS S3 / Cloudflare R2 later)
+media:
+  endpoint: ${MEDIA_S3_ENDPOINT:http://localhost:9910}
+  region: ${MEDIA_S3_REGION:us-east-1}
+  bucket: ${MEDIA_S3_BUCKET:tenashop-media}
+  access-key: ${MEDIA_S3_ACCESS_KEY:tenashop}
+  secret-key: ${MEDIA_S3_SECRET_KEY:tenashop-local-secret}
+  # served by the backend, so the bucket can stay private
+  public-path: /api/media
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5280}

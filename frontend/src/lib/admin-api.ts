@@ -244,3 +244,96 @@ export async function changeOwnPassword(currentPassword: string, newPassword: st
   if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
   return res.json() as Promise<StaffSession>
 }
+
+// ---------- catalog ----------
+
+export type ProductRow = {
+  id: number
+  name: string
+  slug: string
+  categoryName: string
+  categoryId: number
+  price: number
+  stock: number
+  reserved: number
+  available: number
+  lowStockThreshold: number
+  lowStock: boolean
+  featured: boolean
+  active: boolean
+  imageUrl: string | null
+  updatedAt: string | null
+}
+
+export type ProductImageView = {
+  id: number
+  position: number
+  url: string
+  thumbUrl: string
+  width: number | null
+  height: number | null
+  sizeBytes: number | null
+}
+
+export type ProductDetail = { product: ProductRow; description: string | null; images: ProductImageView[]; maxImages: number }
+
+export type CategoryRow = {
+  id: number
+  name: string
+  slug: string
+  sortOrder: number
+  active: boolean
+  productCount: number
+  activeProductCount: number
+}
+
+export type ChangeRow = { id: number; action: string; detail: string | null; userEmail: string | null; createdAt: string }
+
+export type ProductInput = {
+  name: string
+  slug?: string
+  description?: string
+  categoryId: number
+  price: number
+  stock?: number
+  lowStockThreshold: number
+  featured: boolean
+  active: boolean
+}
+
+const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) })
+
+export const catalogApi = {
+  products: (p: { q?: string; categoryId?: number; status?: string; page?: number }) =>
+    request<Page<ProductRow>>(`/products?${qs(p)}`),
+  product: (id: number) => request<ProductDetail>(`/products/${id}`),
+  create: (body: ProductInput) => request<ProductDetail>('/products', json('POST', body)),
+  update: (id: number, body: ProductInput) => request<ProductDetail>(`/products/${id}`, json('PUT', body)),
+  setVisible: (id: number, active: boolean) =>
+    request<ProductDetail>(`/products/${id}/visibility`, json('PATCH', { active })),
+  adjustStock: (id: number, delta: number, reason: string) =>
+    request<ProductDetail>(`/products/${id}/stock`, json('POST', { delta, reason })),
+  duplicate: (id: number) => request<ProductDetail>(`/products/${id}/duplicate`, { method: 'POST' }),
+  changes: (id: number) => request<Page<ChangeRow>>(`/products/${id}/changes`),
+  removeImage: (id: number, imageId: number) =>
+    request<ProductDetail>(`/products/${id}/images/${imageId}`, { method: 'DELETE' }),
+  reorderImages: (id: number, ids: number[]) =>
+    request<ProductDetail>(`/products/${id}/images/order`, json('PUT', { ids })),
+  /** Multipart upload; lets the browser set the boundary header. */
+  async uploadImage(id: number, file: File): Promise<ProductDetail> {
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`/api/admin/products/${id}/images`, {
+      method: 'POST',
+      headers: adminToken.get() ? { Authorization: `Bearer ${adminToken.get()}` } : {},
+      body: form,
+    })
+    if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
+    return res.json() as Promise<ProductDetail>
+  },
+  categories: () => request<CategoryRow[]>('/categories'),
+  createCategory: (name: string) => request<CategoryRow[]>('/categories', json('POST', { name })),
+  updateCategory: (id: number, body: { name?: string; active?: boolean }) =>
+    request<CategoryRow[]>(`/categories/${id}`, json('PATCH', body)),
+  reorderCategories: (ids: number[]) => request<CategoryRow[]>('/categories/order', json('PUT', { ids })),
+}

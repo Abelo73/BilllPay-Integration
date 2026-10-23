@@ -22,6 +22,11 @@ export function ProductCard({ product }: { product: Product }) {
         />
       </Link>
       {product.featured && <Badge className="absolute left-3 top-3">Featured</Badge>}
+      {soldOut ? (
+        <Badge variant="secondary" className="absolute right-3 top-3">Sold out</Badge>
+      ) : (
+        product.lowStock && <Badge variant="secondary" className="absolute right-3 top-3 bg-warning/90 text-foreground">Only {product.available} left</Badge>
+      )}
       <div className="flex flex-1 flex-col gap-2 p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{product.categoryName}</p>
         <Link to={`/product/${product.slug}`} className="line-clamp-1 font-medium hover:underline">

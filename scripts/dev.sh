@@ -99,12 +99,13 @@ prereqs() {
 
 # ---------- start ----------
 start_infra() {
-  step "Docker: Postgres, Kafka, Kafka UI"
-  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui >/dev/null 2>"$RUN/docker.log") \
+  step "Docker: Postgres, Kafka, Kafka UI, media (photos)"
+  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media >/dev/null 2>"$RUN/docker.log") \
     || { bad "docker compose up" "see .run/docker.log"; return; }
   local i; for i in $(seq 1 40); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-postgres-1 2>/dev/null)" = healthy ] &&
-    [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-kafka-1 2>/dev/null)" = healthy ] && break
+    [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-kafka-1 2>/dev/null)" = healthy ] &&
+    [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-media-1 2>/dev/null)" = healthy ] && break
     sleep 3
   done
   ok "containers started"
@@ -156,6 +157,7 @@ checks() {
   local s
   [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-postgres-1 2>/dev/null)" = healthy ] && ok "Postgres :5544" || bad "Postgres" "not healthy"
   [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-kafka-1 2>/dev/null)" = healthy ] && ok "Kafka :29492" || bad "Kafka" "not healthy"
+  [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-media-1 2>/dev/null)" = healthy ] && ok "Photo storage (S3) :9910" "file browser http://localhost:9911" || bad "Photo storage" "media container not healthy"
   [ "$(http_code "http://localhost:$KAFKA_UI_PORT/")" = 200 ] && ok "Kafka UI" "http://localhost:$KAFKA_UI_PORT" || warn "Kafka UI" "not answering yet"
 
   local health; health=$(curl -s -m 5 "http://localhost:$BACKEND_PORT/actuator/health" 2>/dev/null)

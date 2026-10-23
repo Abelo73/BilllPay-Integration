@@ -91,3 +91,20 @@ Record for each run: date, order number, BillPay payment ID, observed result, pa
 - **Never-answered tries** (`…9999`) fail after ~20 min with `failureCode: PROVIDER_TIMEOUT` (not in BillPay's published table).
 - **`PaymentFailed` webhooks** arrive when the whole payment fails or expires, not for each failed try.
 - **`eventId` equals the paymentId**, so TenaShop deduplicates on `eventId:eventType`.
+
+---
+
+## Results: 2026-10-23 (Phase 2 P1, catalog management)
+
+API run: **47 / 47 checks passed**. Browser run (create → 3 photos → main photo → restock → store gallery): passed, no page errors.
+
+| Area | Checked | Result |
+|------|---------|--------|
+| Photos | Upload, resize (1200 px + 400 px thumb), serve, reorder, make main, remove; 6th photo refused | ✅ PASS |
+| Photo validation | Non-image renamed `.jpg` → 400; file over 5 MB → 413 `FILE_TOO_LARGE` | ✅ PASS |
+| Stock | Add / remove with reason; removing below units held by unpaid orders → 409 `BELOW_RESERVED`; low-stock and sold-out badges | ✅ PASS |
+| Hide / show | Hidden product 404s in the store, stays in admin; hiding a category hides its products | ✅ PASS |
+| Duplicate | Copy is hidden, stock 0, photos copied in storage | ✅ PASS |
+| History | Each change recorded with field diff and staff email | ✅ PASS |
+| Roles | Support can view but not edit or upload (403); guests 401 | ✅ PASS |
+| Unit tests | `ImageProcessorTest`, `SlugsTest` (24 backend unit tests in total) | ✅ PASS |

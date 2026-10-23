@@ -5,6 +5,7 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 - **Backend:** Spring Boot 4.1 (Java 21), PostgreSQL 16, Flyway, Spring Kafka. Lives in [backend/](backend/).
 - **Frontend:** React 19 + Vite 8 + TypeScript + Tailwind 4 + shadcn/ui, managed with **pnpm**. Lives in [frontend/](frontend/).
 - **Messaging:** Apache Kafka 3.9 (KRaft) + Kafka UI
+- **Product photos:** SeaweedFS (S3-compatible), served through the backend at `/api/media/...`
 - **Runtime:** Docker Compose, using **non-default ports** throughout
 
 ## Documents
@@ -31,6 +32,8 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 | Kafka UI | http://localhost:8191 |
 | PostgreSQL | `localhost:5544` |
 | Kafka (from host) | `localhost:29492` |
+| Photo storage (SeaweedFS S3 API) | `localhost:9910` (bucket `tenashop-media`) |
+| Photo storage file browser | http://localhost:9911 |
 
 Override any port in `.env`.
 

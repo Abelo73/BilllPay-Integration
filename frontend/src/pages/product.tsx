@@ -12,6 +12,34 @@ import { formatETB } from '@/lib/format'
 import { MAX_QTY, useCart } from '@/store/cart'
 import { NotFoundPage } from './not-found'
 
+/** Main photo with clickable thumbnails; falls back to the category illustration when there are no photos. */
+function Gallery({ name, categorySlug, images }: { name: string; categorySlug: string; images: { url: string; thumbUrl: string }[] }) {
+  const [active, setActive] = useState(0)
+  if (images.length === 0) {
+    return <ProductVisual categorySlug={categorySlug} name={name} className="aspect-square w-full rounded-3xl" iconClassName="size-32" />
+  }
+  return (
+    <div className="space-y-3">
+      <img src={images[active].url} alt={name} className="aspect-square w-full rounded-3xl object-cover ring-1 ring-border" />
+      {images.length > 1 && (
+        <div className="flex gap-3">
+          {images.map((img, i) => (
+            <button
+              key={img.url}
+              type="button"
+              aria-label={`Photo ${i + 1}`}
+              onClick={() => setActive(i)}
+              className={`overflow-hidden rounded-xl ring-2 transition ${i === active ? 'ring-brand' : 'ring-transparent opacity-70 hover:opacity-100'}`}
+            >
+              <img src={img.thumbUrl} alt="" className="size-20 object-cover" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ProductPage() {
   const { slug = '' } = useParams()
   const [qty, setQty] = useState(1)
@@ -38,13 +66,7 @@ export function ProductPage() {
         </div>
       ) : (
         <div className="grid gap-10 md:grid-cols-2">
-          <ProductVisual
-            categorySlug={p.categorySlug}
-            imageUrl={p.imageUrl}
-            name={p.name}
-            className="aspect-square w-full rounded-3xl"
-            iconClassName="size-32"
-          />
+          <Gallery key={p.slug} name={p.name} categorySlug={p.categorySlug} images={p.images ?? []} />
           <div className="flex flex-col gap-6">
             <div className="space-y-3">
               <Link to={`/shop?category=${p.categorySlug}`} className="text-sm font-medium text-brand hover:underline">
@@ -53,7 +75,9 @@ export function ProductPage() {
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{p.name}</h1>
               <p className="text-2xl font-semibold">{formatETB(p.price)}</p>
               {p.available > 0 ? (
-                <Badge variant="secondary">{p.available <= 10 ? `Only ${p.available} left` : 'In stock'}</Badge>
+                <Badge variant="secondary" className={p.lowStock ? 'bg-warning/90 text-foreground' : ''}>
+                  {p.lowStock ? `Only ${p.available} left` : 'In stock'}
+                </Badge>
               ) : (
                 <Badge variant="destructive">Sold out</Badge>
               )}

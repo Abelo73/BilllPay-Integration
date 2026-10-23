@@ -8,7 +8,10 @@ export type Product = {
   price: number
   currency: string
   available: number
+  lowStock: boolean
   imageUrl: string | null
+  /** Filled on the product page only. */
+  images?: { url: string; thumbUrl: string }[]
   featured: boolean
   categorySlug: string
   categoryName: string

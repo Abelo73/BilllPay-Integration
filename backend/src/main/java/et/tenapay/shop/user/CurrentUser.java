@@ -11,7 +11,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import et.tenapay.shop.common.ApiException;
 
 /** The signed-in user of the current request, if any (from the validated bearer token). */
-public record CurrentUser(UUID id, Role role) {
+public record CurrentUser(UUID id, Role role, String email) {
 
 	public static Optional<CurrentUser> get() {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -19,7 +19,7 @@ public record CurrentUser(UUID id, Role role) {
 			return Optional.empty();
 		}
 		return Optional.of(new CurrentUser(UUID.fromString(jwt.getSubject()),
-				Role.valueOf(jwt.getClaimAsString(TokenService.ROLE_CLAIM))));
+				Role.valueOf(jwt.getClaimAsString(TokenService.ROLE_CLAIM)), jwt.getClaimAsString("email")));
 	}
 
 	public static CurrentUser require() {

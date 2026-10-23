@@ -23,4 +23,9 @@ public class Category {
 	private String name;
 
 	private String slug;
+
+	private int sortOrder;
+
+	/** Hidden categories (and their products) are not shown in the store. */
+	private boolean active = true;
 }

@@ -7,6 +7,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import et.tenapay.shop.payment.billpay.BillPayException;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,13 @@ public class GlobalExceptionHandler {
 		pd.setProperty("code", "VALIDATION_FAILED");
 		pd.setProperty("errors", ex.getBindingResult().getFieldErrors().stream()
 				.collect(Collectors.toMap(e -> e.getField(), e -> String.valueOf(e.getDefaultMessage()), (a, b) -> a)));
+		return pd;
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	ProblemDetail handleTooLarge(MaxUploadSizeExceededException ex) {
+		ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONTENT_TOO_LARGE, "That photo is larger than 5 MB. Use a smaller file.");
+		pd.setProperty("code", "FILE_TOO_LARGE");
 		return pd;
 	}
 

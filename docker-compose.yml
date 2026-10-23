@@ -58,6 +58,28 @@ services:
       kafka:
         condition: service_healthy
 
+  # Product photos: S3-compatible object store (SeaweedFS). MinIO stopped publishing public images in 2025.
+  media:
+    image: chrislusf/seaweedfs:4.48
+    environment:
+      MEDIA_S3_ACCESS_KEY: ${MEDIA_S3_ACCESS_KEY:-tenashop}
+      MEDIA_S3_SECRET_KEY: ${MEDIA_S3_SECRET_KEY:-tenashop-local-secret}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '{"identities":[{"name":"tenashop","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' "$$MEDIA_S3_ACCESS_KEY" "$$MEDIA_S3_SECRET_KEY" > /tmp/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=256 -volume.max=0
+    ports:
+      - "${MEDIA_S3_HOST_PORT:-9910}:8333"   # S3 API
+      - "${MEDIA_UI_PORT:-9911}:8888"        # file browser
+    volumes:
+      - mediadata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
   backend:
     build: ./backend
     env_file:
@@ -66,6 +88,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tenashop}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MEDIA_S3_ENDPOINT: http://media:8333
       BACKEND_PORT: 8181
     ports:
       - "${BACKEND_PORT:-8181}:8181"
@@ -85,3 +108,4 @@ services:
 volumes:
   pgdata:
   kafkadata:
+  mediadata:

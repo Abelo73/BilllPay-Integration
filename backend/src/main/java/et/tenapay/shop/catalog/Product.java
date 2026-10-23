@@ -49,7 +49,11 @@ public class Product {
 	/** Units held by unpaid orders; available = stock - reserved. */
 	private int reserved;
 
+	/** Main photo URL, kept in sync with the first product_images row (or a seeded /products/*.jpg). */
 	private String imageUrl;
+
+	/** At or below this many available units the store shows "only N left". */
+	private int lowStockThreshold = 5;
 
 	private boolean featured;
 
@@ -66,6 +70,10 @@ public class Product {
 
 	public int available() {
 		return stock - reserved;
+	}
+
+	public boolean lowStock() {
+		return available() > 0 && available() <= lowStockThreshold;
 	}
 
 	public void reserve(int qty) {
