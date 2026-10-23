@@ -73,7 +73,7 @@ Order is the recommended build order. Each milestone ends with tests and a commi
 
 ---
 
-## Decisions needed before P1
-1. **Image storage:** local disk now (recommended) or S3-compatible from day one?
-2. **Photos per product:** one, or up to 5 with a gallery (recommended)?
-3. **Delete products:** hide only (recommended, keeps order history clean) or allow hard delete of never-ordered products?
+## Decisions for P1 (2026-10-23)
+1. **Image storage: MinIO in Docker** (S3-compatible). Code talks plain S3, so AWS S3 / Cloudflare R2 / SeaweedFS later is a config change. MinIO stopped publishing new community images in late 2025, so the image is pinned to a last published release; SeaweedFS (already pulled locally) is the fallback. New ports: S3 API **9910**, console **9911**.
+2. **Photos per product: up to 5**, with a main photo and drag-to-reorder; gallery on the product page.
+3. **Delete = hide only.** Products stay in the database, so orders and reports stay intact; they can be shown again.
