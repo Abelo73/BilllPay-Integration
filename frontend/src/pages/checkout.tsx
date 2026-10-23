@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { api, ApiError } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
 import { cartTotals, useCart } from '@/store/cart'
+import { useSession } from '@/store/session'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your full name').max(200),
@@ -31,7 +32,8 @@ export function CheckoutPage() {
   const { lines, clear } = useCart()
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()
-  const [form, setForm] = useState<Form>({ name: '', phone: '', email: '' })
+  const user = useSession((s) => s.session?.user)
+  const [form, setForm] = useState<Form>({ name: user?.fullName ?? '', phone: user?.phone ?? '', email: user?.email ?? '' })
   const [errors, setErrors] = useState<Errors>({})
 
   const checkout = useMutation({
@@ -111,7 +113,15 @@ export function CheckoutPage() {
         <Card>
           <CardHeader>
             <CardTitle>Contact details</CardTitle>
-            <CardDescription>BillPay uses these to send your payment request and receipt.</CardDescription>
+            <CardDescription>
+              BillPay uses these to send your payment request and receipt.
+              {!user && (
+                <>
+                  {' '}
+                  <Link to="/login?next=/checkout" className="font-medium text-brand hover:underline">Sign in</Link> to save this order to your account.
+                </>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form id="checkout-form" onSubmit={submit} className="space-y-5" noValidate>

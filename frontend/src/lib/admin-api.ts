@@ -1,25 +1,36 @@
 import { ApiError, type Page } from '@/lib/api'
+import type { Session } from '@/store/session'
 
-const TOKEN_KEY = 'tenashop-admin-token'
+const STAFF_KEY = 'tenashop-staff-session'
 
+export type StaffSession = Session
+
+function readStaff(): StaffSession | null {
+  try {
+    const raw = localStorage.getItem(STAFF_KEY)
+    const s = raw ? (JSON.parse(raw) as StaffSession) : null
+    return s && new Date(s.expiresAt).getTime() > Date.now() ? s : null
+  } catch {
+    return null
+  }
+}
+
+/** The staff member's sign-in, kept apart from any customer session in the same browser. */
 export const adminToken = {
   get() {
-    try {
-      return localStorage.getItem(TOKEN_KEY)
-    } catch {
-      return null
-    }
+    return readStaff()?.token ?? null
   },
-  set(token: string) {
+  session: readStaff,
+  set(session: StaffSession) {
     try {
-      localStorage.setItem(TOKEN_KEY, token)
+      localStorage.setItem(STAFF_KEY, JSON.stringify(session))
     } catch {
       /* private mode: the session lasts until reload */
     }
   },
   clear() {
     try {
-      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(STAFF_KEY)
     } catch {
       /* ignore */
     }
@@ -164,11 +175,8 @@ export type OrderDetail = {
 }
 
 export const adminApi = {
-  login: (username: string, password: string) =>
-    request<{ token: string; expiresAt: string }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    }),
+  login: (email: string, password: string) =>
+    request<StaffSession>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   config: () => request<AdminConfig>('/config'),
   dashboard: () => request<Dashboard>('/dashboard'),
   orders: (p: { status?: string; q?: string; page?: number }) => request<Page<OrderRow>>(`/orders?${qs(p)}`),
@@ -185,4 +193,54 @@ export const adminApi = {
       body: JSON.stringify(body),
     }),
   retryRefund: (id: string) => request<Refund>(`/refunds/${id}/retry`, { method: 'POST' }),
+
+  users: (p: { kind?: string; q?: string; page?: number }) => request<Page<UserRow>>(`/users?${qs(p)}`),
+  createStaff: (body: { email: string; fullName: string; role: 'ADMIN' | 'SUPPORT'; password: string }) =>
+    request<UserRow>('/users', { method: 'POST', body: JSON.stringify(body) }),
+  updateUser: (id: string, body: { fullName?: string; role?: string; enabled?: boolean }) =>
+    request<UserRow>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  resetPassword: (id: string, newPassword: string) =>
+    request<UserRow>(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }),
+  unlockUser: (id: string) => request<UserRow>(`/users/${id}/unlock`, { method: 'POST' }),
+  revokeSessions: (id: string) => request<UserRow>(`/users/${id}/revoke-sessions`, { method: 'POST' }),
+  loginEvents: (p: { userId?: string; page?: number }) => request<Page<LoginEventRow>>(`/login-events?${qs(p)}`),
+}
+
+export type UserRow = {
+  id: string
+  email: string
+  fullName: string
+  phone: string | null
+  role: 'CUSTOMER' | 'SUPPORT' | 'ADMIN'
+  enabled: boolean
+  locked: boolean
+  lockedUntil: string | null
+  lastLoginAt: string | null
+  createdAt: string
+}
+
+export type LoginEventRow = {
+  id: number
+  userId: string | null
+  email: string | null
+  portal: 'SHOP' | 'ADMIN'
+  success: boolean
+  reason: string
+  ip: string | null
+  userAgent: string | null
+  createdAt: string
+}
+
+/** Support staff can view everything; only admins see buttons that change things (the API enforces it too). */
+export const isAdmin = () => adminToken.session()?.user.role === 'ADMIN'
+
+/** Staff change their own password through /api/me (shared with customers); returns a fresh session. */
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<StaffSession> {
+  const res = await fetch('/api/me/password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken.get() ?? ''}` },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+  if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
+  return res.json() as Promise<StaffSession>
 }

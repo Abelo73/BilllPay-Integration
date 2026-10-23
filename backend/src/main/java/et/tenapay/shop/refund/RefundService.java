@@ -42,8 +42,8 @@ public class RefundService {
 	private final BillPayClient billPay;
 	private final TransactionTemplate tx;
 
-	record RefundRequest(String paymentId, String merchantReference, BigDecimal amount, String currency,
-			String reason) {
+	/** Body for POST /api/v1/checkout/payments/{id}/refunds; the payment id goes in the path. */
+	record RefundRequest(String merchantReference, BigDecimal amount, String currency, String reason) {
 	}
 
 	/** Amount of a successful payment that is not yet refunded or being refunded. */
@@ -109,8 +109,8 @@ public class RefundService {
 		refund.setCurrency(attempt.getCurrency());
 		refund.setReason(reason);
 		refund.setStatus(RefundStatus.REQUESTED);
-		refund.setRequestPayload(billPay.toJson(new RefundRequest(attempt.getBillpayPaymentId(),
-				refund.getMerchantReference(), amount, attempt.getCurrency(), reason)));
+		refund.setRequestPayload(billPay.toJson(new RefundRequest(refund.getMerchantReference(), amount,
+				attempt.getCurrency(), reason)));
 		refunds.save(refund);
 		orderService.note(order, "REFUND_REQUESTED", refund.getMerchantReference() + " " + amount + " " + refund.getCurrency()
 				+ (reason != null ? " (" + reason + ")" : ""));
@@ -119,9 +119,10 @@ public class RefundService {
 
 	private Refund send(UUID refundId) {
 		Refund refund = refunds.findById(refundId).orElseThrow();
+		String billpayPaymentId = attempts.findById(refund.getPaymentAttemptId()).orElseThrow().getBillpayPaymentId();
 		BillPayRefund response;
 		try {
-			response = billPay.createRefund(refund.getRequestPayload(), refund.getIdempotencyKey());
+			response = billPay.createRefund(billpayPaymentId, refund.getRequestPayload(), refund.getIdempotencyKey());
 		} catch (BillPayException e) {
 			tx.executeWithoutResult(s -> recordFailure(refundId, e));
 			return refunds.findById(refundId).orElseThrow();

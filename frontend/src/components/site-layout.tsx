@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, ScrollRestoration } from 'react-router'
 import { CartSheet } from '@/components/cart-sheet'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { UserMenu } from '@/components/user-menu'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
@@ -44,6 +45,7 @@ function Header() {
         </nav>
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
+          <UserMenu />
           <Button variant="ghost" size="icon" className="relative" aria-label="Open cart" onClick={() => setOpen(true)}>
             <ShoppingCart />
             {count > 0 && (

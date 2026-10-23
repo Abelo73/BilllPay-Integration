@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { adminApi, type Webhook } from '@/lib/admin-api'
+import { adminApi, isAdmin, type Webhook } from '@/lib/admin-api'
 import { formatDate } from '@/lib/format'
 import { EmptyRow, JsonBlock, PageHeader, Pager, StatusBadge } from './shared'
 
@@ -134,7 +134,7 @@ export function AdminWebhooksPage() {
               {open.error && <p className="rounded-lg bg-muted p-3 text-xs">{open.error}</p>}
               <JsonBlock label="Payload" raw={open.payload} />
               <JsonBlock label="Headers" raw={open.headers} />
-              {open.status !== 'REJECTED' && (
+              {isAdmin() && open.status !== 'REJECTED' && (
                 <Button variant="outline" onClick={() => replay.mutate(open.id)} disabled={replay.isPending}>
                   Replay through Kafka
                 </Button>

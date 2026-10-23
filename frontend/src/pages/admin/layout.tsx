@@ -9,6 +9,9 @@ import {
   Package,
   RotateCcw,
   Settings2,
+  ShieldCheck,
+  UserRound,
+  Users,
   Webhook,
 } from 'lucide-react'
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -28,12 +31,16 @@ const NAV = [
   { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook },
   { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw },
   { to: '/admin/setup', label: 'BillPay setup', icon: Settings2 },
+  { to: '/admin/users', label: 'Users', icon: Users, adminOnly: true },
+  { to: '/admin/login-history', label: 'Login history', icon: ShieldCheck, adminOnly: true },
+  { to: '/admin/account', label: 'My account', icon: UserRound },
 ]
 
 function Nav({ onNavigate }: { onNavigate?: () => void }) {
+  const isAdmin = adminToken.session()?.user.role === 'ADMIN'
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map((n) => (
+      {NAV.filter((n) => isAdmin || !n.adminOnly).map((n) => (
         <NavLink
           key={n.to}
           to={n.to}
@@ -59,6 +66,7 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const config = useQuery({ queryKey: ['admin-config'], queryFn: adminApi.config, enabled: !!adminToken.get() })
 
+  const staff = adminToken.session()
   if (!adminToken.get()) {
     return <Navigate to={`/admin/login?next=${encodeURIComponent(location.pathname)}`} replace />
   }
@@ -117,7 +125,15 @@ export function AdminLayout() {
           {config.data && !config.data.apiKeyConfigured && (
             <Badge variant="destructive">API key missing</Badge>
           )}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-3">
+            {staff && (
+              <div className="hidden text-right sm:block">
+                <p className="text-sm font-medium leading-tight">{staff.user.fullName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {staff.user.email} · <span className={staff.user.role === 'ADMIN' ? 'text-brand' : ''}>{staff.user.role.toLowerCase()}</span>
+                </p>
+              </div>
+            )}
             <ThemeToggle />
           </div>
         </header>

@@ -48,23 +48,25 @@ billpay:
   base-url: ${BILLPAY_BASE_URL:https://sandbox.api.billpay.et}
   api-key: ${BILLPAY_API_KEY:}
   create-payment-path: /api/v1/checkout/payments
-  # Unconfirmed with BillPay (open question Q5)
+  # Confirmed 2026-10-23 (open question Q5)
   payment-status-path: /api/v1/checkout/payments/{id}
-  # Unconfirmed with BillPay (open question Q6)
-  refund-path: /api/v1/refunds
+  # Path confirmed 2026-10-23; request body still unconfirmed (open question Q6)
+  refund-path: /api/v1/checkout/payments/{id}/refunds
   timeout: ${BILLPAY_TIMEOUT_MS:10000}ms
   webhook:
-    # NONE until BillPay confirms its signature scheme (open question Q3)
+    # HMAC_SHA256 over "<t>.<body>" in X-Billpay-Signature (confirmed 2026-10-23); NONE is sandbox-only
     verification: ${BILLPAY_WEBHOOK_VERIFICATION:NONE}
     secret: ${BILLPAY_WEBHOOK_SECRET:}
     signature-header: ${BILLPAY_WEBHOOK_SIGNATURE_HEADER:X-BillPay-Signature}
 
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5280}
+  # BillPay requires https return/cancel URLs; locally set this to the ngrok URL (see BillPayRedirectController)
+  redirect-base-url: ${APP_REDIRECT_BASE_URL:}
   cors-origins: ${APP_CORS_ORIGINS:http://localhost:5280}
   reconcile-after: ${RECONCILE_AFTER:PT3M}
   payment-expiry: ${PAYMENT_EXPIRY:PT30M}
-  admin-username: ${ADMIN_USERNAME:admin}
+  admin-email: ${ADMIN_EMAIL:admin@tenashop.local}
   admin-password: ${ADMIN_PASSWORD:change-me}
   jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
 

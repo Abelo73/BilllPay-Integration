@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -39,7 +40,7 @@ public class CheckoutService {
 
 	/** Creates the order with server-side prices and reserves stock. Does not call BillPay. */
 	@Transactional
-	public Order createOrder(List<Line> lines, CustomerInfo customer) {
+	public Order createOrder(List<Line> lines, CustomerInfo customer, UUID userId) {
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
@@ -68,6 +69,7 @@ public class CheckoutService {
 		order.setCustomerName(customer.name().trim());
 		order.setCustomerPhone(normalizePhone(customer.phone()));
 		order.setCustomerEmail(customer.email().trim().toLowerCase());
+		order.setUserId(userId);
 
 		BigDecimal subtotal = BigDecimal.ZERO;
 		for (Map.Entry<Long, Integer> e : qtyByProduct.entrySet()) {

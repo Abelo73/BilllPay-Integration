@@ -70,18 +70,21 @@ public class BillPayClient {
 		return BillPayPayloads.parsePayment(readEnvelope(body), body);
 	}
 
-	/** Requests a refund. Endpoint and body shape are unconfirmed (open question Q6). */
-	public BillPayRefund createRefund(String requestJson, UUID idempotencyKey) {
-		String body = postWithRetry(props.refundPath(), requestJson, idempotencyKey);
+	/**
+	 * Refunds part of a captured payment: POST /api/v1/checkout/payments/{id}/refunds (path confirmed 2026-10-23; the
+	 * body shape is still unconfirmed, open question Q6).
+	 */
+	public BillPayRefund createRefund(String billpayPaymentId, String requestJson, UUID idempotencyKey) {
+		String body = postWithRetry(props.refundPath(), requestJson, idempotencyKey, billpayPaymentId);
 		return BillPayPayloads.parseRefund(readEnvelope(body), body);
 	}
 
-	private String postWithRetry(String path, String requestJson, UUID idempotencyKey) {
+	private String postWithRetry(String path, String requestJson, UUID idempotencyKey, Object... uriVariables) {
 		BillPayException last = null;
 		for (int attempt = 0; attempt <= MAX_NETWORK_RETRIES; attempt++) {
 			try {
 				return send(() -> http.post()
-						.uri(path)
+						.uri(path, uriVariables)
 						.contentType(MediaType.APPLICATION_JSON)
 						.header("Idempotency-Key", idempotencyKey.toString())
 						.body(requestJson));

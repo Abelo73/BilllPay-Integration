@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { orderContact } from '@/lib/format'
+import { useSession } from '@/store/session'
 
 /** Asks for order number and phone when they aren't known, then shows the order. */
 function OrderLookup({ initialOrder, onFound }: { initialOrder: string; onFound: (order: string, phone: string) => void }) {
@@ -48,11 +49,14 @@ function OrderLookup({ initialOrder, onFound }: { initialOrder: string; onFound:
 export function OrderStatusPage({ cancelled = false }: { cancelled?: boolean }) {
   const [params, setParams] = useSearchParams()
   const order = params.get('order') ?? ''
-  const [phone, setPhone] = useState(() => (order ? orderContact.phone(order) : null))
+  const signedIn = useSession((s) => !!s.session)
+  const [savedPhone, setPhone] = useState(() => (order ? orderContact.phone(order) : null))
+  // Signed-in customers can open their own orders without the phone; the backend checks ownership.
+  const phone = savedPhone ?? (signedIn ? '' : null)
 
   return (
     <div className="px-4 py-12 sm:px-6">
-      {order && phone ? (
+      {order && phone !== null ? (
         <OrderStatusPanel key={order + phone} orderNumber={order} phone={phone} cancelled={cancelled} />
       ) : (
         <OrderLookup

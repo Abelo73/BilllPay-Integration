@@ -63,3 +63,31 @@ Record for each run: date, order number, BillPay payment ID, observed result, pa
 - All of A, B and C pass on the sandbox
 - No unexpected ERROR-level logs during the run
 - Each test's order timeline in the admin matches the expected states
+
+---
+
+## Results: 2026-10-23 (BillPay sandbox, automated through the real hosted checkout)
+
+| TC | What | Result | Notes |
+|----|------|--------|-------|
+| 01 | Wallet, normal number | ✅ PASS | PAID in ~3 min (sandbox "a few seconds" is really ~3 min) |
+| 02 | Card, normal number | ✅ PASS | PAID (TEST_CARD) |
+| 03 | Bank, normal number | ✅ PASS | PAID (TEST_BANK) |
+| 04 | Wallet …0000 | ✅ PASS | Order stays unpaid, reason INSUFFICIENT_FUNDS shown, can retry |
+| 05 | Wallet …1111 | ✅ PASS | CUSTOMER_DECLINED |
+| 06 | Wallet …2222 | ✅ PASS | ACCOUNT_BLOCKED |
+| 07 | Wallet …3333 | ✅ PASS | LIMIT_EXCEEDED |
+| 08 | `tok_expired_card` | ⛔ N/A | BillPay's sandbox page asks for a phone number for Card too; there is no token field |
+| 09 | Wallet …8888 | ✅ PASS | PAID after ~2.5 min |
+| 10 | Wallet …9999 | ✅ PASS (stage 1) | After ~20 min BillPay fails the try with `PROVIDER_TIMEOUT`; payment stays open until its 30-min expiry, then TenaShop's expiry job sets the order `EXPIRED` |
+| 21 | Partial refund | ⛔ Blocked by BillPay | Endpoint found: `POST /api/v1/checkout/payments/{id}/refunds` → 422 "merchant is at its refund limit; settle or clear what is open first" |
+| 23 | Over-refund | ✅ PASS | Rejected locally (400), BillPay not called |
+| 31 | Duplicate webhook | ✅ PASS | Real case: webhook arrived after the status check had already marked PAID → `DUPLICATE` |
+| 32 | Forged webhook | ✅ PASS | Bad signature via public URL → 401, `REJECTED`, order unchanged |
+| 34 | Missing webhook | ✅ PASS | Status check (GET payment) marked orders PAID before webhooks arrived |
+
+### Sandbox behaviour learned
+- **A failed try does not fail the payment.** BillPay records the attempt as `FAILED` with a `failureCode` but keeps the payment `CREATED` so the customer can retry on the same link. TenaShop keeps the order `PENDING_PAYMENT`, stores the reason and shows "Your last try didn't go through".
+- **Never-answered tries** (`…9999`) fail after ~20 min with `failureCode: PROVIDER_TIMEOUT` (not in BillPay's published table).
+- **`PaymentFailed` webhooks** arrive when the whole payment fails or expires, not for each failed try.
+- **`eventId` equals the paymentId**, so TenaShop deduplicates on `eventId:eventType`.

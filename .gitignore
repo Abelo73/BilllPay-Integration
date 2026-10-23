@@ -14,3 +14,6 @@ frontend/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# scripts/dev.sh logs and pids
+.run/

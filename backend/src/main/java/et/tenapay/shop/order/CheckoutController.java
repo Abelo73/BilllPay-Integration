@@ -22,6 +22,7 @@ import et.tenapay.shop.payment.PaymentAttemptRepository;
 import et.tenapay.shop.payment.PaymentService;
 import et.tenapay.shop.payment.PaymentStatus;
 import et.tenapay.shop.payment.billpay.BillPayException;
+import et.tenapay.shop.user.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
@@ -65,7 +66,7 @@ public class CheckoutController {
 	public record CheckoutResponse(String orderNumber, String checkoutUrl) {
 	}
 
-	public record PayRequest(@NotBlank String phone) {
+	public record PayRequest(String phone) {
 	}
 
 	public record ItemView(String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
@@ -83,18 +84,20 @@ public class CheckoutController {
 	public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest req) {
 		Order order = checkout.createOrder(
 				req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
-				new CheckoutService.CustomerInfo(req.customer().name(), req.customer().phone(), req.customer().email()));
+				new CheckoutService.CustomerInfo(req.customer().name(), req.customer().phone(), req.customer().email()),
+				CurrentUser.customerId().orElse(null));
 		return new CheckoutResponse(order.getOrderNumber(), startPayment(order));
 	}
 
 	@PostMapping("/orders/{orderNumber}/pay")
-	public CheckoutResponse pay(@PathVariable String orderNumber, @Valid @RequestBody PayRequest req) {
-		Order order = findOwned(orderNumber, req.phone());
+	public CheckoutResponse pay(@PathVariable String orderNumber, @RequestBody(required = false) PayRequest req) {
+		Order order = findOwned(orderNumber, req == null ? null : req.phone());
 		return new CheckoutResponse(order.getOrderNumber(), startPayment(order));
 	}
 
+	/** Guests prove ownership with the checkout phone; signed-in customers can open their own orders without it. */
 	@GetMapping("/orders/{orderNumber}/status")
-	public OrderStatusView status(@PathVariable String orderNumber, @RequestParam String phone) {
+	public OrderStatusView status(@PathVariable String orderNumber, @RequestParam(required = false) String phone) {
 		Order order = findOwned(orderNumber, phone);
 		attempts.findFirstByOrderIdOrderByAttemptNoDesc(order.getId())
 				.filter(a -> order.getStatus() == OrderStatus.PENDING_PAYMENT && dueForOnDemandCheck(a))
@@ -122,7 +125,9 @@ public class CheckoutController {
 
 	private Order findOwned(String orderNumber, String phone) {
 		Order order = orders.findByOrderNumber(orderNumber).orElseThrow(() -> ApiException.notFound("Order"));
-		if (!CheckoutService.samePhone(order.getCustomerPhone(), phone)) {
+		boolean ownedBySignedInCustomer = order.getUserId() != null
+				&& CurrentUser.customerId().filter(order.getUserId()::equals).isPresent();
+		if (!ownedBySignedInCustomer && !CheckoutService.samePhone(order.getCustomerPhone(), phone)) {
 			// Same response as a missing order, so order numbers can't be probed.
 			throw ApiException.notFound("Order");
 		}

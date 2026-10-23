@@ -39,6 +39,8 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 			""")
 	Page<Order> adminSearch(@Param("status") OrderStatus status, @Param("q") String q, Pageable pageable);
 
+	Page<Order> findByUserId(UUID userId, Pageable pageable);
+
 	long countByStatus(OrderStatus status);
 
 	@Query("select coalesce(sum(o.total), 0) from Order o where o.status in :statuses")

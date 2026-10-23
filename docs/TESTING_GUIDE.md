@@ -129,6 +129,8 @@ If step 2 fails with "couldn't reach the payment provider", go to Part 9.
 
 ## Part 6: Payment outcome tests (TC-01 to TC-12)
 
+> **Learned from the real sandbox (2026-10-23):** BillPay's page asks for a **phone number for all three methods** (Wallet, Bank, Card); there is no card-token field, so `tok_…` values can't be entered. A **failed try keeps the BillPay payment open**: BillPay shows "Choose your payment method" again, and TenaShop shows **"Your last try didn't go through"** with the reason and a **Continue payment** button (order stays `PENDING_PAYMENT`). "Paid after a few seconds" takes about **3 minutes** in practice.
+
 For each row: place an order with the Sandbox Test Item, then on BillPay's page enter the value shown.
 
 | TC | On BillPay enter | Store page shows | Admin order status | Notes |

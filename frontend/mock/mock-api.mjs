@@ -64,7 +64,9 @@ const routes = {
     const cat = url.searchParams.get('category'), q = url.searchParams.get('q')?.toLowerCase()
     return page(products.filter((p) => (!cat || p.categorySlug === cat) && (!q || p.name.toLowerCase().includes(q))))
   },
-  'POST /api/admin/auth/login': () => ({ token: 'mock', expiresAt: iso(-480) }),
+  'POST /api/admin/auth/login': () => ({ token: 'mock', expiresAt: iso(-480), user: { id: 'u-admin', email: 'admin@tenashop.local', fullName: 'TenaShop Admin', phone: null, role: 'ADMIN' } }),
+  'GET /api/admin/users': () => page([{ id: 'u-admin', email: 'admin@tenashop.local', fullName: 'TenaShop Admin', phone: null, role: 'ADMIN', enabled: true, locked: false, lockedUntil: null, lastLoginAt: iso(1), createdAt: iso(600) }]),
+  'GET /api/admin/login-events': () => page([{ id: 1, userId: 'u-admin', email: 'admin@tenashop.local', portal: 'ADMIN', success: true, reason: 'SUCCESS', ip: '127.0.0.1', userAgent: 'Mozilla/5.0 (Windows NT 10.0) Edg/130', createdAt: iso(1) }]),
   'GET /api/admin/config': () => ({ billpayBaseUrl: 'https://sandbox.api.billpay.et', sandbox: true, apiKeyConfigured: true, apiKeyHint: 'BPG_TEST-…hR18', webhookVerification: 'NONE', webhookSecretConfigured: true, webhookSignatureHeader: 'X-BillPay-Signature', webhookPath: '/api/webhooks/billpay', publicBaseUrl: 'http://localhost:5280', reconcileAfter: 'PT3M', paymentExpiry: 'PT30M' }),
   'GET /api/admin/dashboard': () => ({ sandbox: true, paidVolume: 26450, ordersByStatus: { PENDING_PAYMENT: 3, PAYMENT_FAILED: 2, PAID: 11, PARTIALLY_REFUNDED: 1, REFUNDED: 1, EXPIRED: 2, CANCELLED: 0, REVIEW_REQUIRED: 1 }, paymentSuccessRate: 0.72, failuresByReason: { INSUFFICIENT_FUNDS: 3, CUSTOMER_DECLINED: 2, LIMIT_EXCEEDED: 1, CARD_EXPIRED: 1 }, pendingPayments: 3, webhooksAwaitingProcessing: 0 }),
   'GET /api/admin/orders': () => page(orders),

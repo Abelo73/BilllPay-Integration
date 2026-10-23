@@ -53,9 +53,13 @@ public class BillPayWebhookController {
 			BillPayPayment payment = BillPayPayloads.parsePayment(root, body);
 			JsonNode data = BillPayPayloads.paymentNode(root);
 			// When the payment sits in a nested object, the top-level id is the event id.
-			event.setBillpayEventId(data != root ? BillPayPayloads.text(root, "eventId", "id")
-					: BillPayPayloads.text(root, "eventId", "webhookId"));
-			event.setEventType(BillPayPayloads.text(root, "event", "eventType", "type"));
+			String eventId = data != root ? BillPayPayloads.text(root, "eventId", "id")
+					: BillPayPayloads.text(root, "eventId", "webhookId");
+			String eventType = BillPayPayloads.text(root, "event", "eventType", "type");
+			event.setEventType(eventType);
+			// BillPay reuses the payment id as eventId (seen 2026-10-23), so captured and refunded events of one
+			// payment share it; the type makes the dedupe key unique per event.
+			event.setBillpayEventId(eventId == null ? null : eventType == null ? eventId : eventId + ":" + eventType);
 			event.setBillpayPaymentId(payment.paymentId());
 			event.setMerchantReference(payment.merchantReference());
 			event.setReportedStatus(payment.status());

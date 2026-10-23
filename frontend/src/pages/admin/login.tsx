@@ -11,15 +11,15 @@ import { Label } from '@/components/ui/label'
 import { adminApi, adminToken } from '@/lib/admin-api'
 
 export function AdminLoginPage() {
-  const [username, setUsername] = useState('admin')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const next = params.get('next')
   const login = useMutation({
-    mutationFn: () => adminApi.login(username, password),
+    mutationFn: () => adminApi.login(email, password),
     onSuccess: (res) => {
-      adminToken.set(res.token)
+      adminToken.set(res)
       navigate(next?.startsWith('/admin') ? next : '/admin', { replace: true })
     },
   })
@@ -35,7 +35,7 @@ export function AdminLoginPage() {
             <CardTitle className="flex items-center gap-2">
               <LockKeyhole className="size-4" /> Admin sign in
             </CardTitle>
-            <CardDescription>Credentials come from ADMIN_USERNAME / ADMIN_PASSWORD in .env.</CardDescription>
+            <CardDescription>Staff accounts only. The first admin comes from ADMIN_EMAIL / ADMIN_PASSWORD in .env.</CardDescription>
           </CardHeader>
           <CardContent>
             <form
@@ -46,8 +46,8 @@ export function AdminLoginPage() {
               }}
             >
               <div className="space-y-2">
-                <Label htmlFor="username">Username</Label>
-                <Input id="username" className="h-10" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required />
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" className="h-10" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" placeholder="admin@tenashop.local" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

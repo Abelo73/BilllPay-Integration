@@ -6,6 +6,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router'
 import { SiteLayout } from '@/components/site-layout'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
+import { AccountPage } from '@/pages/account'
+import { LoginPage, RegisterPage } from '@/pages/auth'
 import { CheckoutPage } from '@/pages/checkout'
 import { HomePage } from '@/pages/home'
 import { NotFoundPage } from '@/pages/not-found'
@@ -44,6 +46,9 @@ const router = createBrowserRouter([
       { path: '/checkout/return', element: <OrderStatusPage /> },
       { path: '/checkout/cancelled', element: <OrderStatusPage cancelled /> },
       { path: '/orders/track', element: <OrderStatusPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/account', element: <AccountPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

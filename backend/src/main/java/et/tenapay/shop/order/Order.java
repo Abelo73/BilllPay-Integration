@@ -51,6 +51,9 @@ public class Order {
 
 	private String customerEmail;
 
+	/** Signed-in customer who placed the order; null for guest checkout. */
+	private UUID userId;
+
 	private Instant paidAt;
 
 	@Column(updatable = false)

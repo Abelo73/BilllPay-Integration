@@ -47,6 +47,18 @@ Override any port in `.env`.
 
 ## Run
 
+### Quickest: one script (WSL)
+```bash
+scripts/dev.sh          # starts whatever is down (Docker, backend, frontend, ngrok), then checks everything
+scripts/dev.sh check    # checks only
+scripts/dev.sh test     # checks + smoke test (sign-up, sign-in, roles, forged webhook)
+scripts/dev.sh logs backend    # or frontend / ngrok
+scripts/dev.sh stop     # stop what the script started (stop-all also stops Docker)
+```
+From PowerShell: `.\scripts\dev.ps1` (same commands). Anything already running, such as a backend in your own terminal, is detected and left alone. Logs go to `.run/`.
+
+The frontend uses a flat `node_modules` (`frontend/.npmrc`) with both Windows and Linux build tools, so it runs from either side. Install with `pnpm install` from Windows.
+
 ### Option A: everything in Docker
 ```bash
 docker compose up -d --build

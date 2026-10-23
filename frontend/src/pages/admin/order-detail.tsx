@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { adminApi, type Attempt, type OrderDetail } from '@/lib/admin-api'
+import { adminApi, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { JsonBlock, PageHeader, StatusBadge } from './shared'
 
@@ -91,12 +91,12 @@ function AttemptCard({ attempt, order, onRefund }: { attempt: Attempt; order: Or
         <StatusBadge status={attempt.status} />
         {attempt.reasonCode && <span className="font-mono text-xs text-destructive">{attempt.reasonCode}</span>}
         <div className="ml-auto flex gap-2">
-          {attempt.billpayPaymentId && (
+          {isAdmin() && attempt.billpayPaymentId && (
             <Button size="sm" variant="outline" onClick={() => reconcile.mutate()} disabled={reconcile.isPending}>
               {reconcile.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Check with BillPay
             </Button>
           )}
-          {attempt.status === 'SUCCEEDED' && (attempt.refundable ?? 0) > 0 && (
+          {isAdmin() && attempt.status === 'SUCCEEDED' && (attempt.refundable ?? 0) > 0 && (
             <Button size="sm" variant="outline" onClick={onRefund}>
               <RotateCcw /> Refund
             </Button>
@@ -217,7 +217,7 @@ export function AdminOrderDetailPage() {
                   {r.reasonCode && <span className="font-mono text-xs text-destructive">{r.reasonCode}</span>}
                   {r.external && <span className="text-xs text-muted-foreground">issued outside TenaShop</span>}
                   <span className="ml-auto font-medium tabular-nums">{formatETB(r.amount)}</span>
-                  {(r.status === 'ERROR' || r.status === 'REQUESTED') && (
+                  {isAdmin() && (r.status === 'ERROR' || r.status === 'REQUESTED') && (
                     <Button size="sm" variant="outline" onClick={() => retryRefund.mutate(r.id)} disabled={retryRefund.isPending}>
                       Retry
                     </Button>

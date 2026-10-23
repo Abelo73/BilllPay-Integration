@@ -96,12 +96,22 @@ public class PaymentService {
 	}
 
 	private CreatePaymentRequest buildRequest(Order order, String merchantReference) {
-		String base = app.publicBaseUrl();
+		String redirectBase = app.redirectBaseUrl();
+		String returnUrl;
+		String cancelUrl;
+		if (redirectBase != null && !redirectBase.isBlank()) {
+			// BillPay sends the shopper to our https backend, which forwards to the shop (BillPayRedirectController)
+			String base = redirectBase.replaceAll("/+$", "");
+			returnUrl = base + "/api/billpay/return?order=" + order.getOrderNumber();
+			cancelUrl = base + "/api/billpay/cancel?order=" + order.getOrderNumber();
+		} else {
+			returnUrl = app.publicBaseUrl() + "/checkout/return?order=" + order.getOrderNumber();
+			cancelUrl = app.publicBaseUrl() + "/checkout/cancelled?order=" + order.getOrderNumber();
+		}
 		return new CreatePaymentRequest(merchantReference, order.getTotal(), order.getCurrency(),
 				"TenaShop order " + order.getOrderNumber(),
 				new Customer(order.getCustomerName(), order.getCustomerPhone(), order.getCustomerEmail()),
-				base + "/checkout/return?order=" + order.getOrderNumber(),
-				base + "/checkout/cancelled?order=" + order.getOrderNumber());
+				returnUrl, cancelUrl);
 	}
 
 	private void recordCreated(UUID attemptId, BillPayPayment response) {
@@ -151,6 +161,16 @@ public class PaymentService {
 			return Outcome.IGNORED;
 		}
 		if (next == current) {
+			// BillPay keeps a payment open after a failed try (e.g. INSUFFICIENT_FUNDS) so the customer can retry;
+			// record the latest failure so the shop can explain it.
+			String reason = reported.reasonCode();
+			if (!current.isFinal() && reason != null && !reason.equals(attempt.getReasonCode())) {
+				attempt.setReasonCode(reason);
+				Order order = orders.findById(attempt.getOrderId()).orElseThrow();
+				orderService.note(order, "PAYMENT_TRY_FAILED",
+						attempt.getMerchantReference() + " try failed: " + reason + " via " + source);
+				return Outcome.APPLIED;
+			}
 			return Outcome.DUPLICATE;
 		}
 		// SUCCEEDED is terminal. Other final states only give way to SUCCEEDED, because money really moved.

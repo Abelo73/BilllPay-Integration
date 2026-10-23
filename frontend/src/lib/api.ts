@@ -1,3 +1,5 @@
+import { sessionToken, useSession, type Session, type SessionUser } from '@/store/session'
+
 export type Product = {
   id: number
   name: string
@@ -53,6 +55,16 @@ export type OrderStatusView = {
 }
 
 /** RFC 7807 problem returned by the backend. */
+export type OrderSummary = {
+  orderNumber: string
+  status: OrderStatus
+  total: number
+  currency: string
+  itemCount: number
+  createdAt: string
+  paidAt: string | null
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -66,11 +78,22 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
+  const token = sessionToken()
   const res = await fetch(`/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   })
+  if (res.status === 401 && token) {
+    // The session ended (expired, password changed, signed out elsewhere): forget it.
+    useSession.getState().clear()
+    // Public endpoints still work as a guest, so try once more without the token.
+    if (!retried && !path.startsWith('/me')) return request<T>(path, init, true)
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new ApiError(res.status, body)
@@ -98,4 +121,16 @@ export const api = {
     request<OrderStatusView>(
       `/orders/${encodeURIComponent(orderNumber)}/status?phone=${encodeURIComponent(phone)}`,
     ),
+
+  register: (body: { fullName: string; email: string; phone: string; password: string }) =>
+    request<Session>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  login: (email: string, password: string) =>
+    request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  me: () => request<SessionUser>('/me'),
+  updateMe: (body: { fullName: string; phone: string }) =>
+    request<SessionUser>('/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<Session>('/me/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
+  logoutEverywhere: () => request<{ signedOut: boolean }>('/me/logout-all', { method: 'POST' }),
+  myOrders: (page = 0) => request<Page<OrderSummary>>(`/me/orders?page=${page}`),
 }

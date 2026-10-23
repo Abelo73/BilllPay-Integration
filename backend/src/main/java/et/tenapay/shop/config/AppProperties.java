@@ -8,10 +8,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("app")
 public record AppProperties(
 		String publicBaseUrl,
+		/** Public https base (e.g. the ngrok URL) for BillPay's returnUrl/cancelUrl; blank = use publicBaseUrl. */
+		String redirectBaseUrl,
 		List<String> corsOrigins,
 		Duration reconcileAfter,
 		Duration paymentExpiry,
-		String adminUsername,
+		String adminEmail,
 		String adminPassword,
 		String jwtSecret) {
 }

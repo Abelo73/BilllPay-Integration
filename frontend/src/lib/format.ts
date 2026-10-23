@@ -17,6 +17,8 @@ export function reasonMessage(code: string | null | undefined) {
       return 'The payment is over your account limit.'
     case 'CARD_EXPIRED':
       return 'The card has expired. Try another card or method.'
+    case 'PROVIDER_TIMEOUT':
+      return 'The payment request was never approved, so it timed out.'
     default:
       return code ? `The payment did not go through (${code}).` : 'The payment did not go through.'
   }

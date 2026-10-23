@@ -145,7 +145,11 @@ function describe(o: OrderStatusView, cancelled: boolean) {
       return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Order cancelled', text: 'This order was cancelled.' }
     default:
       if (cancelled) {
-        return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment cancelled', text: 'You left BillPay before paying. Your order is saved — continue whenever you’re ready.' }
+        return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment cancelled', text: `You left BillPay before paying.${o.payment?.reasonCode ? ` Your last try: ${reason}` : ''} Your order is saved — continue whenever you’re ready.` }
+      }
+      if (o.payment?.status === 'PENDING' && o.payment.reasonCode) {
+        // BillPay keeps the payment open after a failed try, so the shopper can try again on the same link
+        return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'Your last try didn’t go through', text: `${reason} Continue the payment to try again with another number or method.` }
       }
       if (o.payment?.status === 'PENDING') {
         return { icon: Loader2, iconClass: 'animate-spin text-brand', tone: 'bg-accent', title: 'Confirming your payment…', text: 'This usually takes a few seconds. You can keep this page open; it updates by itself.' }

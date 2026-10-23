@@ -108,11 +108,11 @@ Get these from the docs or the integration team before building the affected par
 
 | # | Question | Blocks |
 |---|----------|--------|
-| Q1 | Exact response body of create payment: field names for payment ID, checkout URL, status, expiry | FR-PAY-4 |
-| Q2 | ~~How webhooks are configured~~ (answered: Dashboard → Webhooks, or the API). Still open: exact event type names and payload schema. A test delivery will show them. | FR-WH |
-| Q3 | Webhook signature: header name, algorithm, timestamp tolerance. Events are confirmed signed with a per-endpoint secret; the backend probe will detect common HMAC formats from a test delivery. | FR-WH-2 |
+| Q1 | ✅ **Answered 2026-10-23** (real sandbox call): HTTP 201, `body.id` (UUID), `body.checkoutUrl`, `body.status` = `CREATED`, `body.expiresAt` (30 min), money as `{"amount": 10.0000, "currency": "ETB"}` objects (`amount`, `charged`, `fee`, `vat`, `net`, `refunded`). `returnUrl`/`cancelUrl` **must be https**. Bad key → 401 `"Invalid API key"`. | FR-PAY-4 |
+| Q2 | ✅ **Answered 2026-10-23:** body `{eventId, eventType, occurredAt, data:{paymentId, merchantReference, amount, chargedAmount, fee, vat, netAmount, currency, provider, instrument, capturedAt, attemptStartedAt}}`; headers `X-Billpay-Event`, `X-Billpay-Event-Id`. No status field: the type (`PaymentCaptured`, …) carries it. ⚠️ `eventId` equals the paymentId, so we dedupe on `eventId:eventType`. | FR-WH |
+| Q3 | ✅ **Answered 2026-10-23:** `X-Billpay-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`, secret `whsec_…` per endpoint (Test and Live separate). Verified live: real delivery matched, forged one got 401. Still open: BillPay's timestamp tolerance (we don't enforce one yet). | FR-WH-2 |
 | Q4 | Webhook retry policy: how many retries, backoff, which response codes count as success | FR-WH-5 |
-| Q5 | Payment status endpoint (e.g. `GET /api/v1/checkout/payments/{id}`?) and lookup by merchantReference | FR-REC |
+| Q5 | ✅ **Answered 2026-10-23:** `GET /api/v1/checkout/payments/{id}` (UUID) works with `x-api-key`. Statuses seen: `CREATED` → `PROCESSING`. Per-try details live in `attempts[]` (`instrument`, `payerReference`, `status`, `failureCode`, `failureReason`). Lookup by merchantReference still unknown. | FR-REC |
 | Q6 | Refund endpoint and body (we assume `POST /api/v1/refunds` with paymentId, merchantReference, amount, currency, reason; configurable as `billpay.refund-path`), and partial refunds. Refund **webhooks** are confirmed ("refunded" events). | FR-REF |
 | Q7 | How long a pending checkout lives before it expires | FR-REC-2 |
 | Q8 | Must `merchantReference` be unique per payment or per order? Can it be reused after failure? | FR-PAY-6 |
@@ -138,3 +138,4 @@ Get these from the docs or the integration team before building the affected par
 |------|--------|
 | 2026-10-22 | Initial notes from dashboard screenshots (Developers page, sandbox table) |
 | 2026-10-22 | Webhooks page: signed events (captured/failed/refunded/settled), secret shown once, test deliveries, delivery log |
+| 2026-10-23 | First real sandbox payment end to end (TS-20261023-00003, ETB 1,450, TEST_WALLET): create 201 → checkout → PaymentCaptured webhook (signature verified) → order PAID. Q1, Q2, Q3, Q5 answered. |

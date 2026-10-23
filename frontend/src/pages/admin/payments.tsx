@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { adminApi } from '@/lib/admin-api'
+import { adminApi, isAdmin } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { EmptyRow, PageHeader, Pager, StatusBadge } from './shared'
 
@@ -94,7 +94,7 @@ export function AdminPaymentsPage() {
                   <TableCell className="text-right tabular-nums">{formatETB(a.amount)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">{formatDate(a.createdAt)}</TableCell>
                   <TableCell className="pr-4 text-right">
-                    {a.billpayPaymentId && (
+                    {isAdmin() && a.billpayPaymentId && (
                       <Button
                         size="icon-sm"
                         variant="ghost"

@@ -35,15 +35,20 @@ public final class BillPayPayloads {
 
 	public static BillPayPayment parsePayment(JsonNode root, String raw) {
 		JsonNode p = paymentNode(root);
+		// BillPay keeps per-try details in attempts[] (instrument, failureCode); the last one is the latest try
+		JsonNode attempts = p.path("attempts");
+		JsonNode last = attempts.isArray() && !attempts.isEmpty() ? attempts.get(attempts.size() - 1) : p;
+		String reasonCode = text(p, "reasonCode", "reason_code", "failureCode", "failureReason", "reason");
+		String method = text(p, "paymentMethod", "method", "paymentMethodCode", "instrument");
 		return new BillPayPayment(
 				text(p, "paymentId", "id", "checkoutId", "transactionId", "reference"),
 				text(p, "merchantReference", "merchant_reference"),
 				text(p, "checkoutUrl", "checkout_url", "paymentUrl", "redirectUrl", "hostedUrl", "url"),
 				text(p, "status", "paymentStatus", "state"),
-				text(p, "reasonCode", "reason_code", "failureReason", "reason"),
-				decimal(p, "amount"),
-				text(p, "currency"),
-				text(p, "paymentMethod", "method", "paymentMethodCode"),
+				reasonCode != null ? reasonCode : text(last, "failureCode", "failureReason"),
+				money(p, "amount"),
+				p.path("amount").isObject() ? text(p.path("amount"), "currency") : text(p, "currency"),
+				method != null ? method : text(last, "instrument", "provider"),
 				instant(p, "expiresAt", "expires_at", "expiry"),
 				raw);
 	}
@@ -113,7 +118,7 @@ public final class BillPayPayloads {
 				text(r, "merchantReference", "refundReference", "merchant_reference"),
 				text(r, "status", "refundStatus", "state"),
 				text(r, "reasonCode", "reason_code", "failureReason"),
-				decimal(r, "amount") != null ? decimal(r, "amount") : decimal(r, "refundedAmount"),
+				money(r, "amount") != null ? money(r, "amount") : money(r, "refundedAmount"),
 				raw);
 	}
 
@@ -128,6 +133,12 @@ public final class BillPayPayloads {
 			}
 		}
 		return null;
+	}
+
+	/** BillPay sends money as {"amount": 10.0000, "currency": "ETB"}; a plain number is accepted too. */
+	static BigDecimal money(JsonNode node, String name) {
+		JsonNode v = node.path(name);
+		return v.isObject() ? decimal(v, "amount") : decimal(node, name);
 	}
 
 	static BigDecimal decimal(JsonNode node, String name) {
