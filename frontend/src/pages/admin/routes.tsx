@@ -2,6 +2,7 @@ import { useRoutes, type RouteObject } from 'react-router'
 
 import { AdminCategoriesPage } from './categories'
 import { AdminDashboardPage } from './dashboard'
+import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
 import { AdminLayout } from './layout'
 import { AdminLoginHistoryPage } from './login-history'
@@ -30,6 +31,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'products', element: <AdminProductsPage /> },
       { path: 'products/:productId', element: <AdminProductEditPage /> },
       { path: 'categories', element: <AdminCategoriesPage /> },
+      { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },
       { path: 'emails', element: <AdminEmailsPage /> },

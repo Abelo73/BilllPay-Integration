@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import et.tenapay.shop.catalog.Product;
 import et.tenapay.shop.catalog.ProductRepository;
 import et.tenapay.shop.common.ApiException;
+import et.tenapay.shop.discount.DiscountService;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -33,6 +34,7 @@ public class CheckoutService {
 	private final OrderService orderService;
 	private final et.tenapay.shop.config.AppProperties app;
 	private final et.tenapay.shop.events.OrderEventPublisher publisher;
+	private final DiscountService discounts;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -47,7 +49,8 @@ public class CheckoutService {
 	 * Creates the order with server-side prices and the delivery fee, and reserves stock. Does not call BillPay.
 	 */
 	@Transactional
-	public Order createOrder(List<Line> lines, CustomerInfo customer, DeliveryInfo delivery, UUID userId) {
+	public Order createOrder(List<Line> lines, CustomerInfo customer, DeliveryInfo delivery, UUID userId,
+			String discountCode) {
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
@@ -92,19 +95,58 @@ public class CheckoutService {
 			order.addItem(item);
 			subtotal = subtotal.add(item.getLineTotal());
 		}
-		BigDecimal fee = app.delivery().feeFor(subtotal);
+		// Discount comes off the items; the delivery fee is worked out on what's left.
+		BigDecimal discount = BigDecimal.ZERO.setScale(2);
+		if (discountCode != null && !discountCode.isBlank()) {
+			DiscountService.Applied applied = discounts.use(discountCode, subtotal);
+			discount = applied.amount();
+			order.setDiscountCode(applied.code());
+		}
+		BigDecimal items = subtotal.subtract(discount);
+		BigDecimal fee = app.delivery().feeFor(items);
+		BigDecimal total = items.add(fee);
+		if (total.compareTo(BigDecimal.ONE) < 0) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "DISCOUNT_INVALID",
+					"This discount would make the order free; BillPay needs at least ETB 1.00 to charge.",
+					Map.of("reason", "TOTAL_TOO_LOW"));
+		}
 		order.setSubtotal(subtotal);
+		order.setDiscountAmount(discount);
 		order.setDeliveryFee(fee);
-		order.setTotal(subtotal.add(fee));
+		order.setTotal(total);
 		order.setDeliveryAddress(delivery.address().trim());
 		order.setDeliveryCity(delivery.city().trim());
 		order.setDeliveryNotes(delivery.notes() == null || delivery.notes().isBlank() ? null : delivery.notes().trim());
 		order.setCreatedAt(Instant.now());
 		orders.save(order);
 		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s), subtotal " + subtotal
+				+ (discount.signum() > 0 ? " - " + discount + " (" + order.getDiscountCode() + ")" : "")
 				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
 		publisher.publish(order, "order.placed", Map.of());
 		return order;
+	}
+
+	public record Quote(BigDecimal subtotal, String discountCode, String discountDescription, BigDecimal discount,
+			BigDecimal deliveryFee, BigDecimal total) {
+	}
+
+	/** What the cart would cost with this code, using server prices. Nothing is reserved or used. */
+	@Transactional(readOnly = true)
+	public Quote quote(List<Line> lines, String discountCode) {
+		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
+		for (Line line : lines) {
+			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
+		}
+		BigDecimal subtotal = BigDecimal.ZERO.setScale(2);
+		for (Product p : products.findAllById(qtyByProduct.keySet())) {
+			if (p.isActive()) {
+				subtotal = subtotal.add(p.getPrice().multiply(BigDecimal.valueOf(qtyByProduct.get(p.getId()))));
+			}
+		}
+		DiscountService.Applied applied = discounts.quote(discountCode, subtotal);
+		BigDecimal items = subtotal.subtract(applied.amount());
+		BigDecimal fee = app.delivery().feeFor(items);
+		return new Quote(subtotal, applied.code(), applied.description(), applied.amount(), fee, items.add(fee));
 	}
 
 	private String nextOrderNumber() {

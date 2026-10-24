@@ -27,7 +27,8 @@ final class EmailTemplates {
 	record Item(String name, int quantity, BigDecimal lineTotal) {
 	}
 
-	record OrderView(String orderNumber, String customerName, List<Item> items, BigDecimal subtotal,
+	record OrderView(String orderNumber, String customerName, List<Item> items, BigDecimal subtotal, String discountCode,
+			BigDecimal discount,
 			BigDecimal deliveryFee, BigDecimal total, String deliveryAddress, String deliveryCity, String trackingNote,
 			String reasonCode, String trackUrl) {
 	}
@@ -86,7 +87,12 @@ final class EmailTemplates {
 					.append("\n");
 		}
 		String fee = o.deliveryFee() == null || o.deliveryFee().signum() == 0 ? "Free" : etb(o.deliveryFee());
-		rows.append(line("Subtotal", etb(o.subtotal()), false)).append(line("Delivery", fee, false))
+		rows.append(line("Subtotal", etb(o.subtotal()), false));
+		if (o.discount() != null && o.discount().signum() > 0) {
+			rows.append(line("Discount (" + esc(o.discountCode()) + ")", "-" + etb(o.discount()), false));
+			text.append("  Discount ").append(o.discountCode()).append(" -").append(etb(o.discount())).append("\n");
+		}
+		rows.append(line("Delivery", fee, false))
 				.append(line("Total", etb(o.total()), true));
 		text.append("  Delivery ").append(fee).append("\n  Total ").append(etb(o.total())).append("\n");
 

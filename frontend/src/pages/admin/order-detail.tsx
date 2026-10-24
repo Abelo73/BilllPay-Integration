@@ -129,6 +129,7 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
         </div>
         <div className="space-y-1 rounded-lg bg-muted/50 p-3">
           <div className="flex justify-between"><span className="text-muted-foreground">Items</span><span className="tabular-nums">{formatETB(d.subtotal)}</span></div>
+          {d.discountAmount > 0 && <div className="flex justify-between text-success"><span>Discount ({d.discountCode})</span><span className="tabular-nums">−{formatETB(d.discountAmount)}</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">Delivery fee</span><span className="tabular-nums">{d.deliveryFee > 0 ? formatETB(d.deliveryFee) : 'free'}</span></div>
         </div>
         {d.trackingNote && <p className="text-muted-foreground">Tracking: {d.trackingNote}</p>}

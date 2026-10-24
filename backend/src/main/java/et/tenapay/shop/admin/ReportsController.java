@@ -126,7 +126,8 @@ public class ReportsController {
 	public void ordersCsv(@RequestParam(defaultValue = "30") int days, HttpServletResponse response) throws IOException {
 		csv(response, "orders", days, """
 				select o.order_number, o.created_at, o.status, o.fulfilment_status, o.customer_name, o.customer_phone,
-				       o.customer_email, o.delivery_city, o.subtotal, o.delivery_fee, o.total, o.currency, o.paid_at,
+				       o.customer_email, o.delivery_city, o.subtotal, o.discount_code, o.discount_amount, o.delivery_fee,
+				       o.total, o.currency, o.paid_at,
 				       a.payment_method, a.merchant_reference, a.billpay_payment_id
 				from orders o
 				left join lateral (

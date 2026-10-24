@@ -133,6 +133,12 @@ export function OrderStatusPanel({
           <span className="text-muted-foreground">Subtotal</span>
           <span className="tabular-nums">{formatETB(o.subtotal)}</span>
         </div>
+        {o.discountAmount > 0 && (
+          <div className="flex justify-between text-sm text-success">
+            <span>Discount ({o.discountCode})</span>
+            <span className="tabular-nums">−{formatETB(o.discountAmount)}</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Delivery</span>
           <span className="tabular-nums">{o.deliveryFee > 0 ? formatETB(o.deliveryFee) : 'Free'}</span>

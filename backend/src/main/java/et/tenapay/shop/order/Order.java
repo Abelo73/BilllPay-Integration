@@ -62,8 +62,12 @@ public class Order {
 
 	private String deliveryNotes;
 
-	/** Included in {@link #total}; total = subtotal + deliveryFee. */
+	/** Included in {@link #total}; total = subtotal - discountAmount + deliveryFee. */
 	private BigDecimal deliveryFee = BigDecimal.ZERO;
+
+	private String discountCode;
+
+	private BigDecimal discountAmount = BigDecimal.ZERO;
 
 	/** Null until the order is paid. */
 	@Enumerated(EnumType.STRING)

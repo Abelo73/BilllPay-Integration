@@ -81,12 +81,14 @@ public class AdminController {
 		}
 	}
 
-	public record DeliveryDetail(String address, String city, String notes, BigDecimal subtotal, BigDecimal deliveryFee,
+	public record DeliveryDetail(String address, String city, String notes, BigDecimal subtotal, String discountCode,
+			BigDecimal discountAmount, BigDecimal deliveryFee,
 			String fulfilmentStatus, List<String> nextSteps, String trackingNote, Instant shippedAt,
 			Instant deliveredAt, Instant cancelledAt) {
 
 		static DeliveryDetail from(Order o) {
 			return new DeliveryDetail(o.getDeliveryAddress(), o.getDeliveryCity(), o.getDeliveryNotes(), o.getSubtotal(),
+					o.getDiscountCode(), o.getDiscountAmount(),
 					o.getDeliveryFee(), o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(),
 					o.getFulfilmentStatus() == null ? List.of()
 							: o.getFulfilmentStatus().next().stream().map(Enum::name).sorted().toList(),

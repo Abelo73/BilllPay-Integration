@@ -31,6 +31,12 @@ const TONES: Record<string, string> = {
   PROCESSING: 'bg-brand/10 text-brand border-brand/30',
   SHIPPED: 'bg-brand/10 text-brand border-brand/30',
   DELIVERED: 'bg-success/15 text-success border-success/30',
+  // discount codes
+  LIVE: 'bg-success/15 text-success border-success/30',
+  EXPIRED: 'bg-muted text-muted-foreground',
+  USED_UP: 'bg-muted text-muted-foreground',
+  INACTIVE: 'bg-muted text-muted-foreground',
+  NOT_STARTED: 'bg-brand/10 text-brand border-brand/30',
 }
 
 export function StatusBadge({ status }: { status: string }) {

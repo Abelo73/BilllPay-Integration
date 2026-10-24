@@ -73,7 +73,12 @@ public class CheckoutController {
 			@NotNull @Valid CustomerRequest customer,
 			@NotNull @Valid DeliveryRequest delivery,
 			/** Signed-in customers: also save this address to their address book. */
-			Boolean saveAddress) {
+			Boolean saveAddress,
+			@Size(max = 40) String discountCode) {
+	}
+
+	public record QuoteRequest(@NotEmpty @Size(max = 30) List<@Valid CheckoutItem> items,
+			@NotBlank @Size(max = 40) String code) {
 	}
 
 	public record CheckoutResponse(String orderNumber, String checkoutUrl) {
@@ -102,8 +107,8 @@ public class CheckoutController {
 	public record StepView(String type, Instant at) {
 	}
 
-	public record OrderStatusView(String orderNumber, String status, BigDecimal subtotal, BigDecimal deliveryFee,
-			BigDecimal total, String currency, String customerName, List<ItemView> items, PaymentView payment,
+	public record OrderStatusView(String orderNumber, String status, BigDecimal subtotal, String discountCode,
+			BigDecimal discountAmount, BigDecimal deliveryFee, BigDecimal total, String currency, String customerName, List<ItemView> items, PaymentView payment,
 			boolean canRetry, boolean canCancel, DeliveryView delivery, List<StepView> timeline, Instant createdAt,
 			Instant paidAt) {
 	}
@@ -117,6 +122,13 @@ public class CheckoutController {
 		return new DeliveryQuote(app.delivery().flatFee(), app.delivery().freeOver(), "ETB");
 	}
 
+	/** Checks a discount code against the cart and returns what the order would cost. Nothing is used up. */
+	@PostMapping("/discounts/check")
+	public CheckoutService.Quote checkDiscount(@Valid @RequestBody QuoteRequest req) {
+		return checkout.quote(req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
+				req.code());
+	}
+
 	@PostMapping("/checkout")
 	public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest req) {
 		java.util.UUID customerId = CurrentUser.customerId().orElse(null);
@@ -124,7 +136,7 @@ public class CheckoutController {
 				req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
 				new CheckoutService.CustomerInfo(req.customer().name(), req.customer().phone(), req.customer().email()),
 				new CheckoutService.DeliveryInfo(req.delivery().address(), req.delivery().city(), req.delivery().notes()),
-				customerId);
+				customerId, req.discountCode());
 		if (customerId != null && Boolean.TRUE.equals(req.saveAddress())) {
 			saveAddress(customerId, req);
 		}
@@ -217,7 +229,7 @@ public class CheckoutController {
 				.map(e -> new StepView(e.getType(), e.getCreatedAt()))
 				.toList();
 		return new OrderStatusView(order.getOrderNumber(), order.getStatus().name(), order.getSubtotal(),
-				order.getDeliveryFee(), order.getTotal(), order.getCurrency(), order.getCustomerName(),
+				order.getDiscountCode(), order.getDiscountAmount(), order.getDeliveryFee(), order.getTotal(), order.getCurrency(), order.getCustomerName(),
 				order.getItems().stream()
 						.map(i -> new ItemView(i.getProductName(), i.getUnitPrice(), i.getQuantity(), i.getLineTotal()))
 						.toList(),

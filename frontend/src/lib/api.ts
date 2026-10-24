@@ -35,9 +35,19 @@ export type CheckoutRequest = {
   delivery: DeliveryInput
   /** Signed-in customers: also keep this address in the address book. */
   saveAddress?: boolean
+  discountCode?: string
 }
 
 export type DeliveryQuote = { flatFee: number; freeOver: number; currency: string }
+
+export type PriceQuote = {
+  subtotal: number
+  discountCode: string
+  discountDescription: string | null
+  discount: number
+  deliveryFee: number
+  total: number
+}
 
 export function deliveryFee(quote: DeliveryQuote | undefined, subtotal: number) {
   if (!quote || quote.flatFee <= 0) return 0
@@ -75,6 +85,8 @@ export type OrderStatusView = {
   orderNumber: string
   status: OrderStatus
   subtotal: number
+  discountCode: string | null
+  discountAmount: number
   deliveryFee: number
   total: number
   currency: string
@@ -170,6 +182,8 @@ export const api = {
       body: JSON.stringify({ phone, reason }),
     }),
   delivery: () => request<DeliveryQuote>('/delivery'),
+  checkDiscount: (items: { productId: number; quantity: number }[], code: string) =>
+    request<PriceQuote>('/discounts/check', { method: 'POST', body: JSON.stringify({ items, code }) }),
 
   addresses: () => request<Address[]>('/me/addresses'),
   addAddress: (body: AddressInput) => request<Address[]>('/me/addresses', { method: 'POST', body: JSON.stringify(body) }),

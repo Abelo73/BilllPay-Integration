@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Lock, MapPin, ShoppingBag, Truck } from 'lucide-react'
+import { Loader2, Lock, MapPin, ShoppingBag, Tag, Truck, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, Navigate, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { api, ApiError, deliveryFee, type Address } from '@/lib/api'
+import { api, ApiError, deliveryFee, type Address, type PriceQuote } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
@@ -49,6 +49,7 @@ export function CheckoutPage() {
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()
   const user = useSession((s) => s.session?.user)
+  const clearSession = useSession((s) => s.clear)
   const isCustomer = user?.role === 'CUSTOMER'
   const [form, setForm] = useState<Form>({
     name: user?.fullName ?? '',
@@ -64,8 +65,33 @@ export function CheckoutPage() {
 
   const quote = useQuery({ queryKey: ['delivery'], queryFn: api.delivery, staleTime: 5 * 60_000 })
   const saved = useQuery({ queryKey: ['addresses'], queryFn: api.addresses, enabled: isCustomer })
-  const fee = deliveryFee(quote.data, subtotal)
-  const toFree = quote.data && quote.data.freeOver > 0 && fee > 0 ? quote.data.freeOver - subtotal : 0
+  // Discount code: the server works out the price; re-checked whenever the cart changes
+  const [codeInput, setCodeInput] = useState('')
+  const [applied, setApplied] = useState<PriceQuote | null>(null)
+  const [codeError, setCodeError] = useState('')
+  const cartItems = lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
+  const cartKey = JSON.stringify(cartItems)
+  const applyCode = useMutation({
+    mutationFn: (code: string) => api.checkDiscount(cartItems, code),
+    onSuccess: (q) => {
+      setApplied(q)
+      setCodeError('')
+      setCodeInput(q.discountCode)
+    },
+    onError: (e) => {
+      setApplied(null)
+      setCodeError(e.message)
+    },
+  })
+  useEffect(() => {
+    if (applied && lines.length > 0) applyCode.mutate(applied.discountCode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartKey])
+
+  const discount = applied?.discount ?? 0
+  const itemsAfterDiscount = subtotal - discount
+  const fee = applied ? applied.deliveryFee : deliveryFee(quote.data, itemsAfterDiscount)
+  const toFree = quote.data && quote.data.freeOver > 0 && fee > 0 ? quote.data.freeOver - itemsAfterDiscount : 0
 
   const pickAddress = (a: Address) => {
     setChosen(a.id)
@@ -95,12 +121,40 @@ export function CheckoutPage() {
         navigate(`/checkout/return?order=${err.body.orderNumber}`)
         return
       }
+      if (err instanceof ApiError && err.status === 401) {
+        // The session ended while filling in the form; the cart is kept.
+        toast.error('Please sign in again to finish your order.')
+        navigate('/login?next=/checkout')
+        return
+      }
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED') {
         setErrors(fieldErrors((err.body.errors as Record<string, string>) ?? {}))
+      }
+      if (err instanceof ApiError && err.code === 'DISCOUNT_INVALID') {
+        // e.g. the last use was taken while the shopper was filling in the form
+        setApplied(null)
+        setCodeError(err.message)
       }
       toast.error(err.message)
     },
   })
+
+  // Buying needs a customer account: guests sign in (or sign up) first and come back here with the cart kept.
+  if (!user && !checkout.isPending && !checkout.isSuccess) return <Navigate to="/login?next=/checkout" replace />
+  if (user && !isCustomer) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-4 px-4 py-24 text-center">
+        <div className="grid size-16 place-items-center rounded-full bg-muted">
+          <UserRound className="size-7 text-muted-foreground" />
+        </div>
+        <h1 className="text-2xl font-semibold">Staff accounts can’t place orders</h1>
+        <p className="text-sm text-muted-foreground">
+          You’re signed in as {user.email}. Sign out, then sign in with a customer account to buy.
+        </p>
+        <Button onClick={() => { clearSession(); navigate('/login?next=/checkout') }}>Sign out and continue</Button>
+      </div>
+    )
+  }
 
   if (lines.length === 0 && !checkout.isPending && !checkout.isSuccess) {
     return (
@@ -133,6 +187,7 @@ export function CheckoutPage() {
       customer: { name: d.name, phone: d.phone, email: d.email },
       delivery: { address: d.address, city: d.city, notes: d.notes || undefined },
       saveAddress: isCustomer && chosen === null && saveAddress,
+      discountCode: applied?.discountCode,
     })
   }
 
@@ -157,7 +212,7 @@ export function CheckoutPage() {
   )
 
   const busy = checkout.isPending || checkout.isSuccess
-  const total = subtotal + fee
+  const total = itemsAfterDiscount + fee
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -168,13 +223,7 @@ export function CheckoutPage() {
             <CardHeader>
               <CardTitle>Contact details</CardTitle>
               <CardDescription>
-                BillPay uses these to send your payment request and receipt.
-                {!user && (
-                  <>
-                    {' '}
-                    <Link to="/login?next=/checkout" className="font-medium text-brand hover:underline">Sign in</Link> to save this order and your address.
-                  </>
-                )}
+                Filled in from your account. BillPay uses these to send your payment request and receipt.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -246,10 +295,50 @@ export function CheckoutPage() {
               </div>
             ))}
             <Separator />
+            <form
+              className="space-y-1.5"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (codeInput.trim()) applyCode.mutate(codeInput.trim())
+              }}
+            >
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Discount code"
+                  placeholder="Discount code"
+                  className="h-9 uppercase placeholder:normal-case"
+                  value={codeInput}
+                  onChange={(e) => {
+                    setCodeInput(e.target.value)
+                    setCodeError('')
+                  }}
+                  disabled={!!applied}
+                  aria-invalid={!!codeError}
+                />
+                {applied ? (
+                  <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => { setApplied(null); setCodeInput('') }}>
+                    <X /> Remove
+                  </Button>
+                ) : (
+                  <Button type="submit" variant="outline" size="sm" className="h-9" disabled={!codeInput.trim() || applyCode.isPending}>
+                    {applyCode.isPending ? <Loader2 className="animate-spin" /> : <Tag />} Apply
+                  </Button>
+                )}
+              </div>
+              {codeError && <p className="text-xs text-destructive">{codeError}</p>}
+              {applied?.discountDescription && <p className="text-xs text-success">{applied.discountDescription}</p>}
+            </form>
+            <Separator />
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="tabular-nums">{formatETB(subtotal)}</span>
             </div>
+            {applied && discount > 0 && (
+              <div className="flex justify-between text-sm text-success">
+                <span>Discount ({applied.discountCode})</span>
+                <span className="tabular-nums">−{formatETB(discount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Delivery</span>
               <span className="tabular-nums">{quote.isLoading ? '…' : fee === 0 ? 'Free' : formatETB(fee)}</span>

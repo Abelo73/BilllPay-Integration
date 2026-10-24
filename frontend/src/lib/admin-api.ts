@@ -106,6 +106,8 @@ export type DeliveryDetail = {
   city: string | null
   notes: string | null
   subtotal: number
+  discountCode: string | null
+  discountAmount: number
   deliveryFee: number
   fulfilmentStatus: string | null
   nextSteps: string[]
@@ -234,6 +236,10 @@ export const adminApi = {
     }),
   retryRefund: (id: string) => request<Refund>(`/refunds/${id}/retry`, { method: 'POST' }),
   report: (days: number) => request<Report>(`/reports?days=${days}`),
+  discounts: () => request<DiscountRow[]>('/discounts'),
+  createDiscount: (body: DiscountInput) => request<DiscountRow[]>('/discounts', { method: 'POST', body: JSON.stringify(body) }),
+  updateDiscount: (id: number, body: { active?: boolean; description?: string; expiresAt?: string; clearExpiry?: boolean; usageLimit?: number; clearUsageLimit?: boolean }) =>
+    request<DiscountRow[]>(`/discounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   /** Downloads a CSV export with the staff token (a plain link can't send the Authorization header). */
   downloadCsv: async (kind: 'orders' | 'payments', days: number) => {
     const res = await fetch(`/api/admin/reports/${kind}.csv?days=${days}`, {
@@ -414,4 +420,37 @@ export type Report = {
   topProducts: { productId: number; name: string; quantity: number; revenue: number }[]
   byMethod: { method: string; finished: number; succeeded: number; successRate: number }[]
   failureReasons: { reason: string; count: number }[]
+}
+
+export type DiscountRow = {
+  id: number
+  code: string
+  description: string | null
+  kind: 'PERCENT' | 'FIXED'
+  value: number
+  maxDiscount: number | null
+  minSubtotal: number
+  startsAt: string | null
+  expiresAt: string | null
+  usageLimit: number | null
+  timesUsed: number
+  active: boolean
+  /** LIVE, or why it can't be used now: INACTIVE, NOT_STARTED, EXPIRED, USED_UP */
+  state: string
+  paidOrders: number
+  discountGiven: number
+  revenue: number
+  createdAt: string
+}
+
+export type DiscountInput = {
+  code: string
+  description?: string
+  kind: 'PERCENT' | 'FIXED'
+  value: number
+  maxDiscount?: number
+  minSubtotal?: number
+  startsAt?: string
+  expiresAt?: string
+  usageLimit?: number
 }

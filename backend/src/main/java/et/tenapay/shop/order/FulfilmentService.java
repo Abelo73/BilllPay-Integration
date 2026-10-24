@@ -45,7 +45,7 @@ public class FulfilmentService {
 				a.setStatus(PaymentStatus.CANCELLED);
 			}
 		}
-		orderService.releaseStock(order);
+		orderService.releaseReservations(order);
 		order.setCancelledAt(Instant.now());
 		orderService.transition(order, OrderStatus.CANCELLED, "CANCELLED",
 				"by " + by + (reason == null || reason.isBlank() ? "" : ": " + reason.trim()));

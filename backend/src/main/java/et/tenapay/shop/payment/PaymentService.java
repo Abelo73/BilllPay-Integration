@@ -212,7 +212,7 @@ public class PaymentService {
 			}
 			case EXPIRED -> {
 				if (order.getStatus().awaitingPayment()) {
-					orderService.releaseStock(order);
+					orderService.releaseReservations(order);
 					orderService.transition(order, OrderStatus.EXPIRED, "EXPIRED", detail);
 				} else {
 					orderService.note(order, "PAYMENT_EXPIRED", detail);
@@ -276,7 +276,7 @@ public class PaymentService {
 					metrics.paymentStatus(PaymentStatus.EXPIRED.name(), a.getPaymentMethod(), a.getReasonCode());
 				}
 			}
-			orderService.releaseStock(order);
+			orderService.releaseReservations(order);
 			orderService.transition(order, OrderStatus.EXPIRED, "EXPIRED", "payment window of " + app.paymentExpiry() + " passed");
 		});
 	}

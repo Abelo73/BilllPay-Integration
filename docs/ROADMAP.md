@@ -54,7 +54,7 @@ Result: three provisioned dashboards and six alert rules, checked with real traf
 | Metrics | `micrometer-registry-prometheus`; expose `/actuator/prometheus` (internal only, not public) |
 | Custom metrics | Payments created / paid / failed by method and reason; BillPay API latency and errors; webhooks received / rejected (bad signature) / duplicates; webhook processing delay; orders expired; refunds |
 | Prometheus | In Docker Compose on port **9390** (default 9090), scrapes the backend every 15 s |
-| Grafana | In Docker Compose on port **3300** (default 3000); datasource and dashboards provisioned from files in the repo |
+| Grafana | In Docker Compose on port **8484** (default 3000; 3300 is inside a Windows-reserved port range); datasource and dashboards provisioned from files in the repo |
 | Dashboards | **Payments** (success rate, failures by reason, BillPay latency); **Webhooks & Kafka** (throughput, rejections, consumer lag on `orders.events` / webhook topic); **App** (HTTP errors, JVM, DB pool) |
 | Alerts | No successful payment in 30 min; BillPay error rate > 10 %; webhook signature failures; Kafka consumer lag growing; backend down |
 | Logs (optional) | Loki + log shipping, so all logs for one order number can be searched in Grafana |
@@ -76,7 +76,8 @@ Result: emails for order placed, payment confirmed, payment failed (with the rea
 - Uses the existing `orders.events` Kafka topic (the notification stub becomes real)
 - SMS later (provider to choose)
 
-### P5. Storefront growth
+### P5. Storefront growth 🟡 Discount codes done (2026-10-24)
+Discount codes: percentage (with optional cap) or fixed ETB, minimum cart, start/end dates, total-use limit. The discount comes off the items; delivery is worked out on what is left; BillPay is asked for the discounted total. A use is held while the order is unpaid and given back when it is cancelled or expires, so limited codes can't be oversold. Admin → **Discounts** shows uses, paid orders and the amount given. Search, reviews and wishlist still open.
 - Better search (name + description), price range filter, sort by popularity
 - Product reviews and ratings (verified buyers only)
 - Wishlist for signed-in customers

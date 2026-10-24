@@ -98,7 +98,8 @@ public class NotificationService {
 				o.getItems().stream()
 						.map(i -> new EmailTemplates.Item(i.getProductName(), i.getQuantity(), i.getLineTotal()))
 						.toList(),
-				o.getSubtotal(), o.getDeliveryFee(), o.getTotal(), o.getDeliveryAddress(), o.getDeliveryCity(),
+				o.getSubtotal(), o.getDiscountCode(), o.getDiscountAmount(), o.getDeliveryFee(), o.getTotal(),
+				o.getDeliveryAddress(), o.getDeliveryCity(),
 				o.getTrackingNote(), reason, base + "/orders/track?order=" + o.getOrderNumber());
 	}
 

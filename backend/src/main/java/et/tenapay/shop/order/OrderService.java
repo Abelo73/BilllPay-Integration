@@ -22,6 +22,7 @@ public class OrderService {
 	private final ProductRepository products;
 	private final OrderEventPublisher publisher;
 	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
+	private final et.tenapay.shop.discount.DiscountService discounts;
 
 	public void transition(Order order, OrderStatus to, String eventType, String detail) {
 		OrderStatus from = order.getStatus();
@@ -41,7 +42,9 @@ public class OrderService {
 		events.save(new OrderEvent(order.getId(), eventType, order.getStatus(), order.getStatus(), detail));
 	}
 
-	public void releaseStock(Order order) {
+	/** An unpaid order ended (cancelled or expired): its stock and discount-code use go back. */
+	public void releaseReservations(Order order) {
+		discounts.release(order.getDiscountCode());
 		forEachLockedProduct(order, (product, qty) -> product.releaseReservation(qty));
 	}
 
