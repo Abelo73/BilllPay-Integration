@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { FlaskConical, Menu, ShoppingCart } from 'lucide-react'
 import { Link, NavLink, Outlet, ScrollRestoration } from 'react-router'
 
@@ -7,6 +8,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
 
@@ -16,7 +18,10 @@ const NAV = [
   { to: '/orders/track', label: 'Track order' },
 ]
 
+/** Shown only while payments go to BillPay's sandbox; with live keys real money moves, so it must not claim otherwise. */
 function SandboxBanner() {
+  const info = useQuery({ queryKey: ['store-info'], queryFn: api.storeInfo, staleTime: 5 * 60_000 })
+  if (!info.data?.sandbox) return null
   return (
     <div className="flex items-center justify-center gap-2 bg-warning/15 px-4 py-1.5 text-center text-xs font-medium text-foreground">
       <FlaskConical className="size-3.5 shrink-0" />

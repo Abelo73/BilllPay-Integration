@@ -41,8 +41,10 @@ public interface PaymentAttemptRepository extends JpaRepository<PaymentAttempt, 
 
 	Page<PaymentAttempt> findByStatus(PaymentStatus status, Pageable pageable);
 
-	long countByStatus(PaymentStatus status);
+	long countByStatusAndEnvironment(PaymentStatus status, et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
 
-	@Query("select a.reasonCode, count(a) from PaymentAttempt a where a.status = 'FAILED' group by a.reasonCode")
-	List<Object[]> countFailuresByReason();
+	@Query("select a.reasonCode, count(a) from PaymentAttempt a where a.status = 'FAILED' and a.environment = :environment"
+			+ " group by a.reasonCode")
+	List<Object[]> countFailuresByReason(
+			@org.springframework.data.repository.query.Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
 }

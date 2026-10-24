@@ -1,4 +1,4 @@
-import { Check, Copy } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Copy } from 'lucide-react'
 import { useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -85,9 +85,9 @@ export function JsonBlock({ label, raw }: { label: string; raw: string | null })
 
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0 space-y-0.5">
+        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {description && <p className="text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions}
@@ -95,19 +95,91 @@ export function PageHeader({ title, description, actions }: { title: string; des
   )
 }
 
-export function Pager({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
-  if (totalPages <= 1) return null
+/** Page numbers to show: always first and last, a window around the current page, gaps as null. */
+function pageWindow(page: number, totalPages: number): (number | null)[] {
+  const pages = new Set([0, totalPages - 1, page - 1, page, page + 1].filter((p) => p >= 0 && p < totalPages))
+  const sorted = [...pages].sort((a, b) => a - b)
+  const out: (number | null)[] = []
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(null)
+    out.push(p)
+  })
+  return out
+}
+
+const PAGE_SIZES = [20, 50, 100]
+
+/**
+ * Pagination bar: "Showing 21–40 of 132", numbered pages with first/last, and an optional page-size picker.
+ * Pass total/size from the page response to show the range; pass onSize to let staff choose rows per page.
+ */
+export function Pager({
+  page,
+  totalPages,
+  onPage,
+  total,
+  size,
+  onSize,
+}: {
+  page: number
+  totalPages: number
+  onPage: (p: number) => void
+  total?: number
+  size?: number
+  onSize?: (size: number) => void
+}) {
+  if (totalPages <= 1 && !onSize) {
+    return total !== undefined && total > 0 ? (
+      <p className="pt-3 text-right text-xs text-muted-foreground tabular-nums">{total} {total === 1 ? 'row' : 'rows'}</p>
+    ) : null
+  }
+  const from = total !== undefined && size ? page * size + 1 : null
+  const to = total !== undefined && size ? Math.min(total, (page + 1) * size) : null
   return (
-    <div className="flex items-center justify-end gap-2 pt-4">
-      <Button variant="outline" size="sm" disabled={page === 0} onClick={() => onPage(page - 1)}>
-        Previous
-      </Button>
-      <span className="text-xs text-muted-foreground">
-        {page + 1} / {totalPages}
-      </span>
-      <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => onPage(page + 1)}>
-        Next
-      </Button>
+    <div className="flex flex-wrap items-center justify-between gap-3 pt-3">
+      <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+        {from !== null && total ? <span>Showing {from}–{to} of {total}</span> : <span>Page {page + 1} of {totalPages}</span>}
+        {onSize && size && (
+          <label className="flex items-center gap-1.5">
+            Rows
+            <select
+              className="h-7 rounded-md border bg-background px-1.5 text-xs text-foreground"
+              value={size}
+              onChange={(e) => onSize(Number(e.target.value))}
+            >
+              {PAGE_SIZES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
+      {totalPages > 1 && (
+        <nav className="flex items-center gap-1" aria-label="Pages">
+          <Button variant="outline" size="icon-sm" disabled={page === 0} onClick={() => onPage(page - 1)} aria-label="Previous page">
+            <ChevronLeft />
+          </Button>
+          {pageWindow(page, totalPages).map((p, i) =>
+            p === null ? (
+              <span key={`gap-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
+            ) : (
+              <Button
+                key={p}
+                variant={p === page ? 'default' : 'ghost'}
+                size="icon-sm"
+                className="tabular-nums"
+                aria-current={p === page ? 'page' : undefined}
+                onClick={() => onPage(p)}
+              >
+                {p + 1}
+              </Button>
+            ),
+          )}
+          <Button variant="outline" size="icon-sm" disabled={page + 1 >= totalPages} onClick={() => onPage(page + 1)} aria-label="Next page">
+            <ChevronRight />
+          </Button>
+        </nav>
+      )}
     </div>
   )
 }

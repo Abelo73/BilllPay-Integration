@@ -43,9 +43,12 @@ import tools.jackson.databind.ObjectMapper;
  * creates what it needs with unique names.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
-		"billpay.api-key=test-api-key",
+		"billpay.mode=SANDBOX",
+		"billpay.sandbox.api-key=test-api-key",
+		"billpay.sandbox.webhook-secret=" + IntegrationTest.WEBHOOK_SECRET,
+		"billpay.live.api-key=" + IntegrationTest.LIVE_API_KEY,
+		"billpay.live.webhook-secret=" + IntegrationTest.LIVE_WEBHOOK_SECRET,
 		"billpay.webhook.verification=HMAC_SHA256",
-		"billpay.webhook.secret=" + IntegrationTest.WEBHOOK_SECRET,
 		"billpay.webhook.signature-header=X-Billpay-Signature",
 		"billpay.timeout=3s",
 		"app.admin-email=" + IntegrationTest.ADMIN_EMAIL,
@@ -66,6 +69,8 @@ import tools.jackson.databind.ObjectMapper;
 public abstract class IntegrationTest {
 
 	public static final String WEBHOOK_SECRET = "whsec_integration_test_secret";
+	public static final String LIVE_API_KEY = "test-live-key";
+	public static final String LIVE_WEBHOOK_SECRET = "whsec_integration_live_secret";
 	public static final String ADMIN_EMAIL = "admin@it.test";
 	public static final String ADMIN_PASSWORD = "Admin-pass-2026";
 
@@ -86,7 +91,9 @@ public abstract class IntegrationTest {
 
 	@DynamicPropertySource
 	static void externalServices(DynamicPropertyRegistry registry) {
-		registry.add("billpay.base-url", billPay::baseUrl);
+		// both environments talk to the same fake; the API key tells them apart
+		registry.add("billpay.sandbox.base-url", billPay::baseUrl);
+		registry.add("billpay.live.base-url", billPay::baseUrl);
 		registry.add("spring.mail.host", mailpit::getHost);
 		registry.add("spring.mail.port", () -> mailpit.getMappedPort(1025));
 		registry.add("app.mail.inbox-url", IntegrationTest::mailpitApi);

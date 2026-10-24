@@ -1,5 +1,6 @@
 apiVersion: 1
 datasources:
+  # Metrics and outside checks (scraped every 15-30 s, kept 15 days)
   - name: Prometheus
     uid: prometheus
     type: prometheus
@@ -8,3 +9,32 @@ datasources:
     isDefault: true
     jsonData:
       timeInterval: 15s
+
+  # Business numbers straight from the shop database, as the read-only user grafana_reader
+  # (monitoring/postgres/grafana-reader.sql: no customer names, phones, emails or addresses)
+  - name: TenaShop DB
+    uid: tenashop-db
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: grafana_reader
+    jsonData:
+      database: $TENASHOP_DB_NAME
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+      maxOpenConns: 5
+      maxIdleConns: 2
+      timeInterval: 1m
+    secureJsonData:
+      password: $GRAFANA_DB_PASSWORD
+
+  # Shows the alerts Prometheus fired, and lets you add silences, in Grafana → Alerting
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false

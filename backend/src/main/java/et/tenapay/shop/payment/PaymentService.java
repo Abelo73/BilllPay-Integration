@@ -50,7 +50,8 @@ public class PaymentService {
 
 		BillPayPayment response;
 		try {
-			response = billPay.createPayment(attempt.getRequestPayload(), attempt.getIdempotencyKey());
+			response = billPay.createPayment(attempt.getEnvironment(), attempt.getRequestPayload(),
+					attempt.getIdempotencyKey());
 		} catch (BillPayException e) {
 			metrics.paymentRequested(e.getHttpStatus() >= 400 && e.getHttpStatus() < 500 ? "rejected" : "error");
 			tx.executeWithoutResult(s -> recordCreateFailure(attempt.getId(), e));
@@ -91,6 +92,8 @@ public class PaymentService {
 		attempt.setStatus(PaymentStatus.CREATED);
 		attempt.setAmount(order.getTotal());
 		attempt.setCurrency(order.getCurrency());
+		// an order placed in the sandbox is always paid in the sandbox, even after an admin switches to live
+		attempt.setEnvironment(order.getEnvironment());
 		attempt.setRequestPayload(billPay.toJson(buildRequest(order, attempt.getMerchantReference())));
 		attempts.save(attempt);
 
@@ -253,7 +256,7 @@ public class PaymentService {
 			return Outcome.IGNORED;
 		}
 		try {
-			BillPayPayment status = billPay.getPayment(attempt.getBillpayPaymentId());
+			BillPayPayment status = billPay.getPayment(attempt.getEnvironment(), attempt.getBillpayPaymentId());
 			return applyBillPayStatus(attemptId, status, "status-query");
 		} catch (BillPayException e) {
 			log.warn("Status query failed for {}: {}", attempt.getMerchantReference(), e.getMessage());

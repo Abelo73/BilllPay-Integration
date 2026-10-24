@@ -46,6 +46,10 @@ public class WebhookEvent {
 
 	private String signatureScheme;
 
+	/** Whose secret verified the signature; null when it wasn't verified. */
+	@Enumerated(EnumType.STRING)
+	private et.tenapay.shop.payment.billpay.BillPayEnvironment environment;
+
 	@Enumerated(EnumType.STRING)
 	private Status status;
 

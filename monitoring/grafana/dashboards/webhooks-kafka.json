@@ -21,9 +21,58 @@
     "list": []
   },
   "annotations": {
-    "list": []
+    "list": [
+      {
+        "builtIn": 1,
+        "name": "Annotations & Alerts",
+        "type": "dashboard",
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)"
+      },
+      {
+        "name": "Backend restarts",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "step": "60s",
+        "titleFormat": "Backend restarted",
+        "textFormat": "",
+        "tagKeys": "",
+        "useValueForTime": false,
+        "expr": "(time() - process_start_time_seconds{job=\"tenashop-backend\"}) < 90"
+      },
+      {
+        "name": "Alerts firing",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "step": "60s",
+        "titleFormat": "{{alertname}}",
+        "textFormat": "{{severity}} {{name}}{{reason}}",
+        "tagKeys": "severity",
+        "useValueForTime": false,
+        "expr": "ALERTS{alertstate=\"firing\"}"
+      }
+    ]
   },
   "links": [
+    {
+      "title": "Business",
+      "type": "link",
+      "url": "/d/tenashop-business",
+      "icon": "dashboard"
+    },
     {
       "title": "Payments",
       "type": "link",
@@ -40,6 +89,12 @@
       "title": "App",
       "type": "link",
       "url": "/d/tenashop-app",
+      "icon": "dashboard"
+    },
+    {
+      "title": "Uptime & Alerts",
+      "type": "link",
+      "url": "/d/tenashop-uptime",
       "icon": "dashboard"
     }
   ],

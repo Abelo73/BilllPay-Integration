@@ -1,5 +1,5 @@
 # TenaShop stack. All host ports are non-default and come from .env (see .env.example).
-#   Infra only (run apps locally):  docker compose up -d postgres kafka kafka-ui media mailpit prometheus grafana
+#   Infra only (run apps locally):  docker compose up -d postgres kafka kafka-ui media mailpit prometheus alertmanager blackbox grafana-db-init grafana
 #   Everything:                     docker compose up -d --build
 name: tenashop
 
@@ -115,11 +115,57 @@ services:
       timeout: 5s
       retries: 12
 
+  # Sends firing alerts as emails (Mailpit in dev). UI and silences: http://localhost:9393
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9393}:9093"
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - amdata:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Outside checks (store, backend, ngrok tunnel, BillPay) for Prometheus. Runs on the host network so it
+  # reaches localhost-only dev servers (Vite) exactly like your browser does; listens on 9395 (default 9115).
+  blackbox:
+    image: prom/blackbox-exporter:v0.27.0
+    network_mode: host
+    command: ["--config.file=/etc/blackbox/blackbox.yml", "--web.listen-address=:${BLACKBOX_PORT:-9395}"]
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+
+  # One-shot: creates/updates the read-only grafana_reader database user, then exits
+  grafana-db-init:
+    image: postgres:16-alpine
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${POSTGRES_DB:-tenashop}
+      PGUSER: ${POSTGRES_USER:-tenashop}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      READER_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana-reader-local}
+    command: ["sh", "-c", "psql -q -v ON_ERROR_STOP=1 -v reader_password=\"$$READER_PASSWORD\" -v dbname=\"$$PGDATABASE\" -f /init/grafana-reader.sql"]
+    volumes:
+      - ./monitoring/postgres:/init:ro
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   grafana:
     image: grafana/grafana:12.1.1
     environment:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me}
+      # used by provisioning/datasources (TenaShop DB)
+      TENASHOP_DB_NAME: ${POSTGRES_DB:-tenashop}
+      GRAFANA_DB_PASSWORD: ${GRAFANA_DB_PASSWORD:-grafana-reader-local}
       # dashboards are readable without signing in (local dev); editing needs the admin login
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
@@ -176,4 +222,5 @@ volumes:
   kafkadata:
   mediadata:
   promdata:
+  amdata:
   grafanadata:

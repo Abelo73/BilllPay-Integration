@@ -1,0 +1,21 @@
+# Blackbox exporter: checks endpoints from the outside, the way a customer or BillPay sees them.
+# Prometheus asks it to probe each target (prometheus.yml → job "probes") and stores probe_success,
+# probe_duration_seconds and probe_ssl_earliest_cert_expiry.
+modules:
+  # Must answer 2xx (redirects followed)
+  http_2xx:
+    prober: http
+    timeout: 8s
+    http:
+      preferred_ip_protocol: ip4
+      follow_redirects: true
+
+  # Must answer at all: 401/403/404 still mean "the server is up" (BillPay answers 401 without a key).
+  # Timeouts, DNS/TLS errors and 5xx count as down.
+  http_reachable:
+    prober: http
+    timeout: 8s
+    http:
+      preferred_ip_protocol: ip4
+      follow_redirects: true
+      valid_status_codes: [200, 201, 204, 301, 302, 400, 401, 403, 404, 405]

@@ -37,6 +37,7 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 | Photo storage file browser | http://localhost:9911 |
 | Grafana (dashboards) | http://localhost:8484 (view without signing in; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
 | Prometheus (metrics, alerts) | http://localhost:9390/alerts |
+| Alertmanager (alert emails, silences) | http://localhost:9393 (emails land in Mailpit) |
 | Emails (Mailpit test inbox) | http://localhost:8626 (SMTP on `localhost:2626`) |
 
 Override any port in `.env`.
@@ -50,13 +51,15 @@ Override any port in `.env`.
 ## Setup
 
 1. Copy `.env.example` to `.env` (already done locally, with random secrets).
-2. In the BillPay dashboard (Test mode), go to **Developers → API keys → Regenerate**. Paste the key into `BILLPAY_API_KEY`. It is shown only once.
+2. In the BillPay dashboard, go to **Developers → API keys → Regenerate**, once with the **Test** toggle and once with **Live**. Paste the keys into `BILLPAY_SANDBOX_API_KEY` and `BILLPAY_LIVE_API_KEY` (each is shown only once).
+3. **Sandbox or live** is switched in **Admin → BillPay setup → Payment mode**: no restart, and orders keep the mode they were placed in. Live stays locked until its key and webhook secret are set, signatures are enforced, and no admin uses a well-known password.
 
 ## Run
 
 ### Quickest: one script (WSL)
 ```bash
-scripts/dev.sh          # starts whatever is down (Docker, backend, frontend, ngrok), then checks everything
+scripts/dev.sh          # restarts the backend (loads new code), starts whatever else is down, then checks everything
+scripts/dev.sh up       # same, but leaves a running backend alone (faster when the Java code hasn't changed)
 scripts/dev.sh check    # checks only
 scripts/dev.sh test     # checks + smoke test (sign-up, sign-in, roles, forged webhook)
 scripts/dev.sh logs backend    # or frontend / ngrok
@@ -94,7 +97,7 @@ pnpm dev    # http://localhost:5280 (admin: any password)
 ngrok http --url=<your-static-domain>.ngrok-free.dev 8181
 ```
 1. BillPay dashboard → **Developers → Webhooks → Add endpoint**: `https://<your-domain>/api/webhooks/billpay`
-2. Copy the signing secret (**shown once**) into `BILLPAY_WEBHOOK_SECRET` and restart the backend.
+2. Copy the signing secret (**shown once**) into `BILLPAY_SANDBOX_WEBHOOK_SECRET` (Test) or `BILLPAY_LIVE_WEBHOOK_SECRET` (Live) and restart the backend. Add the same URL in both modes.
 3. Click **send a test delivery**. In **Admin → Webhooks**, open the event: the *Signature* box shows which header/format matched.
 4. Set `BILLPAY_WEBHOOK_SIGNATURE_HEADER` to that header and `BILLPAY_WEBHOOK_VERIFICATION=HMAC_SHA256`, then restart.
 
@@ -117,4 +120,4 @@ GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the b
 - The **BillPay API key** (`BPG_TEST-...`) is used only by the backend, in the `x-api-key` header.
 - Never use dashboard session tokens (login/hand-off JWTs) in this app, and never commit them.
 - `.env` is git-ignored.
-- `BILLPAY_WEBHOOK_VERIFICATION=NONE` is allowed **only** against the sandbox URL. The backend refuses to start with unsigned webhooks against a live URL.
+- `BILLPAY_WEBHOOK_VERIFICATION=NONE` is for sandbox experiments only: live mode refuses to switch on without signatures, and a live payment only accepts webhooks signed with the live secret.

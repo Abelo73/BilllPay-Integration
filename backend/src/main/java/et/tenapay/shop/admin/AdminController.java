@@ -37,7 +37,10 @@ import et.tenapay.shop.payment.PaymentAttempt;
 import et.tenapay.shop.payment.PaymentAttemptRepository;
 import et.tenapay.shop.payment.PaymentService;
 import et.tenapay.shop.payment.PaymentStatus;
+import et.tenapay.shop.payment.billpay.BillPayEnvironment;
+import et.tenapay.shop.payment.billpay.BillPayMode;
 import et.tenapay.shop.payment.billpay.BillPayProperties;
+import et.tenapay.shop.user.CurrentUser;
 import et.tenapay.shop.refund.Refund;
 import et.tenapay.shop.refund.RefundRepository;
 import et.tenapay.shop.refund.RefundService;
@@ -66,18 +69,19 @@ public class AdminController {
 	private final RefundService refunds;
 	private final WebhookPublisher webhookPublisher;
 	private final BillPayProperties billPay;
+	private final BillPayMode billPayMode;
 	private final AppProperties app;
 	private final et.tenapay.shop.notification.NotificationRepository notificationRepo;
 
 	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
 			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
-			Instant paidAt) {
+			Instant paidAt, String environment) {
 
 		static OrderRow from(Order o) {
 			return new OrderRow(o.getId(), o.getOrderNumber(), o.getStatus().name(),
 					o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(), o.getTotal(),
 					o.getCurrency(), o.getCustomerName(), o.getCustomerPhone(), o.getDeliveryCity(), o.getCreatedAt(),
-					o.getPaidAt());
+					o.getPaidAt(), o.getEnvironment().name());
 		}
 	}
 
@@ -153,15 +157,17 @@ public class AdminController {
 	/** What the integration is configured with, without revealing secrets. */
 	@GetMapping("/config")
 	public Map<String, Object> config() {
-		String key = billPay.apiKey();
+		BillPayMode.Status mode = billPayMode.status();
+		BillPayMode.EnvironmentStatus active = mode.environments().get(mode.mode());
 		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("billpayBaseUrl", billPay.baseUrl());
-		result.put("sandbox", billPay.isSandbox());
-		result.put("apiKeyConfigured", key != null && !key.isBlank());
-		result.put("apiKeyHint", key == null || key.length() < 16 ? null
-				: key.substring(0, 9) + "…" + key.substring(key.length() - 4));
+		result.put("mode", mode);
+		// the environment new orders use, in the shape the setup page already shows
+		result.put("billpayBaseUrl", active.baseUrl());
+		result.put("sandbox", mode.mode() == BillPayEnvironment.SANDBOX);
+		result.put("apiKeyConfigured", active.apiKeyConfigured());
+		result.put("apiKeyHint", active.apiKeyHint());
 		result.put("webhookVerification", billPay.webhook().verification().name());
-		result.put("webhookSecretConfigured", billPay.webhook().secret() != null && !billPay.webhook().secret().isBlank());
+		result.put("webhookSecretConfigured", active.webhookSecretConfigured());
 		result.put("webhookSignatureHeader", billPay.webhook().signatureHeader());
 		result.put("webhookPath", "/api/webhooks/billpay");
 		result.put("publicBaseUrl", app.publicBaseUrl());
@@ -170,28 +176,49 @@ public class AdminController {
 		return result;
 	}
 
+	public record ModeRequest(@NotNull BillPayEnvironment mode, String confirm) {
+	}
+
+	/**
+	 * Switches which BillPay new orders use. Going live means real money, so the admin has to type LIVE to confirm;
+	 * it is refused (409 MODE_NOT_READY, with the reasons) while live isn't safe. Orders already placed are unaffected.
+	 */
+	@PostMapping("/billpay/mode")
+	public BillPayMode.Status switchMode(@Valid @RequestBody ModeRequest req) {
+		if (req.mode() == BillPayEnvironment.LIVE && !"LIVE".equals(req.confirm())) {
+			throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED",
+					"Type LIVE to confirm that real payments will be taken.");
+		}
+		billPayMode.switchTo(req.mode(), CurrentUser.require().email());
+		return billPayMode.status();
+	}
+
+	/** Figures for one environment: by default the one new orders use, so test orders never mix with real ones. */
 	@GetMapping("/dashboard")
 	@Transactional(readOnly = true)
-	public Map<String, Object> dashboard() {
+	public Map<String, Object> dashboard(@RequestParam(required = false) BillPayEnvironment env) {
+		BillPayEnvironment e = env != null ? env : billPayMode.current();
 		Map<String, Long> byStatus = new LinkedHashMap<>();
 		for (OrderStatus s : OrderStatus.values()) {
-			byStatus.put(s.name(), orders.countByStatus(s));
+			byStatus.put(s.name(), orders.countByStatusAndEnvironment(s, e));
 		}
-		long succeeded = attempts.countByStatus(PaymentStatus.SUCCEEDED);
-		long finished = succeeded + attempts.countByStatus(PaymentStatus.FAILED)
-				+ attempts.countByStatus(PaymentStatus.EXPIRED) + attempts.countByStatus(PaymentStatus.CANCELLED);
+		long succeeded = attempts.countByStatusAndEnvironment(PaymentStatus.SUCCEEDED, e);
+		long finished = succeeded + attempts.countByStatusAndEnvironment(PaymentStatus.FAILED, e)
+				+ attempts.countByStatusAndEnvironment(PaymentStatus.EXPIRED, e)
+				+ attempts.countByStatusAndEnvironment(PaymentStatus.CANCELLED, e);
 		Map<String, Long> failures = new LinkedHashMap<>();
-		for (Object[] row : attempts.countFailuresByReason()) {
+		for (Object[] row : attempts.countFailuresByReason(e)) {
 			failures.put(row[0] == null ? "UNKNOWN" : (String) row[0], (Long) row[1]);
 		}
 		Map<String, Object> result = new LinkedHashMap<>();
-		result.put("sandbox", billPay.isSandbox());
+		result.put("sandbox", billPayMode.isSandbox());
+		result.put("environment", e);
 		result.put("paidVolume", orders.sumTotalByStatusIn(
-				EnumSet.of(OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED, OrderStatus.REFUNDED)));
+				EnumSet.of(OrderStatus.PAID, OrderStatus.PARTIALLY_REFUNDED, OrderStatus.REFUNDED), e));
 		result.put("ordersByStatus", byStatus);
 		result.put("paymentSuccessRate", finished == 0 ? null : (double) succeeded / finished);
 		result.put("failuresByReason", failures);
-		result.put("pendingPayments", attempts.countByStatus(PaymentStatus.PENDING));
+		result.put("pendingPayments", attempts.countByStatusAndEnvironment(PaymentStatus.PENDING, e));
 		result.put("webhooksAwaitingProcessing", webhooks.findByStatus(WebhookEvent.Status.RECEIVED, PageRequest.of(0, 1))
 				.getTotalElements());
 		return result;
@@ -201,10 +228,11 @@ public class AdminController {
 	@Transactional(readOnly = true)
 	public PageDto<OrderRow> orders(@RequestParam(required = false) OrderStatus status,
 			@RequestParam(required = false) et.tenapay.shop.order.FulfilmentStatus fulfilment,
+			@RequestParam(required = false) BillPayEnvironment env,
 			@RequestParam(required = false) String q, @RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "20") int size) {
 		String query = q == null || q.isBlank() ? null : q.trim();
-		return PageDto.of(orders.adminSearch(status, fulfilment, query,
+		return PageDto.of(orders.adminSearch(status, fulfilment, env, query,
 				PageRequest.of(page, Math.min(size, 100), Sort.by("createdAt").descending())).map(OrderRow::from));
 	}
 

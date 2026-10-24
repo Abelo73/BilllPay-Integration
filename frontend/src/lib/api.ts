@@ -182,6 +182,7 @@ export const api = {
       body: JSON.stringify({ phone, reason }),
     }),
   delivery: () => request<DeliveryQuote>('/delivery'),
+  storeInfo: () => request<{ sandbox: boolean }>('/store-info'),
   checkDiscount: (items: { productId: number; quantity: number }[], code: string) =>
     request<PriceQuote>('/discounts/check', { method: 'POST', body: JSON.stringify({ items, code }) }),
 

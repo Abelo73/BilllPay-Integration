@@ -18,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	long countByRoleAndEnabledTrue(Role role);
 
+	java.util.List<User> findByRoleAndEnabledTrue(Role role);
+
 	@Query("""
 			select u from User u
 			where u.role in :roles

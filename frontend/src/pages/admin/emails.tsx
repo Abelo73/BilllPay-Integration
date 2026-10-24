@@ -77,7 +77,7 @@ export function AdminEmailsPage() {
           </Table>
         </CardContent>
       </Card>
-      {data && <Pager page={page} totalPages={data.page.totalPages} onPage={setPage} />}
+      {data && <Pager page={page} totalPages={data.page.totalPages} total={data.page.totalElements} size={data.page.size} onPage={setPage} />}
     </>
   )
 }

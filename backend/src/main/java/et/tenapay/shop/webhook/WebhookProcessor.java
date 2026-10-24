@@ -18,6 +18,7 @@ import et.tenapay.shop.payment.billpay.BillPayPayloads.EventKind;
 import et.tenapay.shop.payment.billpay.BillPayPayment;
 import et.tenapay.shop.payment.billpay.BillPayRefund;
 import et.tenapay.shop.refund.RefundService;
+import et.tenapay.shop.payment.billpay.BillPayEnvironment;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.JsonNode;
@@ -62,6 +63,12 @@ public class WebhookProcessor {
 			case TEST -> finish(eventId, WebhookEvent.Status.IGNORED, "Test delivery from BillPay");
 			case REFUND -> {
 				BillPayRefund refund = BillPayPayloads.parseRefund(root, event.getPayload());
+				Optional<PaymentAttempt> refunded = Optional.ofNullable(refund.paymentId())
+						.flatMap(attempts::findByBillpayPaymentId);
+				if (refunded.isPresent() && !sameEnvironment(event, refunded.get())) {
+					finish(eventId, WebhookEvent.Status.IGNORED, environmentMismatch(event, refunded.get()));
+					return;
+				}
 				if (refund.status() == null && BillPayPayloads.statusFromEventType(event.getEventType()) != null) {
 					refund = new BillPayRefund(refund.refundId(), refund.paymentId(), refund.merchantReference(),
 							BillPayPayloads.statusFromEventType(event.getEventType()), refund.reasonCode(),
@@ -72,6 +79,10 @@ public class WebhookProcessor {
 			case SETTLEMENT -> {
 				BillPayPayment payment = BillPayPayloads.parsePayment(root, event.getPayload());
 				Optional<PaymentAttempt> attempt = findAttempt(payment);
+				if (attempt.isPresent() && !sameEnvironment(event, attempt.get())) {
+					finish(eventId, WebhookEvent.Status.IGNORED, environmentMismatch(event, attempt.get()));
+					return;
+				}
 				attempt.ifPresent(a -> tx.executeWithoutResult(s -> orders.findById(a.getOrderId())
 						.ifPresent(o -> orderService.note(o, "SETTLED", a.getMerchantReference() + " via " + source))));
 				finish(eventId, attempt.isPresent() ? WebhookEvent.Status.PROCESSED : WebhookEvent.Status.IGNORED,
@@ -88,9 +99,30 @@ public class WebhookProcessor {
 							+ payment.paymentId() + " merchantReference=" + payment.merchantReference());
 					return;
 				}
+				if (!sameEnvironment(event, attempt.get())) {
+					finish(eventId, WebhookEvent.Status.IGNORED, environmentMismatch(event, attempt.get()));
+					return;
+				}
 				finish(eventId, statusFor(payments.applyBillPayStatus(attempt.get().getId(), payment, source)), null);
 			}
 		}
+	}
+
+	/**
+	 * A live payment only takes events signed with the live secret; a sandbox one takes sandbox-signed events (or
+	 * unsigned ones while signatures aren't enforced, which live mode never allows). So the sandbox secret, or an
+	 * unsigned request, can never mark a real-money order as paid.
+	 */
+	private static boolean sameEnvironment(WebhookEvent event, PaymentAttempt attempt) {
+		BillPayEnvironment signedBy = event.getEnvironment();
+		return attempt.getEnvironment() == BillPayEnvironment.LIVE ? signedBy == BillPayEnvironment.LIVE
+				: signedBy == null || signedBy == BillPayEnvironment.SANDBOX;
+	}
+
+	private static String environmentMismatch(WebhookEvent event, PaymentAttempt attempt) {
+		return "Payment " + attempt.getMerchantReference() + " is " + attempt.getEnvironment().name().toLowerCase()
+				+ " but this event was " + (event.getEnvironment() == null ? "not signed"
+						: "signed with the " + event.getEnvironment().name().toLowerCase() + " secret");
 	}
 
 	private Optional<PaymentAttempt> findAttempt(BillPayPayment payment) {

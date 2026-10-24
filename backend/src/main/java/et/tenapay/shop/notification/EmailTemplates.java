@@ -128,7 +128,7 @@ final class EmailTemplates {
 				+ "<tr><td style=\"background:" + BRAND + ";padding:18px 24px;color:#ffffff;font-size:18px;font-weight:700\">TenaShop</td></tr>"
 				+ "<tr><td style=\"padding:24px\"><h1 style=\"margin:0 0 12px;font-size:22px\">" + esc(title) + "</h1>" + body
 				+ "</td></tr>"
-				+ "<tr><td style=\"padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px\">TenaShop · Addis Ababa · Payments by BillPay (sandbox test store)</td></tr>"
+				+ "<tr><td style=\"padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px\">TenaShop · Addis Ababa · Payments by BillPay</td></tr>"
 				+ "</table></td></tr></table></body></html>";
 	}
 

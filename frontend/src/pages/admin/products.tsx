@@ -134,7 +134,7 @@ export function AdminProductsPage() {
           </Table>
         </CardContent>
       </Card>
-      {data && <Pager page={page} totalPages={data.totalPages} onPage={(p) => set('page', String(p))} />}
+      {data && <Pager page={page} totalPages={data.totalPages} total={data.totalElements} size={data.size} onPage={(p) => set('page', String(p))} />}
     </>
   )
 }

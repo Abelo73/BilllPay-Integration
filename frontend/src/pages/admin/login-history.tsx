@@ -84,7 +84,7 @@ export function AdminLoginHistoryPage() {
           </Table>
         </CardContent>
       </Card>
-      {data && <Pager page={page} totalPages={data.totalPages} onPage={setPage} />}
+      {data && <Pager page={page} totalPages={data.totalPages} total={data.totalElements} size={data.size} onPage={setPage} />}
     </>
   )
 }

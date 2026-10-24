@@ -17,3 +17,6 @@ Thumbs.db
 
 # scripts/dev.sh logs and pids
 .run/
+
+# JVM crash logs
+hs_err_pid*.log

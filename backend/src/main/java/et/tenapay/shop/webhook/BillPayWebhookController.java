@@ -43,6 +43,7 @@ public class BillPayWebhookController {
 		event.setSignatureValid(signature == WebhookSignatureVerifier.Result.NOT_CHECKED ? null
 				: signature == WebhookSignatureVerifier.Result.VALID);
 		event.setSignatureScheme(verification.scheme());
+		event.setEnvironment(verification.environment());
 
 		JsonNode root = null;
 		try {
@@ -60,7 +61,13 @@ public class BillPayWebhookController {
 			event.setEventType(eventType);
 			// BillPay reuses the payment id as eventId (seen 2026-10-23), so captured and refunded events of one
 			// payment share it; the type makes the dedupe key unique per event.
-			event.setBillpayEventId(eventId == null ? null : eventType == null ? eventId : eventId + ":" + eventType);
+			String dedupeKey = eventId == null ? null : eventType == null ? eventId : eventId + ":" + eventType;
+			// Live events get their own key: a copy signed with the sandbox secret (ignored later) must never claim the
+			// id and make the genuine live delivery look like a duplicate.
+			if (dedupeKey != null && verification.environment() == et.tenapay.shop.payment.billpay.BillPayEnvironment.LIVE) {
+				dedupeKey += ":live";
+			}
+			event.setBillpayEventId(dedupeKey);
 			event.setBillpayPaymentId(payment.paymentId());
 			event.setMerchantReference(payment.merchantReference());
 			event.setReportedStatus(payment.status());

@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, XCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { adminApi } from '@/lib/admin-api'
+import { BillPayModeCard } from './billpay-mode'
 import { PageHeader } from './shared'
 
 const SCENARIOS = [
@@ -37,14 +38,16 @@ export function AdminSetupPage() {
 
   return (
     <>
-      <PageHeader title="BillPay setup" description="What's configured, how to connect webhooks, and the sandbox test values." />
+      <PageHeader title="BillPay setup" description="Payment mode, what's configured, how to connect webhooks, and the sandbox test values." />
+
+      {c && <BillPayModeCard status={c.mode} />}
 
       {c && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Configuration</CardTitle>
             <CardDescription>
-              From <Code>.env</Code>. Restart the backend after changing it.
+              For the mode in use. From <Code>.env</Code>; restart the backend after changing keys there.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -53,10 +56,10 @@ export function AdminSetupPage() {
                 BillPay API: <Code>{c.billpayBaseUrl}</Code> ({c.sandbox ? 'sandbox' : 'live'})
               </Check>
               <Check ok={c.apiKeyConfigured}>
-                API key {c.apiKeyConfigured ? <Code>{c.apiKeyHint ?? 'set'}</Code> : <>missing — set <Code>BILLPAY_API_KEY</Code></>}
+                API key {c.apiKeyConfigured ? <Code>{c.apiKeyHint ?? 'set'}</Code> : <>missing — set <Code>BILLPAY_{c.mode.mode}_API_KEY</Code></>}
               </Check>
-              <Check ok={c.webhookSecretConfigured} warn>
-                Webhook secret {c.webhookSecretConfigured ? 'set' : <>not set — paste it into <Code>BILLPAY_WEBHOOK_SECRET</Code></>}
+              <Check ok={c.webhookSecretConfigured} warn={c.sandbox}>
+                Webhook secret {c.webhookSecretConfigured ? 'set' : <>not set — paste it into <Code>BILLPAY_{c.mode.mode}_WEBHOOK_SECRET</Code></>}
               </Check>
               <Check ok={c.webhookVerification !== 'NONE'} warn={c.sandbox}>
                 Signature enforcement: <Code>{c.webhookVerification}</Code>
@@ -87,11 +90,12 @@ export function AdminSetupPage() {
               Expose the backend publicly: <Code>ngrok http 8181</Code> or <Code>cloudflared tunnel --url http://localhost:8181</Code>.
             </li>
             <li>
-              In the BillPay dashboard (Test mode) open <b>Developers → Webhooks → Add endpoint</b> and enter{' '}
-              <Code>https://&lt;your-tunnel&gt;{c?.webhookPath ?? '/api/webhooks/billpay'}</Code>.
+              In the BillPay dashboard, for <b>Test</b> and again for <b>Live</b>, open <b>Developers → Webhooks → Add endpoint</b> and
+              enter <Code>https://&lt;your-tunnel&gt;{c?.webhookPath ?? '/api/webhooks/billpay'}</Code>. The same URL serves both.
             </li>
             <li>
-              Copy the signing secret <b>immediately</b> (it is shown once) into <Code>BILLPAY_WEBHOOK_SECRET</Code> and restart the backend.
+              Copy each signing secret <b>immediately</b> (it is shown once) into <Code>BILLPAY_SANDBOX_WEBHOOK_SECRET</Code> or{' '}
+              <Code>BILLPAY_LIVE_WEBHOOK_SECRET</Code> and restart the backend.
             </li>
             <li>
               Click <b>send a test delivery</b> in BillPay. Open it on the <b>Webhooks</b> page here: the <i>Signature</i> box shows which

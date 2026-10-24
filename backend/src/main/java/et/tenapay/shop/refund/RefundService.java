@@ -120,10 +120,12 @@ public class RefundService {
 
 	private Refund send(UUID refundId) {
 		Refund refund = refunds.findById(refundId).orElseThrow();
-		String billpayPaymentId = attempts.findById(refund.getPaymentAttemptId()).orElseThrow().getBillpayPaymentId();
+		var paidAttempt = attempts.findById(refund.getPaymentAttemptId()).orElseThrow();
 		BillPayRefund response;
 		try {
-			response = billPay.createRefund(billpayPaymentId, refund.getRequestPayload(), refund.getIdempotencyKey());
+			// refund through the BillPay the payment was made in
+			response = billPay.createRefund(paidAttempt.getEnvironment(), paidAttempt.getBillpayPaymentId(),
+					refund.getRequestPayload(), refund.getIdempotencyKey());
 		} catch (BillPayException e) {
 			tx.executeWithoutResult(s -> recordFailure(refundId, e));
 			return refunds.findById(refundId).orElseThrow();

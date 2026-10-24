@@ -34,19 +34,22 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 			select o from Order o
 			where (:status is null or o.status = :status)
 			  and (:fulfilment is null or o.fulfilmentStatus = :fulfilment)
+			  and (:environment is null or o.environment = :environment)
 			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
 			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%'))
 			       or o.customerPhone like concat('%', cast(:q as string), '%'))
 			""")
 	Page<Order> adminSearch(@Param("status") OrderStatus status, @Param("fulfilment") FulfilmentStatus fulfilment,
-			@Param("q") String q, Pageable pageable);
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment, @Param("q") String q,
+			Pageable pageable);
 
 	Page<Order> findByUserId(UUID userId, Pageable pageable);
 
-	long countByStatus(OrderStatus status);
+	long countByStatusAndEnvironment(OrderStatus status, et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
 
-	@Query("select coalesce(sum(o.total), 0) from Order o where o.status in :statuses")
-	BigDecimal sumTotalByStatusIn(@Param("statuses") Collection<OrderStatus> statuses);
+	@Query("select coalesce(sum(o.total), 0) from Order o where o.status in :statuses and o.environment = :environment")
+	BigDecimal sumTotalByStatusIn(@Param("statuses") Collection<OrderStatus> statuses,
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
 
 	@Query(value = "select nextval('order_number_seq')", nativeQuery = true)
 	long nextOrderSequence();

@@ -70,8 +70,16 @@ springdoc:
     path: /swagger-ui.html
 
 billpay:
-  base-url: ${BILLPAY_BASE_URL:https://sandbox.api.billpay.et}
-  api-key: ${BILLPAY_API_KEY:}
+  # Mode new payments use until an admin switches it in Admin → BillPay setup (the choice is then kept in the database)
+  mode: ${BILLPAY_MODE:SANDBOX}
+  sandbox:
+    base-url: ${BILLPAY_SANDBOX_BASE_URL:https://sandbox.api.billpay.et}
+    api-key: ${BILLPAY_SANDBOX_API_KEY:}
+    webhook-secret: ${BILLPAY_SANDBOX_WEBHOOK_SECRET:}
+  live:
+    base-url: ${BILLPAY_LIVE_BASE_URL:https://api.billpay.et}
+    api-key: ${BILLPAY_LIVE_API_KEY:}
+    webhook-secret: ${BILLPAY_LIVE_WEBHOOK_SECRET:}
   create-payment-path: /api/v1/checkout/payments
   # Confirmed 2026-10-23 (open question Q5)
   payment-status-path: /api/v1/checkout/payments/{id}
@@ -81,7 +89,6 @@ billpay:
   webhook:
     # HMAC_SHA256 over "<t>.<body>" in X-Billpay-Signature (confirmed 2026-10-23); NONE is sandbox-only
     verification: ${BILLPAY_WEBHOOK_VERIFICATION:NONE}
-    secret: ${BILLPAY_WEBHOOK_SECRET:}
     signature-header: ${BILLPAY_WEBHOOK_SIGNATURE_HEADER:X-BillPay-Signature}
 
 # Product photos: any S3-compatible store (SeaweedFS in Docker locally; AWS S3 / Cloudflare R2 later)

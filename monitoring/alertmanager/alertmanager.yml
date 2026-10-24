@@ -1,0 +1,41 @@
+# Alertmanager: receives firing alerts from Prometheus (alerts.yml) and sends notifications.
+# UI: http://localhost:9393 (also Grafana → Alerting, source "Alertmanager"). Silences are set there.
+# Dev: every notification lands in Mailpit (http://localhost:8626). For go-live, point smtp_* at a real
+# SMTP server and/or enable the Telegram receiver below.
+global:
+  smtp_smarthost: mailpit:1025
+  smtp_from: TenaShop Alerts <alerts@tenashop.local>
+  smtp_require_tls: false
+  resolve_timeout: 5m
+
+route:
+  receiver: ops-email
+  group_by: [alertname]
+  group_wait: 30s        # wait for related alerts before the first email
+  group_interval: 5m     # new alerts in an existing group
+  repeat_interval: 4h    # remind while still firing
+  routes:
+    - matchers: [severity="critical"]
+      receiver: ops-email
+      repeat_interval: 1h
+
+receivers:
+  - name: ops-email
+    email_configs:
+      - to: ops@tenashop.local
+        send_resolved: true
+        headers:
+          Subject: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }} x{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }} · TenaShop'
+  # Telegram (create a bot with @BotFather, then add `- receiver: ops-telegram` routes above):
+  # - name: ops-telegram
+  #   telegram_configs:
+  #     - bot_token: '<bot token>'
+  #       chat_id: <chat id>
+  #       send_resolved: true
+
+inhibit_rules:
+  # When the backend is down, don't also send the alerts that are only a consequence of it.
+  - source_matchers: [alertname="BackendDown"]
+    target_matchers: [alertname=~"NoSuccessfulPayment|WebhookProcessingSlow|KafkaConsumerLagGrowing|HighServerErrorRate"]
+  - source_matchers: [alertname="BackendDown"]
+    target_matchers: [alertname="EndpointDown", name=~"Backend health|Webhook tunnel \\(ngrok\\)"]

@@ -35,6 +35,7 @@ public class CheckoutService {
 	private final et.tenapay.shop.config.AppProperties app;
 	private final et.tenapay.shop.events.OrderEventPublisher publisher;
 	private final DiscountService discounts;
+	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -76,6 +77,7 @@ public class CheckoutService {
 		order.setOrderNumber(nextOrderNumber());
 		order.setStatus(OrderStatus.PENDING_PAYMENT);
 		order.setCurrency("ETB");
+		order.setEnvironment(billPayMode.current());
 		order.setCustomerName(customer.name().trim());
 		order.setCustomerPhone(normalizePhone(customer.phone()));
 		order.setCustomerEmail(customer.email().trim().toLowerCase());

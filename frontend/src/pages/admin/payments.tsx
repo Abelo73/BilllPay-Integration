@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
@@ -15,7 +15,9 @@ import { EmptyRow, PageHeader, Pager, StatusBadge } from './shared'
 const STATUSES = ['CREATED', 'ERROR', 'PENDING', 'SUCCEEDED', 'FAILED', 'EXPIRED', 'CANCELLED']
 
 export function AdminPaymentsPage() {
-  const [status, setStatus] = useState('')
+  const [params] = useSearchParams()
+  // the dashboard links here with ?status=PENDING
+  const [status, setStatus] = useState(params.get('status') ?? '')
   const [page, setPage] = useState(0)
   const qc = useQueryClient()
   const { data } = useQuery({
@@ -113,7 +115,7 @@ export function AdminPaymentsPage() {
           </Table>
         </CardContent>
       </Card>
-      {data && <Pager page={page} totalPages={data.totalPages} onPage={setPage} />}
+      {data && <Pager page={page} totalPages={data.totalPages} total={data.totalElements} size={data.size} onPage={setPage} />}
     </>
   )
 }

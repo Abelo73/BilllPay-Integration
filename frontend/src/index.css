@@ -153,3 +153,17 @@
     background-size: 44px 44px;
   }
 }
+
+/* Charts wipe in from the left once drawn; no motion for viewers who ask for less. */
+@keyframes chart-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+@layer utilities {
+  .chart-reveal {
+    animation: chart-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chart-reveal { animation: none; }
+  }
+}

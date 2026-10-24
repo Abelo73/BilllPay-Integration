@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# TenaShop dev stack: start what isn't running, then check everything.
+# TenaShop dev stack: restart the backend, start what isn't running, then check everything.
 #
-#   scripts/dev.sh            start everything that is down, then run all checks (default)
-#   scripts/dev.sh restart    restart the backend (even one started in another terminal) to load new code
+#   scripts/dev.sh            restart the backend so it runs your latest code (even one started in another
+#                             terminal), start anything else that is down, then run all checks (default)
+#   scripts/dev.sh restart    same as the default
+#   scripts/dev.sh up         start only what is down; a running backend is left alone (faster, keeps old code)
 #   scripts/dev.sh check      only run the checks
 #   scripts/dev.sh test       checks + a quick end-to-end smoke test (catalog, sign-up, sign-in, admin)
 #   scripts/dev.sh logs [backend|frontend|ngrok]   follow a log
@@ -39,10 +41,10 @@ FRONTEND_PORT=$(envget FRONTEND_PORT); FRONTEND_PORT=${FRONTEND_PORT:-5280}
 KAFKA_UI_PORT=$(envget KAFKA_UI_PORT); KAFKA_UI_PORT=${KAFKA_UI_PORT:-8191}
 PROMETHEUS_PORT=$(envget PROMETHEUS_PORT); PROMETHEUS_PORT=${PROMETHEUS_PORT:-9390}
 GRAFANA_PORT=$(envget GRAFANA_PORT); GRAFANA_PORT=${GRAFANA_PORT:-8484}
+ALERTMANAGER_PORT=$(envget ALERTMANAGER_PORT); ALERTMANAGER_PORT=${ALERTMANAGER_PORT:-9393}
 MAILPIT_UI_PORT=$(envget MAILPIT_UI_PORT); MAILPIT_UI_PORT=${MAILPIT_UI_PORT:-8626}
 PUBLIC_URL=$(envget APP_REDIRECT_BASE_URL); PUBLIC_URL=${PUBLIC_URL%/}
 NGROK_DOMAIN=${PUBLIC_URL#https://}
-BILLPAY_URL=$(envget BILLPAY_BASE_URL); BILLPAY_URL=${BILLPAY_URL:-https://sandbox.api.billpay.et}
 
 http_code() { curl -s -o /dev/null -m "${2:-5}" -w '%{http_code}' -H 'ngrok-skip-browser-warning: 1' "$1" 2>/dev/null; }
 backend_up()  { [ "$(http_code "http://localhost:$BACKEND_PORT/actuator/health")" = 200 ]; }
@@ -103,8 +105,8 @@ prereqs() {
 
 # ---------- start ----------
 start_infra() {
-  step "Docker: Postgres, Kafka, Kafka UI, media (photos), Mailpit (email), Prometheus, Grafana"
-  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media mailpit prometheus grafana >/dev/null 2>"$RUN/docker.log") \
+  step "Docker: Postgres, Kafka, Kafka UI, media (photos), Mailpit (email), Prometheus, Alertmanager, probes, Grafana"
+  (cd "$ROOT" && docker compose up -d postgres kafka kafka-ui media mailpit prometheus alertmanager blackbox grafana-db-init grafana >/dev/null 2>"$RUN/docker.log") \
     || { bad "docker compose up" "see .run/docker.log"; return; }
   local i; for i in $(seq 1 40); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' tenashop-postgres-1 2>/dev/null)" = healthy ] &&
@@ -172,6 +174,7 @@ checks() {
   [ "$(http_code "http://localhost:$KAFKA_UI_PORT/")" = 200 ] && ok "Kafka UI" "http://localhost:$KAFKA_UI_PORT" || warn "Kafka UI" "not answering yet"
   [ "$(http_code "http://localhost:$PROMETHEUS_PORT/-/ready")" = 200 ] && ok "Prometheus :$PROMETHEUS_PORT" "alerts http://localhost:$PROMETHEUS_PORT/alerts" || warn "Prometheus" "not answering yet"
   [ "$(http_code "http://localhost:$GRAFANA_PORT/api/health")" = 200 ] && ok "Grafana :$GRAFANA_PORT" "dashboards http://localhost:$GRAFANA_PORT" || warn "Grafana" "not answering yet"
+  [ "$(http_code "http://localhost:$ALERTMANAGER_PORT/-/ready")" = 200 ] && ok "Alertmanager :$ALERTMANAGER_PORT" "alert emails go to Mailpit" || warn "Alertmanager" "not answering yet (alerts are not emailed)"
   [ "$(http_code "http://localhost:$MAILPIT_UI_PORT/livez")" = 200 ] && ok "Mailpit (email) :$MAILPIT_UI_PORT" "customer emails land here" || warn "Mailpit" "not answering yet"
 
   local health; health=$(curl -s -m 5 "http://localhost:$BACKEND_PORT/actuator/health" 2>/dev/null)
@@ -196,26 +199,38 @@ checks() {
     public_up && ok "Public URL → backend" "$PUBLIC_URL" || { bad "Public URL → backend" "$PUBLIC_URL"; fix "BillPay redirects and webhooks need this; run: scripts/dev.sh"; }
   fi
 
-  local key secret mode
-  key=$(envget BILLPAY_API_KEY); secret=$(envget BILLPAY_WEBHOOK_SECRET); mode=$(envget BILLPAY_WEBHOOK_VERIFICATION)
-  if [ -z "$key" ] || [ "$key" = "BPG_TEST-replace-me" ]; then bad "BillPay API key" "not set in .env"
-  else
-    s=$(curl -s -m 15 -o /dev/null -w '%{http_code}' -H "x-api-key: $key" "$BILLPAY_URL/api/v1/checkout/refunds?size=1")
-    case "$s" in
-      200) ok "BillPay API key" "accepted (${key:0:9}…${key: -4})" ;;
-      401) bad "BillPay API key" "rejected by BillPay"; fix "Dashboard → Developers → API keys → Regenerate, paste into .env" ;;
-      000) bad "BillPay sandbox" "unreachable from here" ;;
-      *)   warn "BillPay API key" "unexpected HTTP $s" ;;
+  # Which BillPay new orders use is picked in Admin → BillPay setup; ask the running backend
+  if backend_up; then
+    case "$(curl -s -m 5 "http://localhost:$BACKEND_PORT/api/store-info")" in
+      *'"sandbox":false'*) ok "Payment mode" "LIVE: real money (switch in Admin → BillPay setup)" ;;
+      *'"sandbox":true'*)  ok "Payment mode" "SANDBOX: test money (switch in Admin → BillPay setup)" ;;
+      *)                   warn "Payment mode" "backend didn't say" ;;
     esac
   fi
-  [ -n "$secret" ] && ok "Webhook secret" "set (${secret:0:6}…${secret: -4})" || warn "Webhook secret" "not set"
-  [ "$mode" = "HMAC_SHA256" ] && ok "Webhook signatures" "enforced" || warn "Webhook signatures" "NOT enforced ($mode)"
-  # Ask the backend: .env only seeds the first admin, the real password may have been changed since
-  if backend_up; then
-    s=$(curl -s -o /dev/null -m 10 -w '%{http_code}' -X POST "http://localhost:$BACKEND_PORT/api/admin/auth/login" \
-        -H 'Content-Type: application/json' -d "{\"email\":\"$(envget ADMIN_EMAIL)\",\"password\":\"change-me\"}")
-    [ "$s" = 200 ] && warn "Admin password" "still 'change-me' — Admin → My account → Change password" || ok "Admin password" "not the default"
+  billpay_keys SANDBOX true
+  billpay_keys LIVE false
+  [ "$(envget BILLPAY_WEBHOOK_VERIFICATION)" = "HMAC_SHA256" ] && ok "Webhook signatures" "enforced" \
+    || warn "Webhook signatures" "NOT enforced ($(envget BILLPAY_WEBHOOK_VERIFICATION)); live mode needs HMAC_SHA256"
+}
+
+# Checks one environment's key against BillPay (read-only call) and that its webhook secret is set.
+billpay_keys() { # SANDBOX|LIVE required(true|false)
+  local env=$1 required=$2 url key secret label s
+  url=$(envget "BILLPAY_${env}_BASE_URL"); key=$(envget "BILLPAY_${env}_API_KEY"); secret=$(envget "BILLPAY_${env}_WEBHOOK_SECRET")
+  [ "$env" = LIVE ] && { url=${url:-https://api.billpay.et}; label="BillPay live"; } || { url=${url:-https://sandbox.api.billpay.et}; label="BillPay sandbox"; }
+  if [ -z "$key" ] || [ "$key" = "BPG_TEST-replace-me" ]; then
+    if [ "$required" = true ]; then bad "$label key" "BILLPAY_${env}_API_KEY not set in .env"; else warn "$label key" "not set (only needed for live)"; fi
+    return
   fi
+  s=$(curl -s -m 15 -o /dev/null -w '%{http_code}' -H "x-api-key: $key" "$url/api/v1/checkout/refunds?size=1")
+  case "$s" in
+    200) ok "$label key" "accepted (${key:0:9}…${key: -4})" ;;
+    401|403) bad "$label key" "rejected by BillPay (HTTP $s)"; fix "check the key, and Developers → IP whitelist ($(curl -s -m 5 https://api.ipify.org))" ;;
+    000) bad "$label" "unreachable from here ($url)" ;;
+    *)   warn "$label key" "unexpected HTTP $s" ;;
+  esac
+  if [ -n "$secret" ]; then ok "$label webhook secret" "set (${secret:0:6}…${secret: -4})"
+  else warn "$label webhook secret" "BILLPAY_${env}_WEBHOOK_SECRET not set"; fi
 }
 
 summary() {
@@ -226,6 +241,7 @@ summary() {
   printf "  Kafka UI     http://localhost:%s\n" "$KAFKA_UI_PORT"
   printf "  Grafana      http://localhost:%s   (dashboards; sign in as admin to edit)\n" "$GRAFANA_PORT"
   printf "  Prometheus   http://localhost:%s/alerts\n" "$PROMETHEUS_PORT"
+  printf "  Alertmanager http://localhost:%s   (silence alerts; alert emails land in Mailpit)\n" "$ALERTMANAGER_PORT"
   printf "  Emails       http://localhost:%s   (test inbox: every customer email)\n" "$MAILPIT_UI_PORT"
   [ -n "$PUBLIC_URL" ] && printf "  Public URL   %s  (webhook: %s/api/webhooks/billpay)\n" "$PUBLIC_URL" "$PUBLIC_URL"
   echo
@@ -280,14 +296,15 @@ stop_backend_any() {
   else printf "  ${G}✔${N} %-10s stopped (pid %s)\n" "backend" "$pid"; fi
 }
 
-case "${1:-start}" in
-  start)    prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
-  restart)  step "Stopping backend"; stop_backend_any; prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
+case "${1:-restart}" in
+  up|start) prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
+  restart)  step "Stopping backend (to load new code; 'scripts/dev.sh up' keeps it running)"; stop_backend_any
+            prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
   check)    use_java21 >/dev/null; checks; summary ;;
   test)     checks; smoke; summary ;;
   logs)     f="$RUN/${2:-backend}.log"; [ -f "$f" ] && tail -f "$f" || echo "no log at $f (was it started by this script?)" ;;
   stop)     step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend ;;
   stop-all) step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend; (cd "$ROOT" && docker compose stop) ;;
-  *)        sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)        sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 [ "$FAILS" -eq 0 ]

@@ -19,7 +19,9 @@ export function AdminOrdersPage() {
   const status = params.get('status') ?? ''
   const fulfilment = params.get('fulfilment') ?? ''
   const q = params.get('q') ?? ''
+  const env = params.get('env') ?? ''
   const page = Number(params.get('page') ?? 0)
+  const size = Number(params.get('size') ?? 20)
   const [search, setSearch] = useState(q)
 
   const set = (k: string, v: string | null) => {
@@ -37,8 +39,8 @@ export function AdminOrdersPage() {
   }, [search])
 
   const { data } = useQuery({
-    queryKey: ['admin-orders', status, fulfilment, q, page],
-    queryFn: () => adminApi.orders({ status, fulfilment, q, page }),
+    queryKey: ['admin-orders', status, fulfilment, env, q, page, size],
+    queryFn: () => adminApi.orders({ status, fulfilment, env, q, page, size }),
     placeholderData: keepPreviousData,
     refetchInterval: 10_000,
   })
@@ -46,7 +48,7 @@ export function AdminOrdersPage() {
   return (
     <>
       <PageHeader title="Orders" description="Every order, where its payment stands and how far delivery got." />
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-8" placeholder="Order number, customer or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -65,7 +67,7 @@ export function AdminOrdersPage() {
           </SelectContent>
         </Select>
         <Select value={fulfilment || 'ALL'} onValueChange={(v) => set('fulfilment', v === 'ALL' ? null : v)}>
-          <SelectTrigger className="w-full sm:w-44" aria-label="Delivery">
+          <SelectTrigger className="w-full sm:w-40" aria-label="Delivery">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -75,6 +77,16 @@ export function AdminOrdersPage() {
                 {s.toLowerCase()}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={env || 'ALL'} onValueChange={(v) => set('env', v === 'ALL' ? null : v)}>
+          <SelectTrigger className="w-full sm:w-36" aria-label="Mode">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Live and test</SelectItem>
+            <SelectItem value="LIVE">Live only</SelectItem>
+            <SelectItem value="SANDBOX">Test only</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -99,6 +111,11 @@ export function AdminOrdersPage() {
                     <Link to={`/admin/orders/${o.orderNumber}`} className="font-mono text-sm font-medium hover:underline">
                       {o.orderNumber}
                     </Link>
+                    {o.environment === 'SANDBOX' && (
+                      <span className="ml-1.5 rounded bg-warning/15 px-1 py-0.5 text-[10px] font-medium uppercase text-muted-foreground" title="Sandbox order: test money">
+                        test
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="text-sm">{o.customerName}</div>
@@ -119,7 +136,7 @@ export function AdminOrdersPage() {
           </Table>
         </CardContent>
       </Card>
-      {data && <Pager page={page} totalPages={data.totalPages} onPage={(p) => set('page', String(p))} />}
+      {data && <Pager page={page} totalPages={data.totalPages} total={data.totalElements} size={data.size} onPage={(p) => set('page', String(p))} onSize={(n) => set('size', String(n))} />}
     </>
   )
 }

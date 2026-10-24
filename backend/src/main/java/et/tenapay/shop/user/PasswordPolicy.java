@@ -8,6 +8,9 @@ public final class PasswordPolicy {
 
 	public static final int MIN_LENGTH = 8;
 
+	/** Passwords anyone could guess: the shipped default and the example from the setup notes. */
+	public static final java.util.List<String> KNOWN = java.util.List.of("change-me", "YourNewPassw0rd");
+
 	private PasswordPolicy() {
 	}
 
@@ -20,6 +23,9 @@ public final class PasswordPolicy {
 		if (!ok) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "WEAK_PASSWORD",
 					"Use at least 8 characters, including a letter and a number.");
+		}
+		if (KNOWN.contains(password)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "WEAK_PASSWORD", "That password is too well known; choose your own.");
 		}
 	}
 }

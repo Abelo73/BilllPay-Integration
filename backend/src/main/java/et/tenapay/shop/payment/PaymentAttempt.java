@@ -50,6 +50,10 @@ public class PaymentAttempt {
 
 	private String currency;
 
+	/** Same as the order's: status checks and refunds use this environment's keys. */
+	@Enumerated(EnumType.STRING)
+	private et.tenapay.shop.payment.billpay.BillPayEnvironment environment = et.tenapay.shop.payment.billpay.BillPayEnvironment.SANDBOX;
+
 	private String paymentMethod;
 
 	private String reasonCode;

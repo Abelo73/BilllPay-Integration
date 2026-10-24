@@ -63,7 +63,28 @@ const qs = (params: Record<string, string | number | undefined>) => {
   return s.toString()
 }
 
+export type BillPayEnv = 'SANDBOX' | 'LIVE'
+
+export type BillPayEnvStatus = {
+  baseUrl: string
+  apiKeyConfigured: boolean
+  apiKeyHint: string | null
+  webhookSecretConfigured: boolean
+  /** what stops this environment from being used; empty when ready */
+  problems: string[]
+}
+
+export type BillPayModeStatus = {
+  mode: BillPayEnv
+  changedBy: string | null
+  changedAt: string | null
+  /** set when live was selected but isn't safe, so the shop fell back to the sandbox */
+  fallbackReason: string | null
+  environments: Record<BillPayEnv, BillPayEnvStatus>
+}
+
 export type AdminConfig = {
+  mode: BillPayModeStatus
   billpayBaseUrl: string
   sandbox: boolean
   apiKeyConfigured: boolean
@@ -99,6 +120,7 @@ export type OrderRow = {
   deliveryCity: string | null
   createdAt: string
   paidAt: string | null
+  environment: BillPayEnv
 }
 
 export type DeliveryDetail = {
@@ -210,8 +232,12 @@ export const adminApi = {
   login: (email: string, password: string) =>
     request<StaffSession>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   config: () => request<AdminConfig>('/config'),
+  /** Switch which BillPay new orders use; going live needs confirm === 'LIVE'. */
+  switchMode: (mode: BillPayEnv, confirm?: string) =>
+    request<BillPayModeStatus>('/billpay/mode', { method: 'POST', body: JSON.stringify({ mode, confirm }) }),
   dashboard: () => request<Dashboard>('/dashboard'),
-  orders: (p: { status?: string; fulfilment?: string; q?: string; page?: number }) => request<Page<OrderRow>>(`/orders?${qs(p)}`),
+  orders: (p: { status?: string; fulfilment?: string; env?: string; q?: string; page?: number; size?: number }) =>
+    request<Page<OrderRow>>(`/orders?${qs(p)}`),
   order: (orderNumber: string) => request<OrderDetail>(`/orders/${encodeURIComponent(orderNumber)}`),
   fulfil: (orderNumber: string, status: string, note?: string) =>
     request<{ orderNumber: string; fulfilmentStatus: string }>(`/orders/${encodeURIComponent(orderNumber)}/fulfilment`, {
@@ -235,14 +261,15 @@ export const adminApi = {
       body: JSON.stringify(body),
     }),
   retryRefund: (id: string) => request<Refund>(`/refunds/${id}/retry`, { method: 'POST' }),
-  report: (days: number) => request<Report>(`/reports?days=${days}`),
+  /** env omitted = the mode new orders use */
+  report: (days: number, env?: BillPayEnv) => request<Report>(`/reports?${qs({ days, env })}`),
   discounts: () => request<DiscountRow[]>('/discounts'),
   createDiscount: (body: DiscountInput) => request<DiscountRow[]>('/discounts', { method: 'POST', body: JSON.stringify(body) }),
   updateDiscount: (id: number, body: { active?: boolean; description?: string; expiresAt?: string; clearExpiry?: boolean; usageLimit?: number; clearUsageLimit?: boolean }) =>
     request<DiscountRow[]>(`/discounts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   /** Downloads a CSV export with the staff token (a plain link can't send the Authorization header). */
-  downloadCsv: async (kind: 'orders' | 'payments', days: number) => {
-    const res = await fetch(`/api/admin/reports/${kind}.csv?days=${days}`, {
+  downloadCsv: async (kind: 'orders' | 'payments', days: number, env?: BillPayEnv) => {
+    const res = await fetch(`/api/admin/reports/${kind}.csv?${qs({ days, env })}`, {
       headers: adminToken.get() ? { Authorization: `Bearer ${adminToken.get()}` } : {},
     })
     if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
@@ -412,10 +439,15 @@ export const EMAIL_KIND_LABEL: Record<string, string> = {
   PASSWORD_CHANGED: 'Password changed',
 }
 
+export type ReportTotals = { revenue: number; paidOrders: number; orders: number; averageOrder: number; paymentSuccessRate: number; refunded: number }
+
 export type Report = {
   from: string
   to: string
-  totals: { revenue: number; paidOrders: number; orders: number; averageOrder: number; paymentSuccessRate: number; refunded: number }
+  environment: BillPayEnv
+  totals: ReportTotals
+  /** same figures for the equally long period just before */
+  previous: ReportTotals
   salesByDay: { day: string; orders: number; paidOrders: number; revenue: number }[]
   topProducts: { productId: number; name: string; quantity: number; revenue: number }[]
   byMethod: { method: string; finished: number; succeeded: number; successRate: number }[]

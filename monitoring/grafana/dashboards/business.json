@@ -1,0 +1,1546 @@
+{
+  "uid": "tenashop-business",
+  "title": "TenaShop · Business",
+  "description": "Revenue, orders, products, delivery and stock, straight from the shop database",
+  "tags": [
+    "tenashop",
+    "business",
+    "sql"
+  ],
+  "editable": false,
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "timezone": "browser",
+  "graphTooltip": 1,
+  "templating": {
+    "list": [
+      {
+        "type": "custom",
+        "name": "env",
+        "label": "BillPay",
+        "hide": 0,
+        "skipUrlSync": false,
+        "query": "All : true,Sandbox : o.environment = 'SANDBOX',Live : o.environment = 'LIVE'",
+        "current": {
+          "text": "All",
+          "value": "true",
+          "selected": true
+        },
+        "options": [
+          {
+            "text": "All",
+            "value": "true",
+            "selected": true
+          },
+          {
+            "text": "Sandbox",
+            "value": "o.environment = 'SANDBOX'",
+            "selected": false
+          },
+          {
+            "text": "Live",
+            "value": "o.environment = 'LIVE'",
+            "selected": false
+          }
+        ],
+        "description": "Sandbox = test money, Live = real money"
+      },
+      {
+        "type": "custom",
+        "name": "bucket",
+        "label": "Group by",
+        "hide": 0,
+        "skipUrlSync": false,
+        "query": "1h,1d,1w",
+        "current": {
+          "text": "1d",
+          "value": "1d",
+          "selected": true
+        },
+        "options": [
+          {
+            "text": "1h",
+            "value": "1h",
+            "selected": false
+          },
+          {
+            "text": "1d",
+            "value": "1d",
+            "selected": true
+          },
+          {
+            "text": "1w",
+            "value": "1w",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "name": "Annotations & Alerts",
+        "type": "dashboard",
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)"
+      },
+      {
+        "name": "Backend restarts",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "step": "60s",
+        "titleFormat": "Backend restarted",
+        "textFormat": "",
+        "tagKeys": "",
+        "useValueForTime": false,
+        "expr": "(time() - process_start_time_seconds{job=\"tenashop-backend\"}) < 90"
+      },
+      {
+        "name": "Alerts firing",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "red",
+        "step": "60s",
+        "titleFormat": "{{alertname}}",
+        "textFormat": "{{severity}} {{name}}{{reason}}",
+        "tagKeys": "severity",
+        "useValueForTime": false,
+        "expr": "ALERTS{alertstate=\"firing\"}"
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Business",
+      "type": "link",
+      "url": "/d/tenashop-business",
+      "icon": "dashboard"
+    },
+    {
+      "title": "Payments",
+      "type": "link",
+      "url": "/d/tenashop-payments",
+      "icon": "dashboard"
+    },
+    {
+      "title": "Webhooks & Kafka",
+      "type": "link",
+      "url": "/d/tenashop-webhooks",
+      "icon": "dashboard"
+    },
+    {
+      "title": "App",
+      "type": "link",
+      "url": "/d/tenashop-app",
+      "icon": "dashboard"
+    },
+    {
+      "title": "Uptime & Alerts",
+      "type": "link",
+      "url": "/d/tenashop-uptime",
+      "icon": "dashboard"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Selected time range",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Revenue",
+      "description": "Totals of orders paid in the range (incl. delivery fee, after discounts)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(sum(o.total), 0) AS \"Revenue\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Paid orders",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT count(*) AS \"Paid orders\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Average order",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT avg(o.total) AS \"Average order\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Checkout conversion",
+      "description": "Orders placed in the range that ended up paid",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT (count(*) FILTER (WHERE o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED')))::float / nullif(count(*), 0) AS \"Paid ÷ placed\" FROM orders o WHERE $env AND $__timeFilter(o.created_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.7
+              },
+              {
+                "color": "green",
+                "value": 0.9
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Refunded",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(sum(r.amount), 0) AS \"Refunded\" FROM refunds r JOIN orders o ON o.id = r.order_id WHERE $env AND r.status = 'SUCCEEDED' AND $__timeFilter(r.created_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Discounts given",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(sum(o.discount_amount), 0) AS \"Discounts\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "Over time",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Revenue",
+      "description": "Grouped by the \"Group by\" dropdown (UTC buckets)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(o.paid_at, $bucket), sum(o.total) AS \"Revenue\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Orders placed, by outcome",
+      "description": "Where each order placed in that bucket is now: PAID, EXPIRED, CANCELLED, ...",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(o.created_at, $bucket), o.status AS metric, count(*) AS value FROM orders o WHERE $env AND $__timeFilter(o.created_at) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Products and payments",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Top products",
+      "gridPos": {
+        "x": 0,
+        "y": 15,
+        "w": 10,
+        "h": 9
+      },
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Revenue"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: ETB"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT i.product_name AS \"Product\", sum(i.quantity) AS \"Units\", sum(i.line_total) AS \"Revenue\" FROM order_items i JOIN orders o ON o.id = i.order_id WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at) GROUP BY 1 ORDER BY 3 DESC LIMIT 10",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "piechart",
+      "title": "Paid by method",
+      "gridPos": {
+        "x": 10,
+        "y": 15,
+        "w": 7,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "values": [
+            "value",
+            "percent"
+          ],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(p.payment_method, 'unknown') AS \"Method\", count(*) AS \"Paid\" FROM payment_attempts p JOIN orders o ON o.id = p.order_id WHERE $env AND p.status = 'SUCCEEDED' AND $__timeFilter(p.updated_at) GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "bargauge",
+      "title": "Why payments did not go through",
+      "description": "BillPay's reason code, or the status when there is none (EXPIRED = never paid)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 17,
+        "y": 15,
+        "w": 7,
+        "h": 9
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(p.reason_code, p.status) AS \"Reason\", count(*) AS \"Payments\" FROM payment_attempts p JOIN orders o ON o.id = p.order_id WHERE $env AND p.status IN ('FAILED', 'EXPIRED', 'CANCELLED', 'ERROR') AND $__timeFilter(p.updated_at) GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "row",
+      "title": "Delivery and stock",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "To fulfil now",
+      "description": "Paid orders not shipped yet (right now, ignores the time range)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 25,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT count(*) AS \"To fulfil\" FROM orders o WHERE $env AND o.status = 'PAID' AND coalesce(o.fulfilment_status, 'UNFULFILLED') IN ('UNFULFILLED', 'PROCESSING')",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 5
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Oldest waiting",
+      "description": "Time since the oldest unshipped paid order was paid",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 25,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT extract(epoch FROM now() - min(o.paid_at)) AS \"Oldest\" FROM orders o WHERE $env AND o.status = 'PAID' AND coalesce(o.fulfilment_status, 'UNFULFILLED') IN ('UNFULFILLED', 'PROCESSING')",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 86400
+              },
+              {
+                "color": "red",
+                "value": 172800
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "On the way",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 25,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT count(*) AS \"Shipped\" FROM orders o WHERE $env AND o.fulfilment_status = 'SHIPPED'",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Paid → delivered (avg)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 25,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT avg(extract(epoch FROM o.delivered_at - o.paid_at)) AS \"Paid to delivered\" FROM orders o WHERE $env AND o.delivered_at IS NOT NULL AND $__timeFilter(o.delivered_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Low stock",
+      "description": "Active products at or below their low-stock alert level",
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 10,
+        "h": 9
+      },
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Available"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT p.name AS \"Product\", p.stock - p.reserved AS \"Available\", p.reserved AS \"Held for checkouts\", p.low_stock_threshold AS \"Alert at\" FROM products p WHERE p.active AND p.stock - p.reserved <= p.low_stock_threshold ORDER BY 2, 1",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Latest orders",
+      "description": "Click an order number to open it in the admin",
+      "gridPos": {
+        "x": 10,
+        "y": 29,
+        "w": 14,
+        "h": 9
+      },
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "suffix: ETB"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Order"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open in admin",
+                    "url": "http://localhost:5280/admin/orders/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT o.created_at AS \"Placed\", o.order_number AS \"Order\", o.status AS \"Status\", o.fulfilment_status AS \"Delivery\", o.total AS \"Total\" FROM orders o WHERE $env AND $__timeFilter(o.created_at) ORDER BY o.created_at DESC LIMIT 20",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "row",
+      "title": "Operations",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 23,
+      "type": "bargauge",
+      "title": "Customer emails",
+      "description": "FAILED means the email could not be sent (SMTP down?)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 39,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT n.status AS \"Status\", count(*) AS \"Emails\" FROM notifications n WHERE $__timeFilter(n.created_at) GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "bargauge",
+      "title": "Webhooks stored",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 39,
+        "w": 6,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT w.status AS \"Status\", count(*) AS \"Webhooks\" FROM billpay_webhook_events w WHERE $__timeFilter(w.received_at) GROUP BY 1 ORDER BY 2 DESC",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Failed sign-ins",
+      "description": "Wrong passwords, locked or disabled accounts, by portal. A sudden spike can mean password guessing.",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 39,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(l.created_at, $bucket), l.portal || ' · ' || l.reason AS metric, count(*) AS value FROM login_events l WHERE NOT l.success AND $__timeFilter(l.created_at) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 2,
+            "fillOpacity": 80,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "axisSoftMin": 0
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "table",
+      "title": "Discount codes",
+      "gridPos": {
+        "x": 0,
+        "y": 46,
+        "w": 24,
+        "h": 7
+      },
+      "transformations": [],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": ""
+        }
+      },
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT d.code AS \"Code\", d.kind AS \"Type\", d.value AS \"Value\", d.times_used AS \"Used\", d.usage_limit AS \"Limit\", d.active AS \"Active\", d.expires_at AS \"Expires\" FROM discount_codes d ORDER BY d.times_used DESC, d.code LIMIT 15",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

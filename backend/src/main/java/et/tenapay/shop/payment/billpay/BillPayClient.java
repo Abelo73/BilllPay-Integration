@@ -26,7 +26,8 @@ public class BillPayClient {
 
 	private static final int MAX_NETWORK_RETRIES = 2;
 
-	private final RestClient http;
+	/** One client per environment, each with its own base URL and API key. */
+	private final java.util.Map<BillPayEnvironment, RestClient> clients = new java.util.EnumMap<>(BillPayEnvironment.class);
 	private final BillPayProperties props;
 	private final ObjectMapper json;
 	private final ShopMetrics metrics;
@@ -43,17 +44,24 @@ public class BillPayClient {
 		this.json = json;
 		this.metrics = metrics;
 		HttpClient httpClient = HttpClient.newBuilder().connectTimeout(props.timeout()).build();
-		JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
-		factory.setReadTimeout(props.timeout());
-		this.http = RestClient.builder()
-				.baseUrl(props.baseUrl())
-				.requestFactory(factory)
-				.defaultHeader("x-api-key", props.apiKey())
-				.defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
-				.build();
-		if (props.apiKey() == null || props.apiKey().isBlank()) {
-			log.warn("BILLPAY_API_KEY is not set; calls to BillPay will be rejected");
+		for (BillPayEnvironment env : BillPayEnvironment.values()) {
+			BillPayProperties.Credentials c = props.credentials(env);
+			JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);
+			factory.setReadTimeout(props.timeout());
+			clients.put(env, RestClient.builder()
+					.baseUrl(c.baseUrl())
+					.requestFactory(factory)
+					.defaultHeader("x-api-key", c.hasApiKey() ? c.apiKey() : "")
+					.defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
+					.build());
+			if (!c.hasApiKey()) {
+				log.info("BILLPAY_{}_API_KEY is not set; {} payments are unavailable", env, env.name().toLowerCase());
+			}
 		}
+	}
+
+	private RestClient http(BillPayEnvironment env) {
+		return clients.get(env);
 	}
 
 	public String toJson(Object value) {
@@ -64,13 +72,13 @@ public class BillPayClient {
 	 * Creates a hosted-checkout payment. Network failures are retried with the same Idempotency-Key, so
 	 * BillPay can recognise a repeat and not create a second payment.
 	 */
-	public BillPayPayment createPayment(String requestJson, UUID idempotencyKey) {
-		String body = postWithRetry("create_payment", props.createPaymentPath(), requestJson, idempotencyKey);
+	public BillPayPayment createPayment(BillPayEnvironment env, String requestJson, UUID idempotencyKey) {
+		String body = postWithRetry(env, "create_payment", props.createPaymentPath(), requestJson, idempotencyKey);
 		return BillPayPayloads.parsePayment(readEnvelope(body), body);
 	}
 
-	public BillPayPayment getPayment(String billpayPaymentId) {
-		String body = send("get_payment", () -> http.get().uri(props.paymentStatusPath(), billpayPaymentId));
+	public BillPayPayment getPayment(BillPayEnvironment env, String billpayPaymentId) {
+		String body = send("get_payment", () -> http(env).get().uri(props.paymentStatusPath(), billpayPaymentId));
 		return BillPayPayloads.parsePayment(readEnvelope(body), body);
 	}
 
@@ -78,17 +86,19 @@ public class BillPayClient {
 	 * Refunds part of a captured payment: POST /api/v1/checkout/payments/{id}/refunds (path confirmed 2026-10-23; the
 	 * body shape is still unconfirmed, open question Q6).
 	 */
-	public BillPayRefund createRefund(String billpayPaymentId, String requestJson, UUID idempotencyKey) {
-		String body = postWithRetry("create_refund", props.refundPath(), requestJson, idempotencyKey, billpayPaymentId);
+	public BillPayRefund createRefund(BillPayEnvironment env, String billpayPaymentId, String requestJson,
+			UUID idempotencyKey) {
+		String body = postWithRetry(env, "create_refund", props.refundPath(), requestJson, idempotencyKey,
+				billpayPaymentId);
 		return BillPayPayloads.parseRefund(readEnvelope(body), body);
 	}
 
-	private String postWithRetry(String operation, String path, String requestJson, UUID idempotencyKey,
-			Object... uriVariables) {
+	private String postWithRetry(BillPayEnvironment env, String operation, String path, String requestJson,
+			UUID idempotencyKey, Object... uriVariables) {
 		BillPayException last = null;
 		for (int attempt = 0; attempt <= MAX_NETWORK_RETRIES; attempt++) {
 			try {
-				return send(operation, () -> http.post()
+				return send(operation, () -> http(env).post()
 						.uri(path, uriVariables)
 						.contentType(MediaType.APPLICATION_JSON)
 						.header("Idempotency-Key", idempotencyKey.toString())

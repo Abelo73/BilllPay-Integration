@@ -45,6 +45,10 @@ public class Order {
 
 	private String currency;
 
+	/** Which BillPay this order is paid through; fixed when the order is placed. */
+	@Enumerated(EnumType.STRING)
+	private et.tenapay.shop.payment.billpay.BillPayEnvironment environment = et.tenapay.shop.payment.billpay.BillPayEnvironment.SANDBOX;
+
 	private String customerName;
 
 	private String customerPhone;

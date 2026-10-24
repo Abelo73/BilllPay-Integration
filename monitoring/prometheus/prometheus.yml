@@ -6,6 +6,12 @@ global:
 rule_files:
   - /etc/prometheus/alerts.yml
 
+# Firing alerts go to Alertmanager, which emails them (monitoring/alertmanager/alertmanager.yml)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
 scrape_configs:
   # The backend runs either on the host (scripts/dev.sh) or in Compose with 8181 published on the host,
   # so host.docker.internal:8181 reaches it in both cases. /actuator/prometheus only answers direct,
@@ -16,6 +22,37 @@ scrape_configs:
       - targets: ['host.docker.internal:8181']
         labels:
           service: backend
+
+  # Outside checks through the blackbox exporter (monitoring/blackbox/blackbox.yml). It runs on the host
+  # network, so localhost below means this machine, exactly as in your browser.
+  # Each target is probed every 30 s; `name` is the label shown on the Uptime dashboard and in alerts.
+  - job_name: probes
+    metrics_path: /probe
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['http://localhost:5280/']
+        labels: { name: 'Store (frontend)', module: http_2xx }
+      - targets: ['http://localhost:8181/actuator/health']
+        labels: { name: 'Backend health', module: http_2xx }
+      # Public webhook URL BillPay calls. Change it here if your ngrok domain changes.
+      - targets: ['https://vocalize-porridge-cogwheel.ngrok-free.dev/actuator/health']
+        labels: { name: 'Webhook tunnel (ngrok)', module: http_2xx }
+      - targets: ['https://sandbox.api.billpay.et/']
+        labels: { name: 'BillPay sandbox API', module: http_reachable }
+    relabel_configs:
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: host.docker.internal:9395   # the blackbox exporter on the host network
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ['alertmanager:9093']
 
   - job_name: prometheus
     static_configs:

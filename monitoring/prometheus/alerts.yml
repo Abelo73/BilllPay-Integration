@@ -60,3 +60,62 @@ groups:
         annotations:
           summary: Kafka consumer lag on {{ $labels.topic }}
           description: More than 50 messages are waiting on {{ $labels.topic }} for 5 minutes.
+
+      - alert: HighServerErrorRate
+        expr: |
+          (sum(rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*"}[5m])) or vector(0))
+            / sum(rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: More than 5% of requests fail with 5xx
+          description: '{{ $value | humanizePercentage }} of backend requests answered 5xx. Check the App dashboard and backend logs.'
+
+      - alert: PaymentDeclineSpike
+        expr: sum by (reason) (increase(tenashop_payments_tries_failed_total[10m])) >= 5
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Many declined payments: {{ $labels.reason }}'
+          description: '{{ $value | printf "%.0f" }} tries were declined with {{ $labels.reason }} in 10 minutes.'
+
+      - alert: DatabasePoolExhausted
+        expr: max(hikaricp_connections_pending) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Requests are waiting for a database connection
+          description: The Hikari pool has had waiting requests for 2 minutes. Look for slow queries or raise the pool size.
+
+      - alert: JvmHeapHigh
+        expr: |
+          sum(jvm_memory_used_bytes{area="heap",job="tenashop-backend"})
+            / sum(jvm_memory_max_bytes{area="heap",job="tenashop-backend"}) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend heap above 90%
+          description: Heap has been above 90% for 10 minutes; the backend may slow down or run out of memory.
+
+  - name: probes
+    rules:
+      - alert: EndpointDown
+        expr: probe_success{job="probes"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: '{{ $labels.name }} is not reachable'
+          description: '{{ $labels.instance }} failed its check for 2 minutes. If this is the ngrok tunnel, BillPay webhooks and return pages are failing.'
+
+      - alert: TlsCertificateExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry{job="probes"} - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: 'TLS certificate for {{ $labels.name }} expires soon'
+          description: 'The certificate expires in {{ $value | printf "%.0f" }} days.'

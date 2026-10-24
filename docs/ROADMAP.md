@@ -49,6 +49,8 @@ Result: 25 end-to-end scenarios + 25 unit tests, all green ([TEST_PLAN.md](TEST_
 
 Result: three provisioned dashboards and six alert rules, checked with real traffic from a browser run ([MONITORING.md](MONITORING.md)). Loki (optional) not done.
 
+Added 2026-10-24: **Alertmanager** emails alerts (Mailpit in dev; one email per alert, BackendDown holds back its side effects), **blackbox checks** of the store, backend, ngrok tunnel and BillPay sandbox with TLS expiry, a **Business** dashboard straight from Postgres through a column-limited read-only user (no customer personal data), an **Uptime & Alerts** dashboard, six more alert rules (12 total), and restart/alert markers on every chart. Still open: Loki logs, real SMTP or Telegram for alerts at go-live.
+
 | Area | Deliverables |
 |------|--------------|
 | Metrics | `micrometer-registry-prometheus`; expose `/actuator/prometheus` (internal only, not public) |

@@ -53,6 +53,7 @@ public class CheckoutController {
 	private final OrderEventRepository orderEvents;
 	private final et.tenapay.shop.user.CustomerAddressRepository addresses;
 	private final et.tenapay.shop.config.AppProperties app;
+	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
 
 	public record CheckoutItem(@NotNull Long productId, @Min(1) @Max(20) int quantity) {
 	}
@@ -116,6 +117,15 @@ public class CheckoutController {
 	private static final java.util.Set<String> CUSTOMER_STEPS = java.util.Set.of("ORDER_CREATED", "PAID", "EXPIRED",
 			"CANCELLED", "PAYMENT_FAILED", "FULFILMENT_PROCESSING", "FULFILMENT_SHIPPED", "FULFILMENT_DELIVERED",
 			"FULFILMENT_CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED");
+
+	public record StoreInfo(boolean sandbox) {
+	}
+
+	/** Lets the store show its "sandbox, no real money" banner only when payments really are test payments. */
+	@GetMapping("/store-info")
+	public StoreInfo storeInfo() {
+		return new StoreInfo(billPayMode.isSandbox());
+	}
 
 	@GetMapping("/delivery")
 	public DeliveryQuote delivery() {

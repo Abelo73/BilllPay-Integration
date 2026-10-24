@@ -15,6 +15,7 @@ import javax.crypto.spec.SecretKeySpec;
 
 import org.springframework.stereotype.Component;
 
+import et.tenapay.shop.payment.billpay.BillPayEnvironment;
 import et.tenapay.shop.payment.billpay.BillPayProperties;
 import et.tenapay.shop.payment.billpay.BillPayProperties.Verification;
 import lombok.extern.slf4j.Slf4j;
@@ -36,18 +37,24 @@ public class WebhookSignatureVerifier {
 
 	public enum Result { VALID, INVALID, NOT_CHECKED }
 
-	/** {@code scheme} names what matched (or what was probed), for the webhook log. */
-	public record Outcome(Result result, String scheme) {
+	/**
+	 * {@code scheme} names what matched (or what was probed), for the webhook log; {@code environment} is whose secret
+	 * verified it (null when not verified), so a sandbox-signed event can never settle a live payment.
+	 */
+	public record Outcome(Result result, String scheme, BillPayEnvironment environment) {
+
+		Outcome(Result result, String scheme) {
+			this(result, scheme, null);
+		}
 	}
 
 	private final BillPayProperties.Webhook config;
+	private final BillPayProperties props;
 
 	public WebhookSignatureVerifier(BillPayProperties props) {
+		this.props = props;
 		this.config = props.webhook();
-		if (config.verification() == Verification.NONE && !props.isSandbox()) {
-			throw new IllegalStateException("Unsigned webhooks are only allowed against the BillPay sandbox. "
-					+ "Set BILLPAY_WEBHOOK_VERIFICATION and BILLPAY_WEBHOOK_SECRET before using live keys.");
-		}
+		// Unsigned webhooks are tolerated for sandbox development only; BillPayMode refuses live mode without them.
 		if (config.verification() == Verification.NONE) {
 			log.warn("BillPay webhook signatures are NOT enforced (sandbox only). Anyone who can reach the "
 					+ "webhook URL could forge a payment update.{}", hasSecret()
@@ -75,23 +82,45 @@ public class WebhookSignatureVerifier {
 		if (value == null) {
 			return new Outcome(Result.INVALID, "missing header " + config.signatureHeader());
 		}
-		String scheme = match(rawBody, value, timestamps(headers));
-		return scheme != null ? new Outcome(Result.VALID, config.signatureHeader() + " " + scheme)
-				: new Outcome(Result.INVALID, "signature mismatch");
+		// Live first: each environment has its own endpoint secret, and the match tells us which BillPay sent it.
+		for (BillPayEnvironment env : List.of(BillPayEnvironment.LIVE, BillPayEnvironment.SANDBOX)) {
+			String secret = props.credentials(env).webhookSecret();
+			if (secret == null || secret.isBlank()) {
+				continue;
+			}
+			// A live secret equal to the sandbox one proves nothing about where an event came from: treat it as sandbox
+			// (live mode is refused in that state, see BillPayMode).
+			if (env == BillPayEnvironment.LIVE && secret.trim().equals(
+					props.sandbox().webhookSecret() == null ? null : props.sandbox().webhookSecret().trim())) {
+				continue;
+			}
+			String scheme = match(secret, rawBody, value, timestamps(headers));
+			if (scheme != null) {
+				return new Outcome(Result.VALID, config.signatureHeader() + " " + scheme + " (" + env.name().toLowerCase()
+						+ " secret)", env);
+			}
+		}
+		return new Outcome(Result.INVALID, "signature mismatch");
 	}
 
 	private boolean hasSecret() {
-		return config.secret() != null && !config.secret().isBlank();
+		return props.sandbox().hasWebhookSecret() || props.live().hasWebhookSecret();
 	}
 
 	private String probe(String body, Map<String, String> headers) {
 		List<String> timestamps = timestamps(headers);
-		for (Map.Entry<String, String> h : headers.entrySet()) {
-			String name = h.getKey().toLowerCase(Locale.ROOT);
-			if (name.contains("sign") || name.contains("hmac")) {
-				String scheme = match(body, h.getValue(), timestamps);
-				if (scheme != null) {
-					return "header '" + h.getKey() + "' = " + scheme;
+		for (BillPayEnvironment env : BillPayEnvironment.values()) {
+			String secret = props.credentials(env).webhookSecret();
+			if (secret == null || secret.isBlank()) {
+				continue;
+			}
+			for (Map.Entry<String, String> h : headers.entrySet()) {
+				String name = h.getKey().toLowerCase(Locale.ROOT);
+				if (name.contains("sign") || name.contains("hmac")) {
+					String scheme = match(secret, body, h.getValue(), timestamps);
+					if (scheme != null) {
+						return "header '" + h.getKey() + "' = " + scheme + " (" + env.name().toLowerCase() + " secret)";
+					}
 				}
 			}
 		}
@@ -99,9 +128,9 @@ public class WebhookSignatureVerifier {
 	}
 
 	/** Returns a description of the scheme that matched, or null. */
-	private String match(String body, String headerValue, List<String> timestampHeaders) {
+	private String match(String secret, String body, String headerValue, List<String> timestampHeaders) {
 		String value = headerValue.trim();
-		for (byte[] key : keys()) {
+		for (byte[] key : keys(secret)) {
 			if (value.contains("v1=") || value.startsWith("t=")) {
 				String ts = null;
 				List<String> sigs = new ArrayList<>();
@@ -140,8 +169,8 @@ public class WebhookSignatureVerifier {
 	}
 
 	/** The secret as raw text, plus base64-decoded when it looks like "whsec_<base64>". */
-	private List<byte[]> keys() {
-		String secret = config.secret().trim();
+	private static List<byte[]> keys(String rawSecret) {
+		String secret = rawSecret.trim();
 		List<byte[]> keys = new ArrayList<>();
 		keys.add(secret.getBytes(StandardCharsets.UTF_8));
 		int underscore = secret.indexOf('_');

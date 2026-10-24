@@ -67,13 +67,35 @@ const routes = {
   'POST /api/admin/auth/login': () => ({ token: 'mock', expiresAt: iso(-480), user: { id: 'u-admin', email: 'admin@tenashop.local', fullName: 'TenaShop Admin', phone: null, role: 'ADMIN' } }),
   'GET /api/admin/users': () => page([{ id: 'u-admin', email: 'admin@tenashop.local', fullName: 'TenaShop Admin', phone: null, role: 'ADMIN', enabled: true, locked: false, lockedUntil: null, lastLoginAt: iso(1), createdAt: iso(600) }]),
   'GET /api/admin/login-events': () => page([{ id: 1, userId: 'u-admin', email: 'admin@tenashop.local', portal: 'ADMIN', success: true, reason: 'SUCCESS', ip: '127.0.0.1', userAgent: 'Mozilla/5.0 (Windows NT 10.0) Edg/130', createdAt: iso(1) }]),
-  'GET /api/admin/config': () => ({ billpayBaseUrl: 'https://sandbox.api.billpay.et', sandbox: true, apiKeyConfigured: true, apiKeyHint: 'BPG_TEST-…hR18', webhookVerification: 'NONE', webhookSecretConfigured: true, webhookSignatureHeader: 'X-BillPay-Signature', webhookPath: '/api/webhooks/billpay', publicBaseUrl: 'http://localhost:5280', reconcileAfter: 'PT3M', paymentExpiry: 'PT30M' }),
+  'GET /api/store-info': () => ({ sandbox: true }),
+  'GET /api/admin/config': () => ({ mode: { mode: 'SANDBOX', changedBy: null, changedAt: null, fallbackReason: null, environments: { SANDBOX: { baseUrl: 'https://sandbox.api.billpay.et', apiKeyConfigured: true, apiKeyHint: 'BPG_TEST-…hR18', webhookSecretConfigured: true, problems: [] }, LIVE: { baseUrl: 'https://api.billpay.et', apiKeyConfigured: false, apiKeyHint: null, webhookSecretConfigured: false, problems: ['BILLPAY_LIVE_API_KEY is not set in .env', 'BILLPAY_LIVE_WEBHOOK_SECRET is not set in .env (BillPay dashboard, Live → Webhooks)'] } } }, billpayBaseUrl: 'https://sandbox.api.billpay.et', sandbox: true, apiKeyConfigured: true, apiKeyHint: 'BPG_TEST-…hR18', webhookVerification: 'NONE', webhookSecretConfigured: true, webhookSignatureHeader: 'X-BillPay-Signature', webhookPath: '/api/webhooks/billpay', publicBaseUrl: 'http://localhost:5280', reconcileAfter: 'PT3M', paymentExpiry: 'PT30M' }),
   'GET /api/admin/dashboard': () => ({ sandbox: true, paidVolume: 26450, ordersByStatus: { PENDING_PAYMENT: 3, PAYMENT_FAILED: 2, PAID: 11, PARTIALLY_REFUNDED: 1, REFUNDED: 1, EXPIRED: 2, CANCELLED: 0, REVIEW_REQUIRED: 1 }, paymentSuccessRate: 0.72, failuresByReason: { INSUFFICIENT_FUNDS: 3, CUSTOMER_DECLINED: 2, LIMIT_EXCEEDED: 1, CARD_EXPIRED: 1 }, pendingPayments: 3, webhooksAwaitingProcessing: 0 }),
   'GET /api/admin/orders': () => page(orders),
   'GET /api/admin/payments': () => page([attempt(2, 'SUCCEEDED'), attempt(1, 'FAILED')]),
   'GET /api/admin/webhooks': () => page(webhooks),
   'GET /api/admin/refunds': () => page([{ id: 'r1', orderNumber: 'TS-20261023-00003', merchantReference: 'TS-20261023-00003-R1', billpayRefundId: 'rf_1', amount: 1200, currency: 'ETB', reason: 'Customer returned one item', status: 'SUCCEEDED', reasonCode: null, external: false, error: null, requestPayload: '{}', responsePayload: '{}', createdAt: iso(20), updatedAt: iso(19) }, { id: 'r2', orderNumber: 'TS-20261023-00003', merchantReference: 'TS-20261023-00003-R2', billpayRefundId: null, amount: 50.13, currency: 'ETB', reason: 'Sandbox .13 test', status: 'REFUSED', reasonCode: 'REFUND_REFUSED', external: false, error: null, requestPayload: '{}', responsePayload: '{}', createdAt: iso(10), updatedAt: iso(10) }]),
 }
+// Reports / dashboard charts: a deterministic wave of sample sales for the requested number of days
+routes['GET /api/admin/reports'] = (url) => {
+  const days = Math.min(366, Math.max(1, Number(url.searchParams.get('days') ?? 30)))
+  const salesByDay = Array.from({ length: days }, (_, i) => {
+    const d = new Date(Date.now() - (days - 1 - i) * 86_400_000)
+    const orders = 3 + Math.round(3 * Math.sin(i / 3) + 3)
+    const paid = Math.max(0, orders - 1 - (i % 3))
+    return { day: d.toISOString().slice(0, 10), orders, paidOrders: paid, revenue: paid * (1200 + (i % 5) * 180) }
+  })
+  const sum = (k) => salesByDay.reduce((a, d) => a + d[k], 0)
+  const totals = { revenue: sum('revenue'), paidOrders: sum('paidOrders'), orders: sum('orders'), averageOrder: Math.round(sum('revenue') / Math.max(1, sum('paidOrders'))), paymentSuccessRate: 0.82, refunded: 1250.13 }
+  return {
+    from: salesByDay[0].day, to: salesByDay[days - 1].day, environment: 'SANDBOX', totals,
+    previous: { ...totals, revenue: Math.round(totals.revenue * 0.86), paidOrders: Math.round(totals.paidOrders * 0.9), averageOrder: totals.averageOrder - 60, paymentSuccessRate: 0.78, refunded: 600 },
+    salesByDay,
+    topProducts: products.slice(0, 5).map((p, i) => ({ productId: p.id, name: p.name, quantity: 9 - i, revenue: (9 - i) * p.price })),
+    byMethod: [{ method: 'TEST_WALLET', finished: 40, succeeded: 35, successRate: 0.875 }, { method: 'TEST_BANK', finished: 18, succeeded: 14, successRate: 0.7778 }, { method: 'TEST_CARD', finished: 9, succeeded: 6, successRate: 0.6667 }, { method: 'NOT_CHOSEN', finished: 5, succeeded: 0, successRate: 0 }],
+    failureReasons: [{ reason: 'INSUFFICIENT_FUNDS', count: 7 }, { reason: 'CUSTOMER_DECLINED', count: 4 }, { reason: 'LIMIT_EXCEEDED', count: 2 }, { reason: 'PROVIDER_TIMEOUT', count: 1 }],
+  }
+}
+
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x')
   const key = `${req.method} ${url.pathname}`

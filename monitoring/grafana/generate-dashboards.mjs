@@ -57,19 +57,57 @@ function barGauge(title, expr, legend, { x, y, w = 12, h = 8, unit = 'short', de
 
 const row = (title, y) => ({ id: ++id, type: 'row', title, collapsed: false, gridPos: { x: 0, y, w: 24, h: 1 }, panels: [] })
 
-function dashboard(uid, title, description, panels, tags) {
+// Markers on every dashboard: backend restarts and alerts that fired (toggle them at the top of the dashboard)
+const annotations = [
+  { builtIn: 1, name: 'Annotations & Alerts', type: 'dashboard', datasource: { type: 'grafana', uid: '-- Grafana --' }, enable: true, hide: true, iconColor: 'rgba(0, 211, 255, 1)' },
+  { name: 'Backend restarts', datasource: DS, enable: true, iconColor: 'orange', step: '60s', titleFormat: 'Backend restarted', textFormat: '', tagKeys: '', useValueForTime: false,
+    expr: '(time() - process_start_time_seconds{job="tenashop-backend"}) < 90' },
+  { name: 'Alerts firing', datasource: DS, enable: true, iconColor: 'red', step: '60s', titleFormat: '{{alertname}}', textFormat: '{{severity}} {{name}}{{reason}}', tagKeys: 'severity', useValueForTime: false,
+    expr: 'ALERTS{alertstate="firing"}' },
+]
+
+const NAV = [
+  ['Business', '/d/tenashop-business'], ['Payments', '/d/tenashop-payments'], ['Webhooks & Kafka', '/d/tenashop-webhooks'],
+  ['App', '/d/tenashop-app'], ['Uptime & Alerts', '/d/tenashop-uptime'],
+]
+
+function dashboard(uid, title, description, panels, tags, { variables = [], links = [], time = 'now-6h', refresh = '30s' } = {}) {
   return {
     uid, title, description, tags: ['tenashop', ...tags], editable: false, schemaVersion: 39, version: 1,
-    time: { from: 'now-6h', to: 'now' }, refresh: '30s', timezone: 'browser', graphTooltip: 1,
-    templating: { list: [] }, annotations: { list: [] },
-    links: [
-      { title: 'Payments', type: 'link', url: '/d/tenashop-payments', icon: 'dashboard' },
-      { title: 'Webhooks & Kafka', type: 'link', url: '/d/tenashop-webhooks', icon: 'dashboard' },
-      { title: 'App', type: 'link', url: '/d/tenashop-app', icon: 'dashboard' },
-    ],
+    time: { from: time, to: 'now' }, refresh, timezone: 'browser', graphTooltip: 1,
+    templating: { list: variables }, annotations: { list: annotations },
+    links: [...NAV.map(([t, url]) => ({ title: t, type: 'link', url, icon: 'dashboard' })), ...links],
     panels,
   }
 }
+
+// ---------- Postgres (TenaShop DB) helpers ----------
+const PG = { type: 'grafana-postgresql-datasource', uid: 'tenashop-db' }
+const sql = (rawSql, format = 'table', refId = 'A') => ({ datasource: PG, rawSql, format, rawQuery: true, editorMode: 'code', refId })
+const onPg = (panel, queries, format) => ({ ...panel, datasource: PG, targets: queries.map((q, i) => sql(q, format, String.fromCharCode(65 + i))) })
+const pgStat = (title, query, opts) => onPg(stat(title, [], opts), [query], 'table')
+const pgTs = (title, query, opts) => onPg(ts(title, [], opts), [query], 'time_series')
+function pgBars(title, query, { x, y, w = 12, h = 8, unit = 'short', description } = {}) {
+  const p = onPg(barGauge(title, '', '', { x, y, w, h, unit, description }), [query], 'table')
+  p.options.reduceOptions = { calcs: ['lastNotNull'], fields: '', values: true }
+  return p
+}
+function pie(title, query, { x, y, w = 8, h = 8, description } = {}) {
+  return onPg({
+    id: ++id, type: 'piechart', title, description, gridPos: { x, y, w, h },
+    fieldConfig: { defaults: { color: { mode: 'palette-classic' } }, overrides: [] },
+    options: { pieType: 'donut', reduceOptions: { calcs: ['lastNotNull'], fields: '', values: true }, legend: { displayMode: 'table', placement: 'right', values: ['value', 'percent'], showLegend: true }, tooltip: { mode: 'single' } },
+  }, [query], 'table')
+}
+function table(title, targetsOrSql, { x, y, w = 12, h = 8, description, overrides = [], transformations = [], pg = true } = {}) {
+  const panel = {
+    id: ++id, type: 'table', title, description, gridPos: { x, y, w, h }, transformations,
+    fieldConfig: { defaults: { custom: { align: 'auto', cellOptions: { type: 'auto' } } }, overrides },
+    options: { showHeader: true, cellHeight: 'sm', footer: { show: false, reducer: ['sum'], fields: '' } },
+  }
+  return pg ? onPg(panel, [targetsOrSql], 'table') : { ...panel, datasource: DS, targets: targetsOrSql }
+}
+const unitFor = (name, unit, extra = {}) => ({ matcher: { id: 'byName', options: name }, properties: [{ id: 'unit', value: unit }, ...Object.entries(extra).map(([k, v]) => ({ id: k, value: v }))] })
 
 const pct = { mode: 'absolute', steps: [{ color: 'red', value: null }, { color: 'orange', value: 0.7 }, { color: 'green', value: 0.9 }] }
 const FINAL = 'SUCCEEDED|FAILED|EXPIRED|CANCELLED'
@@ -131,7 +169,120 @@ const app = dashboard('tenashop-app', 'TenaShop · App', 'Backend HTTP, JVM and 
   ts('JVM threads and GC pauses', [[`jvm_threads_live_threads{job="tenashop-backend"}`, 'live threads'], [`sum(rate(jvm_gc_pause_seconds_sum[5m])) * 1000`, 'GC ms per s']], { x: 12, y: 20 }),
 ], ['app'])
 
-for (const [file, d] of [['payments.json', payments], ['webhooks-kafka.json', webhooks], ['app.json', app]]) {
+// ---------- Business (SQL on the shop database) ----------
+// Numbers here come from the database, so they survive backend restarts (unlike Prometheus counters).
+// $env is a SQL condition picked from the "BillPay" dropdown; every query names the orders table `o`.
+id = 0
+const PAID = `o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED')`
+const ETB = 'suffix: ETB'
+const green = { mode: 'absolute', steps: [{ color: 'green', value: null }] }
+const businessVars = [
+  {
+    type: 'custom', name: 'env', label: 'BillPay', hide: 0, skipUrlSync: false,
+    query: `All : true,Sandbox : o.environment = 'SANDBOX',Live : o.environment = 'LIVE'`,
+    current: { text: 'All', value: 'true', selected: true },
+    options: [
+      { text: 'All', value: 'true', selected: true },
+      { text: 'Sandbox', value: `o.environment = 'SANDBOX'`, selected: false },
+      { text: 'Live', value: `o.environment = 'LIVE'`, selected: false },
+    ],
+    description: 'Sandbox = test money, Live = real money',
+  },
+  {
+    type: 'custom', name: 'bucket', label: 'Group by', hide: 0, skipUrlSync: false, query: '1h,1d,1w',
+    current: { text: '1d', value: '1d', selected: true },
+    options: ['1h', '1d', '1w'].map((v) => ({ text: v, value: v, selected: v === '1d' })),
+  },
+]
+const business = dashboard('tenashop-business', 'TenaShop · Business', 'Revenue, orders, products, delivery and stock, straight from the shop database', [
+  row('Selected time range', 0),
+  pgStat('Revenue', `SELECT coalesce(sum(o.total), 0) AS "Revenue" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at)`,
+    { x: 0, y: 1, w: 4, unit: ETB, decimals: 0, thresholds: green, description: 'Totals of orders paid in the range (incl. delivery fee, after discounts)' }),
+  pgStat('Paid orders', `SELECT count(*) AS "Paid orders" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at)`,
+    { x: 4, y: 1, w: 4, decimals: 0, thresholds: green }),
+  pgStat('Average order', `SELECT avg(o.total) AS "Average order" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at)`,
+    { x: 8, y: 1, w: 4, unit: ETB, decimals: 2 }),
+  pgStat('Checkout conversion', `SELECT (count(*) FILTER (WHERE ${PAID}))::float / nullif(count(*), 0) AS "Paid ÷ placed" FROM orders o WHERE $env AND $__timeFilter(o.created_at)`,
+    { x: 12, y: 1, w: 4, unit: 'percentunit', decimals: 1, thresholds: pct, description: 'Orders placed in the range that ended up paid' }),
+  pgStat('Refunded', `SELECT coalesce(sum(r.amount), 0) AS "Refunded" FROM refunds r JOIN orders o ON o.id = r.order_id WHERE $env AND r.status = 'SUCCEEDED' AND $__timeFilter(r.created_at)`,
+    { x: 16, y: 1, w: 4, unit: ETB, decimals: 0 }),
+  pgStat('Discounts given', `SELECT coalesce(sum(o.discount_amount), 0) AS "Discounts" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at)`,
+    { x: 20, y: 1, w: 4, unit: ETB, decimals: 0 }),
+
+  row('Over time', 5),
+  pgTs('Revenue', `SELECT $__timeGroupAlias(o.paid_at, $bucket), sum(o.total) AS "Revenue" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at) GROUP BY 1 ORDER BY 1`,
+    { x: 0, y: 6, unit: ETB, bars: true, description: 'Grouped by the "Group by" dropdown (UTC buckets)' }),
+  pgTs('Orders placed, by outcome', `SELECT $__timeGroupAlias(o.created_at, $bucket), o.status AS metric, count(*) AS value FROM orders o WHERE $env AND $__timeFilter(o.created_at) GROUP BY 1, 2 ORDER BY 1`,
+    { x: 12, y: 6, bars: true, stack: true, description: 'Where each order placed in that bucket is now: PAID, EXPIRED, CANCELLED, ...' }),
+
+  row('Products and payments', 14),
+  table('Top products', `SELECT i.product_name AS "Product", sum(i.quantity) AS "Units", sum(i.line_total) AS "Revenue" FROM order_items i JOIN orders o ON o.id = i.order_id WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at) GROUP BY 1 ORDER BY 3 DESC LIMIT 10`,
+    { x: 0, y: 15, w: 10, h: 9, overrides: [unitFor('Revenue', ETB, { decimals: 0 })] }),
+  pie('Paid by method', `SELECT coalesce(p.payment_method, 'unknown') AS "Method", count(*) AS "Paid" FROM payment_attempts p JOIN orders o ON o.id = p.order_id WHERE $env AND p.status = 'SUCCEEDED' AND $__timeFilter(p.updated_at) GROUP BY 1 ORDER BY 2 DESC`,
+    { x: 10, y: 15, w: 7, h: 9 }),
+  pgBars('Why payments did not go through', `SELECT coalesce(p.reason_code, p.status) AS "Reason", count(*) AS "Payments" FROM payment_attempts p JOIN orders o ON o.id = p.order_id WHERE $env AND p.status IN ('FAILED', 'EXPIRED', 'CANCELLED', 'ERROR') AND $__timeFilter(p.updated_at) GROUP BY 1 ORDER BY 2 DESC LIMIT 10`,
+    { x: 17, y: 15, w: 7, h: 9, description: "BillPay's reason code, or the status when there is none (EXPIRED = never paid)" }),
+
+  row('Delivery and stock', 24),
+  pgStat('To fulfil now', `SELECT count(*) AS "To fulfil" FROM orders o WHERE $env AND o.status = 'PAID' AND coalesce(o.fulfilment_status, 'UNFULFILLED') IN ('UNFULFILLED', 'PROCESSING')`,
+    { x: 0, y: 25, w: 6, decimals: 0, thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'orange', value: 5 }] }, description: 'Paid orders not shipped yet (right now, ignores the time range)' }),
+  pgStat('Oldest waiting', `SELECT extract(epoch FROM now() - min(o.paid_at)) AS "Oldest" FROM orders o WHERE $env AND o.status = 'PAID' AND coalesce(o.fulfilment_status, 'UNFULFILLED') IN ('UNFULFILLED', 'PROCESSING')`,
+    { x: 6, y: 25, w: 6, unit: 's', decimals: 1, thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'orange', value: 86400 }, { color: 'red', value: 172800 }] }, description: 'Time since the oldest unshipped paid order was paid' }),
+  pgStat('On the way', `SELECT count(*) AS "Shipped" FROM orders o WHERE $env AND o.fulfilment_status = 'SHIPPED'`,
+    { x: 12, y: 25, w: 6, decimals: 0 }),
+  pgStat('Paid → delivered (avg)', `SELECT avg(extract(epoch FROM o.delivered_at - o.paid_at)) AS "Paid to delivered" FROM orders o WHERE $env AND o.delivered_at IS NOT NULL AND $__timeFilter(o.delivered_at)`,
+    { x: 18, y: 25, w: 6, unit: 's', decimals: 1 }),
+  table('Low stock', `SELECT p.name AS "Product", p.stock - p.reserved AS "Available", p.reserved AS "Held for checkouts", p.low_stock_threshold AS "Alert at" FROM products p WHERE p.active AND p.stock - p.reserved <= p.low_stock_threshold ORDER BY 2, 1`,
+    { x: 0, y: 29, w: 10, h: 9, description: 'Active products at or below their low-stock alert level',
+      overrides: [{ matcher: { id: 'byName', options: 'Available' }, properties: [{ id: 'custom.cellOptions', value: { type: 'color-text' } }, { id: 'thresholds', value: { mode: 'absolute', steps: [{ color: 'red', value: null }, { color: 'orange', value: 1 }] } }] }] }),
+  table('Latest orders', `SELECT o.created_at AS "Placed", o.order_number AS "Order", o.status AS "Status", o.fulfilment_status AS "Delivery", o.total AS "Total" FROM orders o WHERE $env AND $__timeFilter(o.created_at) ORDER BY o.created_at DESC LIMIT 20`,
+    { x: 10, y: 29, w: 14, h: 9, description: 'Click an order number to open it in the admin',
+      overrides: [unitFor('Total', ETB, { decimals: 2 }), { matcher: { id: 'byName', options: 'Order' }, properties: [{ id: 'links', value: [{ title: 'Open in admin', url: 'http://localhost:5280/admin/orders/${__value.raw}', targetBlank: true }] }] }] }),
+
+  row('Operations', 38),
+  pgBars('Customer emails', `SELECT n.status AS "Status", count(*) AS "Emails" FROM notifications n WHERE $__timeFilter(n.created_at) GROUP BY 1 ORDER BY 2 DESC`,
+    { x: 0, y: 39, w: 6, h: 7, description: 'FAILED means the email could not be sent (SMTP down?)' }),
+  pgBars('Webhooks stored', `SELECT w.status AS "Status", count(*) AS "Webhooks" FROM billpay_webhook_events w WHERE $__timeFilter(w.received_at) GROUP BY 1 ORDER BY 2 DESC`,
+    { x: 6, y: 39, w: 6, h: 7 }),
+  pgTs('Failed sign-ins', `SELECT $__timeGroupAlias(l.created_at, $bucket), l.portal || ' · ' || l.reason AS metric, count(*) AS value FROM login_events l WHERE NOT l.success AND $__timeFilter(l.created_at) GROUP BY 1, 2 ORDER BY 1`,
+    { x: 12, y: 39, w: 12, h: 7, bars: true, stack: true, description: 'Wrong passwords, locked or disabled accounts, by portal. A sudden spike can mean password guessing.' }),
+  table('Discount codes', `SELECT d.code AS "Code", d.kind AS "Type", d.value AS "Value", d.times_used AS "Used", d.usage_limit AS "Limit", d.active AS "Active", d.expires_at AS "Expires" FROM discount_codes d ORDER BY d.times_used DESC, d.code LIMIT 15`,
+    { x: 0, y: 46, w: 24, h: 7 }),
+], ['business', 'sql'], { variables: businessVars, time: 'now-7d', refresh: '1m' })
+
+// ---------- Uptime & Alerts (blackbox probes + Prometheus alerts) ----------
+id = 0
+const updown = [{ type: 'value', options: { 0: { text: 'DOWN', color: 'red' }, 1: { text: 'UP', color: 'green' } } }]
+const upThresholds = { mode: 'absolute', steps: [{ color: 'red', value: null }, { color: 'green', value: 1 }] }
+const uptime = dashboard('tenashop-uptime', 'TenaShop · Uptime & Alerts', 'Is everything reachable from the outside, and which alerts are firing', [
+  row('Alerts', 0),
+  stat('Firing alerts', [`count(ALERTS{alertstate="firing"}) or vector(0)`], { x: 0, y: 1, w: 6, decimals: 0, colorMode: 'background', thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'red', value: 1 }] }, description: 'Emailed by Alertmanager (Mailpit in dev)' }),
+  stat('Pending alerts', [`count(ALERTS{alertstate="pending"}) or vector(0)`], { x: 6, y: 1, w: 6, decimals: 0, colorMode: 'background', thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'orange', value: 1 }] }, description: 'Condition is true but has not lasted long enough to fire yet' }),
+  stat('Endpoints down', [`count(probe_success{job="probes"} == 0) or vector(0)`], { x: 12, y: 1, w: 6, decimals: 0, colorMode: 'background', thresholds: { mode: 'absolute', steps: [{ color: 'green', value: null }, { color: 'red', value: 1 }] } }),
+  stat('Alertmanager', [`up{job="alertmanager"}`], { x: 18, y: 1, w: 6, colorMode: 'background', thresholds: upThresholds, mappings: updown, description: 'If this is DOWN, alerts are not emailed' }),
+  table('Active alerts', [target(`ALERTS{alertstate=~"firing|pending"}`, '', 'A', { instant: true, format: 'table' })],
+    { x: 0, y: 5, w: 24, h: 7, pg: false, description: 'Silence an alert in Grafana → Alerting → Silences (source: Alertmanager) or at http://localhost:9393',
+      transformations: [{ id: 'organize', options: { excludeByName: { Time: true, Value: true, __name__: true, job: true, service: true, module: true }, renameByName: { alertname: 'Alert', alertstate: 'State', severity: 'Severity', name: 'Endpoint' } } }] }),
+
+  row('Endpoints (checked every 30 s from the outside)', 12),
+  stat('Now', [[`probe_success{job="probes"}`, '{{name}}', { instant: true }]], { x: 0, y: 13, w: 24, h: 4, colorMode: 'background', thresholds: upThresholds, mappings: updown }),
+  {
+    id: ++id, type: 'state-timeline', title: 'Up / down over time', datasource: DS, gridPos: { x: 0, y: 17, w: 24, h: 7 },
+    targets: [target(`probe_success{job="probes"}`, '{{name}}')],
+    fieldConfig: { defaults: { color: { mode: 'thresholds' }, thresholds: upThresholds, mappings: updown, custom: { fillOpacity: 80, lineWidth: 0 } }, overrides: [] },
+    options: { showValue: 'never', mergeValues: true, alignValue: 'left', rowHeight: 0.8, legend: { showLegend: false } },
+  },
+  stat('Availability (selected range)', [[`avg_over_time(probe_success{job="probes"}[$__range])`, '{{name}}', { instant: true }]],
+    { x: 0, y: 24, w: 24, h: 4, unit: 'percentunit', decimals: 2, thresholds: { mode: 'absolute', steps: [{ color: 'red', value: null }, { color: 'orange', value: 0.95 }, { color: 'green', value: 0.99 }] } }),
+  ts('Response time', [[`probe_duration_seconds{job="probes"}`, '{{name}}']], { x: 0, y: 28, unit: 's', description: 'Full check time, including DNS, TLS and the tunnel' }),
+  stat('TLS certificate expires in', [[`probe_ssl_earliest_cert_expiry{job="probes"} - time()`, '{{name}}', { instant: true }]],
+    { x: 12, y: 28, h: 8, unit: 's', decimals: 0, thresholds: { mode: 'absolute', steps: [{ color: 'red', value: null }, { color: 'orange', value: 604800 }, { color: 'green', value: 1209600 }] }, description: 'Alert below 14 days' }),
+], ['uptime', 'alerts'], { links: [
+  { title: 'Alertmanager', type: 'link', url: 'http://localhost:9393', icon: 'bolt', targetBlank: true },
+  { title: 'Alert emails (Mailpit)', type: 'link', url: 'http://localhost:8626', icon: 'info', targetBlank: true },
+] })
+
+for (const [file, d] of [['business.json', business], ['payments.json', payments], ['webhooks-kafka.json', webhooks], ['app.json', app], ['uptime.json', uptime]]) {
   fs.writeFileSync(path.join(OUT, file), JSON.stringify(d, null, 2) + '\n')
   console.log('wrote', file, d.panels.length, 'panels')
 }
