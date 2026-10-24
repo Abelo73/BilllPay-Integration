@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
+import { VerifiedBadge } from '@/components/verified-badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -112,6 +113,7 @@ function ShopCard({ row, onDecide }: { row: AdminShopRow; onDecide: (d: Decision
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-semibold">{s.name}</p>
             <ShopStatusBadge status={s.status} />
+            {s.verifiedAt && <VerifiedBadge />}
             <span className="text-xs text-muted-foreground">{KIND_LABEL[s.kind]}{s.area && ` · ${s.area}`}</span>
           </div>
           {s.description && <p className="line-clamp-2 text-sm text-muted-foreground">{s.description}</p>}

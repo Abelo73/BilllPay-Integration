@@ -37,8 +37,15 @@ public class CatalogAdminService {
 	private final MediaProperties media;
 	private final TransactionTemplate tx;
 
+	/** {@code condition}, {@code negotiable}, {@code area}: listing details (M4); null leaves them as they are. */
 	public record ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
-			Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active) {
+			Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active, ItemCondition condition,
+			Boolean negotiable, String area) {
+
+		public ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
+				Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active) {
+			this(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active, null, null, null);
+		}
 	}
 
 	// ---------- products ----------
@@ -62,6 +69,9 @@ public class CatalogAdminService {
 			p.setLowStockThreshold(f.lowStockThreshold() == null ? 5 : f.lowStockThreshold());
 			p.setFeatured(Boolean.TRUE.equals(f.featured()));
 			p.setActive(f.active() == null || f.active());
+			p.setCondition(f.condition());
+			p.setNegotiable(Boolean.TRUE.equals(f.negotiable()));
+			p.setArea(blankToNull(f.area()));
 			products.save(p);
 			record(CatalogChange.EntityType.PRODUCT, p.getId(), "CREATED",
 					p.getName() + " · " + p.getPrice() + " ETB · stock " + p.getStock());
@@ -111,6 +121,18 @@ public class CatalogAdminService {
 				diff.add(f.active() ? "shown in store" : "hidden from store");
 				p.setActive(f.active());
 			}
+			if (f.condition() != null && f.condition() != p.getCondition()) {
+				diff.add("condition " + (p.getCondition() == null ? "-" : p.getCondition()) + " → " + f.condition());
+				p.setCondition(f.condition());
+			}
+			if (f.negotiable() != null && f.negotiable() != p.isNegotiable()) {
+				diff.add(f.negotiable() ? "price negotiable" : "fixed price");
+				p.setNegotiable(f.negotiable());
+			}
+			if (f.area() != null && !Objects.equals(blankToNull(f.area()), p.getArea())) {
+				diff.add("area " + (p.getArea() == null ? "-" : p.getArea()) + " → " + (blankToNull(f.area()) == null ? "-" : f.area().trim()));
+				p.setArea(blankToNull(f.area()));
+			}
 			if (!diff.isEmpty()) {
 				record(CatalogChange.EntityType.PRODUCT, p.getId(), "UPDATED", String.join("; ", diff));
 			}
@@ -124,6 +146,27 @@ public class CatalogAdminService {
 			if (p.isActive() != active) {
 				p.setActive(active);
 				record(CatalogChange.EntityType.PRODUCT, id, active ? "SHOWN" : "HIDDEN", null);
+			}
+			return p;
+		});
+	}
+
+	/** Takes a listing off the store after reports; only {@link #unblock} brings it back. */
+	public Product block(Long id, String reason) {
+		return tx.execute(s -> {
+			Product p = products.lockById(id).orElseThrow(() -> ApiException.notFound("Product"));
+			p.setBlockedReason(reason);
+			record(CatalogChange.EntityType.PRODUCT, id, "BLOCKED", reason);
+			return p;
+		});
+	}
+
+	public Product unblock(Long id) {
+		return tx.execute(s -> {
+			Product p = products.lockById(id).orElseThrow(() -> ApiException.notFound("Product"));
+			if (p.getBlockedReason() != null) {
+				p.setBlockedReason(null);
+				record(CatalogChange.EntityType.PRODUCT, id, "UNBLOCKED", null);
 			}
 			return p;
 		});
@@ -168,6 +211,9 @@ public class CatalogAdminService {
 			p.setLowStockThreshold(source.getLowStockThreshold());
 			p.setFeatured(false);
 			p.setActive(false);
+			p.setCondition(source.getCondition());
+			p.setNegotiable(source.isNegotiable());
+			p.setArea(source.getArea());
 			p.setImageUrl(sourceImages.isEmpty() ? source.getImageUrl() : null);
 			products.save(p);
 			record(CatalogChange.EntityType.PRODUCT, p.getId(), "DUPLICATED", "from #" + source.getId() + " " + source.getName());

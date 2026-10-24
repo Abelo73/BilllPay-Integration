@@ -64,6 +64,20 @@ public class Product {
 
 	private boolean active;
 
+	/** NEW, LIKE_NEW or USED; null = new goods from a shop. */
+	@jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+	@jakarta.persistence.Column(name = "item_condition")
+	private ItemCondition condition;
+
+	/** The seller is open to offers on the price. */
+	private boolean negotiable;
+
+	/** Where the item is; null = the shop's area. */
+	private String area;
+
+	/** Set when staff took the listing down after reports; it stays off the store until staff lift it. */
+	private String blockedReason;
+
 	@Column(updatable = false, insertable = false)
 	private Instant createdAt;
 
@@ -73,9 +87,14 @@ public class Product {
 	@Version
 	private Integer version;
 
-	/** Shown and buyable: switched on, and its seller (if any) approved. */
+	/** Shown and buyable: switched on, not taken down by staff, and its seller (if any) approved. */
 	public boolean sellable() {
-		return active && (shop == null || shop.getStatus().selling());
+		return active && blockedReason == null && (shop == null || shop.getStatus().selling());
+	}
+
+	/** The item's area, else its shop's. */
+	public String effectiveArea() {
+		return area != null ? area : shop != null ? shop.getArea() : null;
 	}
 
 	public int available() {

@@ -1,5 +1,6 @@
 import { useRoutes, type RouteObject } from 'react-router'
 
+import { AdminAreasPage } from './areas'
 import { AdminCategoriesPage } from './categories'
 import { AdminChatReportsPage } from './chat-reports'
 import { AdminDashboardPage } from './dashboard'
@@ -7,6 +8,7 @@ import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
 import { AdminSmsPage } from './sms'
 import { AdminLayout } from './layout'
+import { AdminListingReportsPage } from './listing-reports'
 import { AdminLoadTestsPage } from './load-tests'
 import { AdminLoginHistoryPage } from './login-history'
 import { AdminLoginPage } from './login'
@@ -23,6 +25,7 @@ import { AdminReviewsPage } from './reviews'
 import { AdminSetupPage } from './setup'
 import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
+import { AdminVerificationsPage } from './verifications'
 import { AdminWebhooksPage } from './webhooks'
 
 const adminRoutes: RouteObject[] = [
@@ -41,6 +44,9 @@ const adminRoutes: RouteObject[] = [
       { path: 'pros', element: <AdminProsPage /> },
       { path: 'reviews', element: <AdminReviewsPage /> },
       { path: 'chat-reports', element: <AdminChatReportsPage /> },
+      { path: 'verifications', element: <AdminVerificationsPage /> },
+      { path: 'listing-reports', element: <AdminListingReportsPage /> },
+      { path: 'areas', element: <AdminAreasPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

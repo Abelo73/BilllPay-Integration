@@ -18,14 +18,15 @@ import jakarta.persistence.LockModeType;
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
 	// The store shows a product only when it is switched on, its category is shown, and its seller is approved
-	// (shop is null = sold by Sodo Gebeya itself). A pending, rejected or suspended shop's products stay hidden.
+	// (shop is null = sold by Sodo Gebeya itself), and staff haven't taken it down after reports. A pending, rejected or
+	// suspended shop's products stay hidden.
 
 	/** Store listing: active products in visible categories, from approved sellers; optionally one shop's. */
 	@EntityGraph(attributePaths = { "category", "shop" })
 	@Query("""
 			select p from Product p left join p.shop s
 			where p.active = true and p.category.active = true
-			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
 			  and (:category is null or p.category.slug = :category)
 			  and (:shopId is null or s.id = :shopId)
 			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%')))
@@ -38,7 +39,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("""
 			select p from Product p left join p.shop s
 			where p.slug = :slug and p.active = true and p.category.active = true
-			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
 			""")
 	Optional<Product> findVisibleBySlug(@Param("slug") String slug);
 
@@ -46,7 +47,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Query("""
 			select p from Product p left join p.shop s
 			where p.featured = true and p.active = true and p.category.active = true
-			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
 			order by p.id
 			""")
 	List<Product> findFeaturedVisible();
@@ -64,7 +65,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and (:shopId is null or p.shop.id = :shopId)
 			  and (:houseOnly = false or p.shop is null)
 			  and (:status is null
-			       or (:status = 'active' and p.active = true)
+			       or (:status = 'active' and p.active = true and p.blockedReason is null)
+			       or (:status = 'blocked' and p.blockedReason is not null)
 			       or (:status = 'hidden' and p.active = false)
 			       or (:status = 'low' and p.stock - p.reserved > 0 and p.stock - p.reserved <= p.lowStockThreshold)
 			       or (:status = 'out' and p.stock - p.reserved <= 0))

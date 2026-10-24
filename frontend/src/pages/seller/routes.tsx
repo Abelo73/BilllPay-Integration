@@ -5,6 +5,7 @@ import { SellerLayout } from './layout'
 import { SellerOrderPage, SellerOrdersPage } from './orders'
 import { SellerProductEditPage, SellerProductsPage } from './products'
 import { SellerShopPage } from './shop-settings'
+import { SellerVerifyPage } from './verify'
 
 const sellerRoutes: RouteObject[] = [
   {
@@ -16,6 +17,7 @@ const sellerRoutes: RouteObject[] = [
       { path: 'products', element: <SellerProductsPage /> },
       { path: 'products/:productId', element: <SellerProductEditPage /> },
       { path: 'shop', element: <SellerShopPage /> },
+      { path: 'verify', element: <SellerVerifyPage /> },
     ],
   },
 ]

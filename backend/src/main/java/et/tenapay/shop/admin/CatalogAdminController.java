@@ -70,10 +70,14 @@ public class CatalogAdminController {
 			@Min(0) @Max(1000000) Integer stock,
 			@Min(0) @Max(100000) Integer lowStockThreshold,
 			Boolean featured,
-			Boolean active) {
+			Boolean active,
+			et.tenapay.shop.catalog.ItemCondition condition,
+			Boolean negotiable,
+			@Size(max = 120) String area) {
 
 		ProductForm form() {
-			return new ProductForm(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active);
+			return new ProductForm(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active,
+					condition, negotiable, area);
 		}
 	}
 
@@ -102,7 +106,7 @@ public class CatalogAdminController {
 	public record ProductRow(Long id, String name, String slug, String categoryName, Long categoryId,
 			BigDecimal price, int stock, int reserved, int available, int lowStockThreshold, boolean lowStock,
 			boolean featured, boolean active, String imageUrl, Instant updatedAt, Long shopId, String shopName,
-			String shopStatus, boolean inStore) {
+			String shopStatus, boolean inStore, String condition, boolean negotiable, String area, String blockedReason) {
 
 		public static ProductRow of(Product p) {
 			var shop = p.getShop();
@@ -110,7 +114,9 @@ public class CatalogAdminController {
 					p.getCategory().getId(), p.getPrice(), p.getStock(), p.getReserved(), p.available(),
 					p.getLowStockThreshold(), p.lowStock(), p.isFeatured(), p.isActive(), p.getImageUrl(),
 					p.getUpdatedAt(), shop == null ? null : shop.getId(), shop == null ? null : shop.getName(),
-					shop == null ? null : shop.getStatus().name(), p.sellable() && p.getCategory().isActive());
+					shop == null ? null : shop.getStatus().name(), p.sellable() && p.getCategory().isActive(),
+					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.getArea(),
+					p.getBlockedReason());
 		}
 	}
 

@@ -21,6 +21,8 @@ export type MyShop = {
   statusNote: string | null
   decidedAt: string | null
   createdAt: string
+  /** Verified badge since; null = not verified */
+  verifiedAt: string | null
 }
 
 export type ShopInput = {

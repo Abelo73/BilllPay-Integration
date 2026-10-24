@@ -71,13 +71,20 @@ Result: any customer account opens one shop at **/sell** (a shop, or "just me" f
 - Isolation: every `/api/seller/**` call resolves the caller's own shop; another shop's product or order answers 404. Tests: `SellerIntegrationTest` (4: approval gating, two shops can't reach each other, seller orders and mixed orders, account rules), plus a browser walkthrough on a phone-size screen (open shop → add product with photo → approve → shop and product pages → pay → pack and send).
 - Still open: S20 desktop layout beyond the phone one, ratings (M12), payouts (M6), the real Sodo neighbourhood list (M4; the area field accepts any text and suggests four).
 
-### M4. Verification and listings (1.5 weeks)
+### M4. Verification and listings (1.5 weeks) ✅ Done 2026-10-24
 - Verification flow (**S18**): ID front/back, selfie, shop or skill details; private storage, staff only
 - Admin verification queue (**S21**): approve, reject, ask for a better photo; Verified badge
 - Post a listing from the phone (**S16**): item or service switch, up to 5 photos (built), condition, price, negotiable, area
 - Used items from individuals; neighbourhood list for Sodo
 - Report a listing; admin hides it
 - **Done when:** a verified shop and a private seller both post listings from a phone; admin can hide a reported one
+
+Result:
+- **Get verified** (Sell → Get verified, design S18): ID type (Fayda, kebele, passport, driving licence), both sides, a selfie holding it, optional trade licence and a note. Photos are re-encoded (camera data such as GPS dropped) and stored under `private/`, which the public photo route never serves; only the seller and staff can open them, never cached. Admin → **Verifications** (S21): approve (Verified badge on the shop page, product page and product cards), ask for a better photo (the seller fixes and sends again) or reject; the seller gets an SMS each time.
+- **Listings** (S16): condition (new, like new, used), "price negotiable" and the item's area (else the shop's) in the product editor and on product pages. Admin → **Areas**: the list of Sodo neighbourhoods offered in forms; it starts with the five from the design, so staff add the real ones there.
+- **Report a listing**: signed-in shoppers only, once each, not their own (reasons: scam, fake, not allowed, wrong details, offensive, other). Admin → **Listing reports**, most reported first: take it down (off the store and out of checkout; the seller is told why and can't switch it back on) or dismiss; "Put back" lifts a take-down.
+- Tests: `VerificationAndListingsIntegrationTest` (3: verification flow and photo privacy, listing details and reports, areas), plus a browser walkthrough on a phone-size screen.
+- Item or service switch: services are their own listings since M13 (pro profiles, job requests).
 
 ---
 

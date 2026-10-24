@@ -30,7 +30,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { catalogApi, isAdmin, type ChangeRow, type ProductDetail, type ProductInput } from '@/lib/admin-api'
-import type { Page } from '@/lib/api'
+import type { ItemCondition, Page } from '@/lib/api'
+import { publicTrustApi } from '@/lib/trust-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StockBadge } from './products'
@@ -48,6 +49,8 @@ const ACTION_LABEL: Record<string, string> = {
   IMAGE_ADDED: 'Photo added',
   IMAGE_REMOVED: 'Photo removed',
   IMAGES_REORDERED: 'Photos reordered',
+  BLOCKED: 'Taken down',
+  UNBLOCKED: 'Put back',
 }
 
 /** The calls the editor needs: the admin's catalogApi, or the seller's sellerCatalog (only their own products). */
@@ -94,6 +97,10 @@ type FormState = {
   lowStockThreshold: string
   featured: boolean
   active: boolean
+  /** '' = not set (new goods from a shop) */
+  condition: '' | ItemCondition
+  negotiable: boolean
+  area: string
 }
 
 function initialForm(d?: ProductDetail): FormState {
@@ -107,6 +114,9 @@ function initialForm(d?: ProductDetail): FormState {
     lowStockThreshold: d ? String(d.product.lowStockThreshold) : '5',
     featured: d?.product.featured ?? false,
     active: d?.product.active ?? true,
+    condition: d?.product.condition ?? '',
+    negotiable: d?.product.negotiable ?? false,
+    area: d?.product.area ?? '',
   }
 }
 
@@ -116,6 +126,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
   const [form, setForm] = useState<FormState>(() => initialForm(detail))
   const [errors, setErrors] = useState<Record<string, string>>({})
   const categories = useQuery({ queryKey: [`${keyPrefix}-categories`], queryFn: client.categories })
+  const areas = useQuery({ queryKey: ['areas'], queryFn: publicTrustApi.areas, staleTime: 10 * 60_000 })
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const save = useMutation({
@@ -129,6 +140,9 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
         lowStockThreshold: Number(form.lowStockThreshold || 0),
         featured: form.featured,
         active: form.active,
+        condition: form.condition || null,
+        negotiable: form.negotiable,
+        area: form.area,
         ...(isNew ? { stock: Number(form.stock || 0) } : {}),
       }
       return isNew ? client.create(body) : client.update(detail.product.id, body)
@@ -198,6 +212,35 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
                 <Input id="stock" type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} />
               </div>
             )}
+            <div className="space-y-2 sm:col-span-2">
+              <span className="text-sm font-medium">Condition</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Condition">
+                {([['', seller ? 'Not set' : 'New (shop stock)'], ['NEW', 'New'], ['LIKE_NEW', 'Like new'], ['USED', 'Used']] as const).map(([v, label]) => (
+                  <button
+                    key={v || 'none'}
+                    type="button"
+                    aria-pressed={form.condition === v}
+                    disabled={!editable}
+                    onClick={() => set('condition', v)}
+                    className={cn('h-10 flex-1 rounded-lg border px-3 text-sm font-semibold', form.condition === v ? 'border-2 border-primary bg-primary/5 text-primary' : 'bg-card')}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="area">Where is it?</Label>
+              <Input id="area" list="area-list" maxLength={120} value={form.area} onChange={(e) => set('area', e.target.value)} placeholder="Leave empty for the shop's area" />
+              <datalist id="area-list">{areas.data?.map((a) => <option key={a} value={a} />)}</datalist>
+            </div>
+            <label className="flex items-center justify-between gap-3 rounded-lg border p-3 sm:self-end">
+              <span>
+                <span className="block text-sm font-medium">Price negotiable</span>
+                <span className="block text-xs text-muted-foreground">Buyers may offer less</span>
+              </span>
+              <Switch checked={form.negotiable} onCheckedChange={(v) => set('negotiable', v)} disabled={!editable} />
+            </label>
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" rows={5} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="What it is, size, materials, care…" />
@@ -515,7 +558,13 @@ function EditorPage() {
           )
         }
       />
-      {seller && p && p.active && !p.inStore && (
+      {p?.blockedReason && (
+        <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+          <span className="font-semibold">Taken down by Sodo Gebeya after reports:</span> {p.blockedReason}.{' '}
+          {seller ? 'Fix it, then call us to put it back.' : 'Put it back from Admin → Listing reports.'}
+        </p>
+      )}
+      {seller && p && p.active && !p.inStore && !p.blockedReason && (
         <p className="rounded-lg bg-amber-soft p-3 text-sm text-amber-ink">
           Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.
         </p>

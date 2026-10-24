@@ -3,7 +3,8 @@ import { Link } from 'react-router'
 
 import { ProductVisual } from '@/components/product-visual'
 import { Button } from '@/components/ui/button'
-import type { Product } from '@/lib/api'
+import { VerifiedBadge } from '@/components/verified-badge'
+import { CONDITION_LABEL, type Product } from '@/lib/api'
 import { formatETB } from '@/lib/format'
 import { useCart } from '@/store/cart'
 
@@ -35,11 +36,18 @@ export function ProductCard({ product }: { product: Product }) {
         )
       )}
       <div className="flex flex-1 flex-col gap-1 p-3 sm:p-4">
-        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{product.categoryName}</p>
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {product.condition && product.condition !== 'NEW' ? `${CONDITION_LABEL[product.condition]} · ` : ''}{product.categoryName}
+        </p>
         <Link to={`/product/${product.slug}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:underline">
           {product.name}
         </Link>
-        {product.seller && <p className="truncate text-xs text-muted-foreground">{product.seller.name}</p>}
+        {product.seller && (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="truncate">{product.seller.name}</span>
+            {product.seller.verified && <VerifiedBadge compact className="px-1" />}
+          </p>
+        )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <span className="text-base font-extrabold tabular-nums">{formatETB(product.price)}</span>
           <Button

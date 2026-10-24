@@ -17,11 +17,20 @@ export type Product = {
   categoryName: string
   /** Who sells it; null = Sodo Gebeya itself */
   seller: Seller | null
+  /** null = new goods from a shop */
+  condition: ItemCondition | null
+  negotiable: boolean
+  /** Where the item is (its own area, else the shop's) */
+  area: string | null
 }
+
+export type ItemCondition = 'NEW' | 'LIKE_NEW' | 'USED'
+
+export const CONDITION_LABEL: Record<ItemCondition, string> = { NEW: 'New', LIKE_NEW: 'Like new', USED: 'Used' }
 
 export type ShopKind = 'SHOP' | 'INDIVIDUAL'
 
-export type Seller = { name: string; slug: string; kind: ShopKind; area: string | null }
+export type Seller = { name: string; slug: string; kind: ShopKind; area: string | null; verified: boolean }
 
 /** A seller's public page. */
 export type PublicShop = {
@@ -34,6 +43,7 @@ export type PublicShop = {
   coverUrl: string | null
   memberSince: string
   productCount: number
+  verified: boolean
 }
 
 export type Category = { id: number; name: string; slug: string }

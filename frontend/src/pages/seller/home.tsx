@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { PackageCheck, Plus } from 'lucide-react'
+import { PackageCheck, Plus, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,16 @@ export function SellerHomePage() {
         </div>
         <p className="text-[11px] text-white/60">Your items only, before fees. Payouts to your account come in a later update.</p>
       </div>
+
+      {!data.shop.verifiedAt && (
+        <Link to="/seller/verify" className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition hover:border-primary">
+          <ShieldCheck className="size-6 shrink-0 text-primary" />
+          <span className="flex-1 text-sm">
+            <span className="block font-bold">Get the Verified badge</span>
+            <span className="block text-muted-foreground">Buyers trust verified sellers more. It takes a photo of your ID and a selfie.</span>
+          </span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile value={data.toSend} label="To pack and send" to="/seller/orders" warn />

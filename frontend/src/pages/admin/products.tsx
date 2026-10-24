@@ -15,7 +15,8 @@ import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyRow, PageHeader, Pager } from './shared'
 
-export function StockBadge({ p }: { p: Pick<ProductRow, 'available' | 'lowStock' | 'active'> & { inStore?: boolean } }) {
+export function StockBadge({ p }: { p: Pick<ProductRow, 'available' | 'lowStock' | 'active'> & { inStore?: boolean; blockedReason?: string | null } }) {
+  if (p.blockedReason) return <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">taken down</Badge>
   if (!p.active) return <Badge variant="outline" className="bg-muted text-muted-foreground">hidden</Badge>
   if (p.inStore === false) return <Badge variant="outline" className="bg-muted text-muted-foreground">not in store yet</Badge>
   if (p.available <= 0) return <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">out of stock</Badge>
@@ -78,6 +79,7 @@ export function AdminProductsPage() {
             <TabsTrigger value="low">Low stock</TabsTrigger>
             <TabsTrigger value="out">Out of stock</TabsTrigger>
             <TabsTrigger value="hidden">Hidden</TabsTrigger>
+            <TabsTrigger value="blocked">Taken down</TabsTrigger>
           </TabsList>
         </Tabs>
         <div className="flex flex-wrap gap-2 lg:ml-auto">

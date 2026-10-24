@@ -3,11 +3,15 @@ import { ChevronLeft, ChevronRight, Lock, MapPin, Minus, Plus, RotateCcw, Store,
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
+import { ChatWithSeller } from '@/components/chat-with-seller'
 import { ProductVisual } from '@/components/product-visual'
+import { ReportListing } from '@/components/report-listing'
+import { ReviewsSection } from '@/components/reviews'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api, ApiError } from '@/lib/api'
+import { VerifiedBadge } from '@/components/verified-badge'
+import { api, ApiError, CONDITION_LABEL } from '@/lib/api'
 import { formatETB } from '@/lib/format'
 import { MAX_QTY, useCart } from '@/store/cart'
 import { NotFoundPage } from './not-found'
@@ -81,6 +85,13 @@ export function ProductPage() {
               ) : (
                 <Badge variant="destructive">Sold out</Badge>
               )}
+              {(p.condition || p.negotiable || p.area) && (
+                <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                  {p.condition && <span className="font-semibold text-foreground">{CONDITION_LABEL[p.condition]}</span>}
+                  {p.negotiable && <span>Price negotiable</span>}
+                  {p.area && <span className="flex items-center gap-1"><MapPin className="size-3.5" /> {p.area}</span>}
+                </p>
+              )}
             </div>
             <p className="text-muted-foreground text-pretty">{p.description}</p>
 
@@ -89,7 +100,10 @@ export function ProductPage() {
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Store className="size-5" /></span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs text-muted-foreground">Sold by</span>
-                  <span className="block truncate text-sm font-bold">{p.seller.name}</span>
+                  <span className="flex items-center gap-1.5 text-sm font-bold">
+                    <span className="truncate">{p.seller.name}</span>
+                    {p.seller.verified && <VerifiedBadge />}
+                  </span>
                   {p.seller.area && (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3" /> {p.seller.area}</span>
                   )}
@@ -119,13 +133,20 @@ export function ProductPage() {
                 Add to cart
               </Button>
             </div>
+            {p.seller && <ChatWithSeller productId={p.id} slug={p.slug} className="-mt-3 w-full" />}
 
             <ul className="space-y-3 rounded-2xl border bg-muted/30 p-5 text-sm">
               <li className="flex items-center gap-3"><Lock className="size-4 text-brand" /> Secure payment with BillPay Wallet, Bank or Card</li>
               <li className="flex items-center gap-3"><Truck className="size-4 text-brand" /> Delivery in Wolaita Sodo</li>
               <li className="flex items-center gap-3"><RotateCcw className="size-4 text-brand" /> Refunds back to your BillPay method</li>
             </ul>
+            {p.seller && <ReportListing productId={p.id} slug={p.slug} />}
           </div>
+        </div>
+      )}
+      {p && (
+        <div className="mt-12 max-w-3xl">
+          <ReviewsSection productId={p.id} title="Reviews from buyers" />
         </div>
       )}
     </div>

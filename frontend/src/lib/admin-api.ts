@@ -373,8 +373,13 @@ export type ProductRow = {
   shopId: number | null
   shopName: string | null
   shopStatus: string | null
-  /** Shoppers can see it: switched on, category shown, seller approved */
+  /** Shoppers can see it: switched on, category shown, seller approved, not taken down */
   inStore: boolean
+  condition: 'NEW' | 'LIKE_NEW' | 'USED' | null
+  negotiable: boolean
+  area: string | null
+  /** Staff took it down after reports */
+  blockedReason: string | null
 }
 
 export type ProductImageView = {
@@ -411,6 +416,9 @@ export type ProductInput = {
   lowStockThreshold: number
   featured: boolean
   active: boolean
+  condition?: 'NEW' | 'LIKE_NEW' | 'USED' | null
+  negotiable?: boolean
+  area?: string
 }
 
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) })

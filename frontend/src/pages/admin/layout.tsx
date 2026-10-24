@@ -6,6 +6,9 @@ import {
   ExternalLink,
   FlaskConical,
   Flag,
+  BadgeCheck,
+  MapPin,
+  MessageSquareWarning,
   FolderTree,
   LayoutDashboard,
   LogOut,
@@ -36,9 +39,10 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { adminApi, adminToken, shopAdminApi } from '@/lib/admin-api'
+import { trustAdminApi } from '@/lib/trust-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -61,11 +65,19 @@ const GROUPS: { label: string; items: Item[] }[] = [
     label: 'Catalog',
     items: [
       { to: '/admin/products', label: 'Products', icon: ShoppingBag },
-      { to: '/admin/shops', label: 'Sellers', icon: Store, badge: 'sellers' },
       { to: '/admin/categories', label: 'Categories', icon: FolderTree },
+      { to: '/admin/areas', label: 'Areas', icon: MapPin },
+    ],
+  },
+  {
+    label: 'Marketplace',
+    items: [
+      { to: '/admin/shops', label: 'Sellers', icon: Store, badge: 'sellers' },
       { to: '/admin/pros', label: 'Pros', icon: Wrench },
+      { to: '/admin/verifications', label: 'Verifications', icon: BadgeCheck, badge: 'verifications' },
+      { to: '/admin/listing-reports', label: 'Listing reports', icon: Flag, badge: 'listings' },
+      { to: '/admin/chat-reports', label: 'Chat reports', icon: MessageSquareWarning },
       { to: '/admin/reviews', label: 'Reviews', icon: Star },
-      { to: '/admin/chat-reports', label: 'Chat reports', icon: Flag },
     ],
   },
   {
@@ -196,6 +208,15 @@ export function AdminLayout() {
   const signedIn = !!adminToken.get()
   const config = useQuery({ queryKey: ['admin-config'], queryFn: adminApi.config, enabled: signedIn })
   const dashboard = useQuery({ queryKey: ['admin-dashboard'], queryFn: () => adminApi.dashboard(), enabled: signedIn, refetchInterval: 30_000 })
+  const trustQueue = useQuery({
+    queryKey: ['admin-trust-badges'],
+    queryFn: async () => {
+      const [v, r] = await Promise.all([trustAdminApi.verifications('SUBMITTED'), trustAdminApi.reports('OPEN')])
+      return { verifications: v.counts.SUBMITTED ?? 0, listings: r.open }
+    },
+    enabled: signedIn,
+    refetchInterval: 60_000,
+  })
   const shopQueue = useQuery({
     queryKey: ['admin-shops', 'badge'],
     queryFn: () => shopAdminApi.list({ status: 'PENDING' }),
@@ -212,6 +233,8 @@ export function AdminLayout() {
     review: dashboard.data?.ordersByStatus.REVIEW_REQUIRED ?? 0,
     webhooks: dashboard.data?.webhooksAwaitingProcessing ?? 0,
     sellers: shopQueue.data?.counts.PENDING ?? 0,
+    verifications: trustQueue.data?.verifications ?? 0,
+    listings: trustQueue.data?.listings ?? 0,
   }
 
   const toggle = () => {

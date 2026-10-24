@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router'
 import { ProductCard } from '@/components/product-card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { VerifiedBadge } from '@/components/verified-badge'
 import { api, ApiError } from '@/lib/api'
 import { NotFoundPage } from './not-found'
 
@@ -50,7 +51,9 @@ export function ShopPublicPage() {
               </span>
             )}
             <div className="min-w-0 flex-1 space-y-1">
-              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">{s.name}</h1>
+              <h1 className="flex flex-wrap items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
+                {s.name} {s.verified && <VerifiedBadge className="text-xs" />}
+              </h1>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   {s.kind === 'SHOP' ? <Store className="size-4" /> : <UserRound className="size-4" />}

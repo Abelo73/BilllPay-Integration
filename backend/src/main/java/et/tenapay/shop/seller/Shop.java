@@ -60,6 +60,9 @@ public class Shop {
 
 	private String decidedBy;
 
+	/** Set when staff approved the owner's ID (Verified badge); null = not verified. */
+	private Instant verifiedAt;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

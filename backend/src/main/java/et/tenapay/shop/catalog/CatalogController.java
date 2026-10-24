@@ -33,22 +33,25 @@ public class CatalogController {
 	}
 
 	/** Who sells a product; null on the product = Sodo Gebeya itself. */
-	public record SellerDto(String name, String slug, String kind, String area) {
+	public record SellerDto(String name, String slug, String kind, String area, boolean verified) {
 
 		static SellerDto of(et.tenapay.shop.seller.Shop s) {
-			return s == null ? null : new SellerDto(s.getName(), s.getSlug(), s.getKind().name(), s.getArea());
+			return s == null ? null
+					: new SellerDto(s.getName(), s.getSlug(), s.getKind().name(), s.getArea(), s.getVerifiedAt() != null);
 		}
 	}
 
 	/** {@code images} is filled on the product page only; lists use {@code imageUrl}. */
 	public record ProductDto(Long id, String name, String slug, String description, BigDecimal price,
 			String currency, int available, boolean lowStock, String imageUrl, boolean featured, String categorySlug,
-			String categoryName, List<ImageDto> images, SellerDto seller) {
+			String categoryName, List<ImageDto> images, SellerDto seller, String condition, boolean negotiable,
+			String area) {
 
 		public static ProductDto from(Product p, List<ImageDto> images) {
 			return new ProductDto(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
 					p.getCurrency(), Math.max(0, p.available()), p.lowStock(), p.getImageUrl(), p.isFeatured(),
-					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()));
+					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()),
+					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea());
 		}
 
 		public static ProductDto from(Product p) {

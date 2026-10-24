@@ -3,6 +3,7 @@ import { AlertTriangle, Clock, ExternalLink, Loader2, Store } from 'lucide-react
 import { Link, Navigate, NavLink, Outlet, useLocation } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { VerifiedBadge } from '@/components/verified-badge'
 import { ApiError } from '@/lib/api'
 import { KIND_LABEL, SHOP_STATUS_LABEL, sellerApi, type MyShop } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
@@ -13,6 +14,7 @@ const TABS = [
   { to: '/seller/orders', label: 'Orders' },
   { to: '/seller/products', label: 'Products' },
   { to: '/seller/shop', label: 'Shop details' },
+  { to: '/seller/verify', label: 'Get verified' },
 ]
 
 export function ShopLogo({ shop, className }: { shop: Pick<MyShop, 'logoUrl' | 'name'>; className?: string }) {
@@ -68,7 +70,10 @@ export function SellerLayout() {
       <header className="flex items-center gap-3">
         <ShopLogo shop={s} />
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-extrabold sm:text-xl">{s.name}</h1>
+          <h1 className="flex items-center gap-1.5 text-lg font-extrabold sm:text-xl">
+            <span className="truncate">{s.name}</span>
+            {s.verifiedAt && <VerifiedBadge compact />}
+          </h1>
           <p className="truncate text-xs text-muted-foreground">
             {KIND_LABEL[s.kind]}{s.area && ` · ${s.area}`} ·{' '}
             <span className={cn('font-semibold', s.status === 'APPROVED' ? 'text-success' : 'text-amber-ink')}>{SHOP_STATUS_LABEL[s.status]}</span>

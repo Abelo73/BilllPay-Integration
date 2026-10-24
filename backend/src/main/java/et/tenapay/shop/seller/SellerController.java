@@ -102,7 +102,10 @@ public class SellerController {
 			@NotNull @DecimalMin("0.01") @DecimalMax("10000000") @Digits(integer = 10, fraction = 2) BigDecimal price,
 			@Min(0) @Max(100000) Integer stock,
 			@Min(0) @Max(100000) Integer lowStockThreshold,
-			Boolean active) {
+			Boolean active,
+			et.tenapay.shop.catalog.ItemCondition condition,
+			Boolean negotiable,
+			@Size(max = 120) String area) {
 	}
 
 	public record StockRequest(@NotNull @Min(-100000) @Max(100000) Integer delta, @Size(max = 200) String reason) {
@@ -231,7 +234,7 @@ public class SellerController {
 		Shop shop = shopService.requireMine();
 		activeCategory(req.categoryId());
 		Product p = catalog.create(new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(),
-				req.stock(), req.lowStockThreshold(), false, req.active()), shop);
+				req.stock(), req.lowStockThreshold(), false, req.active(), req.condition(), req.negotiable(), req.area()), shop);
 		return detailOf(p.getId());
 	}
 
@@ -243,13 +246,17 @@ public class SellerController {
 		}
 		// sellers can't feature their own products on the home page or change the address of a listing
 		catalog.update(id, new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(), null,
-				req.lowStockThreshold(), null, req.active()));
+				req.lowStockThreshold(), null, req.active(), req.condition(), req.negotiable(), req.area() == null ? "" : req.area()));
 		return detailOf(id);
 	}
 
 	@PatchMapping("/products/{id}/visibility")
 	public ProductDetail visibility(@PathVariable Long id, @Valid @RequestBody VisibilityRequest req) {
-		own(shopService.requireMine(), id);
+		Product p = own(shopService.requireMine(), id);
+		if (req.active() && p.getBlockedReason() != null) {
+			throw new ApiException(HttpStatus.CONFLICT, "LISTING_BLOCKED",
+					"Sodo Gebeya took this listing down: " + p.getBlockedReason() + ". Edit it and call us to put it back.");
+		}
 		catalog.setActive(id, req.active());
 		return detailOf(id);
 	}
