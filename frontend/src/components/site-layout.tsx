@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { FlaskConical, Home, Package, Search, ShoppingCart, Store, User } from 'lucide-react'
+import { FlaskConical, Home, Search, ShoppingCart, Store, User, Wrench } from 'lucide-react'
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 
 import { CartSheet } from '@/components/cart-sheet'
+import { ChatsNavLink } from '@/components/chat-nav'
 import { InstallApp } from '@/components/install-app'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -15,7 +16,9 @@ import { cartTotals, useCart } from '@/store/cart'
 const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/shop', label: 'Shop' },
+  { to: '/services', label: 'Services' },
   { to: '/orders/track', label: 'Track order' },
+  { to: '/chats', label: 'Chats' },
   { to: '/sell', label: 'Sell' },
 ]
 
@@ -96,7 +99,8 @@ function SellLink({ className }: { className: (s: { isActive: boolean }) => stri
   )
 }
 
-/** Phone navigation, as in the design. Only pages that exist today; Services and Chats join when they ship. */
+/** Phone navigation, as in the design (S1): Home, Services, Sell, Chats, Account. Shop is reached from search and Home,
+ *  orders from Account. */
 function BottomNav() {
   const item = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -111,13 +115,11 @@ function BottomNav() {
       <NavLink to="/" end className={item}>
         <Home className="size-[22px]" /> Home
       </NavLink>
-      <NavLink to="/shop" className={item}>
-        <Search className="size-[22px]" /> Shop
-      </NavLink>
-      <NavLink to="/orders/track" className={item}>
-        <Package className="size-[22px]" /> Orders
+      <NavLink to="/services" className={item}>
+        <Wrench className="size-[22px]" /> Services
       </NavLink>
       <SellLink className={item} />
+      <ChatsNavLink className={item} />
       <NavLink to="/account" className={item}>
         <User className="size-[22px]" /> Account
       </NavLink>

@@ -5,6 +5,7 @@ import {
   Gauge,
   ExternalLink,
   FlaskConical,
+  Flag,
   FolderTree,
   LayoutDashboard,
   LogOut,
@@ -24,6 +25,8 @@ import {
   UserRound,
   Users,
   Webhook,
+  Wrench,
+  Star,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -60,6 +63,9 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/products', label: 'Products', icon: ShoppingBag },
       { to: '/admin/shops', label: 'Sellers', icon: Store, badge: 'sellers' },
       { to: '/admin/categories', label: 'Categories', icon: FolderTree },
+      { to: '/admin/pros', label: 'Pros', icon: Wrench },
+      { to: '/admin/reviews', label: 'Reviews', icon: Star },
+      { to: '/admin/chat-reports', label: 'Chat reports', icon: Flag },
     ],
   },
   {

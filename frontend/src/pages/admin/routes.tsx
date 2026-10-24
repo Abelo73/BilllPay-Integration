@@ -1,6 +1,7 @@
 import { useRoutes, type RouteObject } from 'react-router'
 
 import { AdminCategoriesPage } from './categories'
+import { AdminChatReportsPage } from './chat-reports'
 import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
@@ -15,8 +16,10 @@ import { AdminOrdersPage } from './orders'
 import { AdminPaymentsPage } from './payments'
 import { AdminProductEditPage } from './product-edit'
 import { AdminProductsPage } from './products'
+import { AdminProsPage } from './pros'
 import { AdminRefundsPage } from './refunds'
 import { AdminReportsPage } from './reports'
+import { AdminReviewsPage } from './reviews'
 import { AdminSetupPage } from './setup'
 import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
@@ -35,6 +38,9 @@ const adminRoutes: RouteObject[] = [
       { path: 'products/:productId', element: <AdminProductEditPage /> },
       { path: 'categories', element: <AdminCategoriesPage /> },
       { path: 'shops', element: <AdminShopsPage /> },
+      { path: 'pros', element: <AdminProsPage /> },
+      { path: 'reviews', element: <AdminReviewsPage /> },
+      { path: 'chat-reports', element: <AdminChatReportsPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

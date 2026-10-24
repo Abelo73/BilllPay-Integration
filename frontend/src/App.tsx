@@ -7,6 +7,11 @@ import { SiteLayout } from '@/components/site-layout'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { AccountPage } from '@/pages/account'
+import { ChatPage } from '@/pages/chat'
+import { ChatsPage } from '@/pages/chats'
+import { JobPage, MyJobsPage, NewJobPage } from '@/pages/jobs'
+import { ProDashboardPage } from '@/pages/pro-dashboard'
+import { ProProfilePage, ServicesPage } from '@/pages/services'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { CheckoutPage } from '@/pages/checkout'
 import { HomePage } from '@/pages/home'
@@ -61,6 +66,15 @@ const router = createBrowserRouter([
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/account', element: <AccountPage /> },
+      { path: '/chats', element: <ChatsPage /> },
+      { path: '/chats/:id', element: <ChatPage /> },
+      { path: '/services', element: <ServicesPage /> },
+      { path: '/pros/:id', element: <ProProfilePage /> },
+      { path: '/jobs', element: <MyJobsPage /> },
+      { path: '/jobs/new', element: <NewJobPage /> },
+      { path: '/jobs/:id', element: <JobPage /> },
+      { path: '/pro', element: <ProDashboardPage /> },
+      { path: '/pro/jobs/:id', element: <JobPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

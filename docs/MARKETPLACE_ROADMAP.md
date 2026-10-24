@@ -130,6 +130,8 @@ All of these must be true:
 - Safety warning when a phone number or "transfer" appears; report and block; staff can read reported chats only
 - **Done when:** a buyer and seller agree a price in chat and the order uses that price
 
+🟡 Mostly done 2026-10-24 (session 16): buyer ↔ shop chat (S11/S12) from a product page ("Chat with seller"): text and photos, unread counts and a Chats item with a badge in the phone menu, offers with counter / accept / decline / withdraw (an accepted price stays valid 48 h), safety flag and warning on messages that look like off-platform deals (phone numbers, "send money first", Telebirr…), block, report, Admin → **Chat reports** (staff can read only reported chats), at most one SMS nudge per conversation every 6 h. Messages refresh every 4 s (WebSocket later). V17, `ChatIntegrationTest` (4). **Still to do:** checkout at the agreed price, after M5 rewrites checkout (`ChatService.agreedPrice` / `markOfferUsed` are ready).
+
 ### M11. Notifications (0.5 week)
 - In-app notifications (**S15**), SMS for key events (order paid, on the way, new quote, payment reminder), emails kept
 - Each user picks what they get
@@ -142,6 +144,8 @@ All of these must be true:
 - Ratings on shop, product and pro pages; response time shown
 - **Done when:** reviews can't be posted without a completed purchase
 
+✅ Done 2026-10-24 (session 16): one review per bought item, only after delivery; 1–5 stars + text; shown as "Hana G." with a Verified purchase label; summary with star bars on product (and shop) pages; "Rate what you received" box in My account; the shop replies once; Admin → **Reviews** to hide (hidden ones stop counting). V18, `ReviewIntegrationTest`. Shop page and seller-area review list to be plugged in by the M4 owner (`ReviewsSection shopSlug`, `/api/seller/reviews`).
+
 ---
 
 ## Phase 4: Services
@@ -151,10 +155,14 @@ All of these must be true:
 - Services home (**S7**) with categories and top-rated pros
 - **Done when:** 10 real pros have complete profiles
 
+✅ Built 2026-10-24 (session 16): pro profile (trade, headline, areas, years, bio, price list, up to 6 work photos) at /pro, staff approval in Admin → **Pros** (SMS on decision), Hire a pro page (S7) with trade filters and search, public profile (S8), rating and jobs-done from completed jobs. The 10 real pros are your field work.
+
 ### M14. Job requests and quotes (1.5 weeks)
 - Describe a job (**S9**): type, text, photos, when, where, budget
 - Sent to matching pros nearby; pros send quotes; customer compares (**S10**)
 - **Done when:** a job gets 2+ quotes and the customer accepts one
+
+✅ Done 2026-10-24 (session 16): post a job (S9: trade, description, up to 3 photos, when, where, budget) or send it to one pro from their profile; pros of that trade see it at /pro and send a price; the customer compares quotes (S10) and accepts one, and only then do both see each other's phone; cancel; mark done with a 1–5 rating. SMS: new quote (max one per job per hour), quote accepted, direct request, job cancelled. V19, `ServicesIntegrationTest` (3). Deposits come with M15.
 
 ### M15. Deposits and job completion (1 week)
 - Accepting pays a deposit through BillPay (held); "job done" releases deposit and balance to the pro

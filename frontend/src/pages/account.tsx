@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { ToReview } from '@/components/reviews'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -344,7 +345,15 @@ export function AccountPage() {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
-        <TabsContent value="orders" className="pt-4"><MyOrders /></TabsContent>
+        <TabsContent value="orders" className="space-y-4 pt-4">
+          <ToReview />
+          <div className="flex flex-wrap gap-2 text-sm">
+            <Link to="/jobs" className="rounded-full border px-3 py-1.5 font-semibold hover:border-primary/40">My jobs</Link>
+            <Link to="/chats" className="rounded-full border px-3 py-1.5 font-semibold hover:border-primary/40">My chats</Link>
+            <Link to="/pro" className="rounded-full border px-3 py-1.5 font-semibold hover:border-primary/40">Offer my skills</Link>
+          </div>
+          <MyOrders />
+        </TabsContent>
         <TabsContent value="addresses" className="pt-4"><Addresses /></TabsContent>
         <TabsContent value="profile" className="pt-4"><Profile /></TabsContent>
         <TabsContent value="security" className="pt-4"><Security /></TabsContent>
