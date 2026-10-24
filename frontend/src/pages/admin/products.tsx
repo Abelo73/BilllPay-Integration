@@ -15,8 +15,9 @@ import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyRow, PageHeader, Pager } from './shared'
 
-export function StockBadge({ p }: { p: Pick<ProductRow, 'available' | 'lowStock' | 'active'> }) {
+export function StockBadge({ p }: { p: Pick<ProductRow, 'available' | 'lowStock' | 'active'> & { inStore?: boolean } }) {
   if (!p.active) return <Badge variant="outline" className="bg-muted text-muted-foreground">hidden</Badge>
+  if (p.inStore === false) return <Badge variant="outline" className="bg-muted text-muted-foreground">not in store yet</Badge>
   if (p.available <= 0) return <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">out of stock</Badge>
   if (p.lowStock) return <Badge variant="outline" className="border-warning/40 bg-warning/15">low stock</Badge>
   return <Badge variant="outline" className="border-success/30 bg-success/15 text-success">in store</Badge>
@@ -38,6 +39,7 @@ export function AdminProductsPage() {
   const status = params.get('status') ?? 'all'
   const categoryId = params.get('category') ? Number(params.get('category')) : undefined
   const q = params.get('q') ?? ''
+  const seller = params.get('seller') ?? ''
   const page = Number(params.get('page') ?? 0)
   const [search, setSearch] = useState(q)
 
@@ -56,8 +58,8 @@ export function AdminProductsPage() {
 
   const categories = useQuery({ queryKey: ['admin-categories'], queryFn: catalogApi.categories })
   const { data } = useQuery({
-    queryKey: ['admin-products', q, categoryId, status, page],
-    queryFn: () => catalogApi.products({ q, categoryId, status, page }),
+    queryKey: ['admin-products', q, categoryId, status, page, seller],
+    queryFn: () => catalogApi.products({ q, categoryId, status, page, seller }),
     placeholderData: keepPreviousData,
   })
 
@@ -78,7 +80,18 @@ export function AdminProductsPage() {
             <TabsTrigger value="hidden">Hidden</TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex gap-2 lg:ml-auto">
+        <div className="flex flex-wrap gap-2 lg:ml-auto">
+          {/^d+$/.test(seller) ? (
+            <Button variant="outline" onClick={() => set('seller', null)}>One seller ✕</Button>
+          ) : (
+            <Select value={seller || 'all'} onValueChange={(v) => set('seller', v === 'all' ? null : v)}>
+              <SelectTrigger className="w-44" aria-label="Seller"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All sellers</SelectItem>
+                <SelectItem value="house">Sodo Gebeya only</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <Select value={categoryId ? String(categoryId) : 'all'} onValueChange={(v) => set('category', v === 'all' ? null : v)}>
             <SelectTrigger className="w-44" aria-label="Category"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -101,13 +114,14 @@ export function AdminProductsPage() {
               <TableRow>
                 <TableHead className="pl-4">Product</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Seller</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Available</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data?.content.length === 0 && <EmptyRow colSpan={5} text="No products match." />}
+              {data?.content.length === 0 && <EmptyRow colSpan={6} text="No products match." />}
               {data?.content.map((p) => (
                 <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/admin/products/${p.id}`)}>
                   <TableCell className="pl-4">
@@ -122,6 +136,9 @@ export function AdminProductsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-sm">{p.categoryName}</TableCell>
+                  <TableCell className="text-sm">
+                    {p.shopName ?? <span className="text-muted-foreground">Sodo Gebeya</span>}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{formatETB(p.price)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     <span className={cn(p.available <= 0 && 'text-destructive', p.lowStock && 'font-medium')}>{p.available}</span>

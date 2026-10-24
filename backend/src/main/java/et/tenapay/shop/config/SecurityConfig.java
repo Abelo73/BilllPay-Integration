@@ -59,6 +59,8 @@ public class SecurityConfig {
 						.requestMatchers("/api/me/**").authenticated()
 						// buying needs a customer account (guests get 401, staff 403); tracking an order stays open
 						.requestMatchers(HttpMethod.POST, "/api/checkout").hasRole("CUSTOMER")
+						// selling: a customer account; each request only reaches the caller's own shop (SellerController)
+						.requestMatchers("/api/seller/**").hasRole("CUSTOMER")
 						.requestMatchers("/api/**", "/actuator/health/**", "/actuator/info",
 								"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 						.anyRequest().denyAll())

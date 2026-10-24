@@ -15,6 +15,25 @@ export type Product = {
   featured: boolean
   categorySlug: string
   categoryName: string
+  /** Who sells it; null = Sodo Gebeya itself */
+  seller: Seller | null
+}
+
+export type ShopKind = 'SHOP' | 'INDIVIDUAL'
+
+export type Seller = { name: string; slug: string; kind: ShopKind; area: string | null }
+
+/** A seller's public page. */
+export type PublicShop = {
+  name: string
+  slug: string
+  kind: ShopKind
+  description: string | null
+  area: string | null
+  logoUrl: string | null
+  coverUrl: string | null
+  memberSince: string
+  productCount: number
 }
 
 export type Category = { id: number; name: string; slug: string }
@@ -145,7 +164,8 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
+/** Calls /api with the signed-in customer's token (sellers use it too: lib/seller-api). */
+export async function request<T>(path: string, init?: RequestInit, retried = false): Promise<T> {
   const token = sessionToken()
   const res = await fetch(`/api${path}`, {
     ...init,
@@ -169,7 +189,7 @@ async function request<T>(path: string, init?: RequestInit, retried = false): Pr
 }
 
 export const api = {
-  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number }) => {
+  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string }) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     return request<Page<Product>>(`/products?${qs}`)
@@ -177,6 +197,7 @@ export const api = {
   featured: () => request<Product[]>('/products/featured'),
   product: (slug: string) => request<Product>(`/products/${encodeURIComponent(slug)}`),
   categories: () => request<Category[]>('/categories'),
+  shop: (slug: string) => request<PublicShop>(`/shops/${encodeURIComponent(slug)}`),
   checkout: (body: CheckoutRequest) =>
     request<CheckoutResponse>('/checkout', { method: 'POST', body: JSON.stringify(body) }),
   pay: (orderNumber: string, phone: string) =>

@@ -49,6 +49,50 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
 	Page<Order> findByUserId(UUID userId, Pageable pageable);
 
+	// ---------- seller views: paid orders that contain at least one line of the shop ----------
+
+	@Query("""
+			select o from Order o
+			where o.paidAt is not null and o.environment = :environment
+			  and o.fulfilmentStatus in :fulfilment
+			  and exists (select 1 from OrderItem i where i.order = o and i.shopId = :shopId)
+			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
+			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%')))
+			""")
+	Page<Order> findForShop(@Param("shopId") Long shopId,
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment,
+			@Param("fulfilment") Collection<FulfilmentStatus> fulfilment, @Param("q") String q, Pageable pageable);
+
+	@Query("""
+			select count(o) from Order o
+			where o.paidAt is not null and o.environment = :environment and o.fulfilmentStatus in :fulfilment
+			  and exists (select 1 from OrderItem i where i.order = o and i.shopId = :shopId)
+			""")
+	long countForShop(@Param("shopId") Long shopId,
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment,
+			@Param("fulfilment") Collection<FulfilmentStatus> fulfilment);
+
+	/** [the shop's line totals, orders, units] for orders paid since {@code since} and not refunded. */
+	@Query("""
+			select coalesce(sum(i.lineTotal), 0), count(distinct o), coalesce(sum(i.quantity), 0)
+			from Order o join o.items i
+			where i.shopId = :shopId and o.paidAt >= :since and o.environment = :environment
+			  and o.status in (et.tenapay.shop.order.OrderStatus.PAID, et.tenapay.shop.order.OrderStatus.PARTIALLY_REFUNDED)
+			""")
+	List<Object[]> shopSales(@Param("shopId") Long shopId, @Param("since") Instant since,
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
+
+	/** [product name, units] best sellers of the shop since {@code since}. */
+	@Query("""
+			select i.productName, sum(i.quantity)
+			from Order o join o.items i
+			where i.shopId = :shopId and o.paidAt >= :since and o.environment = :environment
+			  and o.status in (et.tenapay.shop.order.OrderStatus.PAID, et.tenapay.shop.order.OrderStatus.PARTIALLY_REFUNDED)
+			group by i.productName order by sum(i.quantity) desc
+			""")
+	List<Object[]> shopBestSellers(@Param("shopId") Long shopId, @Param("since") Instant since,
+			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment, Pageable pageable);
+
 	long countByStatusAndEnvironment(OrderStatus status, et.tenapay.shop.payment.billpay.BillPayEnvironment environment);
 
 	@Query("select coalesce(sum(o.total), 0) from Order o where o.status in :statuses and o.environment = :environment")

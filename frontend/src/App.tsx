@@ -14,8 +14,17 @@ import { NotFoundPage } from '@/pages/not-found'
 import { OrderStatusPage } from '@/pages/order-status'
 import { ProductPage } from '@/pages/product'
 import { ShopPage } from '@/pages/shop'
+import { ShopPublicPage } from '@/pages/shop-page'
 
 const AdminApp = lazy(() => import('@/pages/admin/routes'))
+const SellerApp = lazy(() => import('@/pages/seller/routes'))
+const SellPage = lazy(() => import('@/pages/seller/sell').then((m) => ({ default: m.SellPage })))
+
+const spinner = (
+  <div className="grid min-h-[50vh] place-items-center">
+    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+  </div>
+)
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
@@ -42,6 +51,9 @@ const router = createBrowserRouter([
       { path: '/', element: <HomePage /> },
       { path: '/shop', element: <ShopPage /> },
       { path: '/product/:slug', element: <ProductPage /> },
+      { path: '/shops/:slug', element: <ShopPublicPage /> },
+      { path: '/sell', element: <Suspense fallback={spinner}><SellPage /></Suspense> },
+      { path: '/seller/*', element: <Suspense fallback={spinner}><SellerApp /></Suspense> },
       { path: '/checkout', element: <CheckoutPage /> },
       { path: '/checkout/return', element: <OrderStatusPage /> },
       { path: '/checkout/cancelled', element: <OrderStatusPage cancelled /> },

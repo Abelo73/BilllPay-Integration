@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { FlaskConical, Home, Package, Search, ShoppingCart, User } from 'lucide-react'
-import { Link, NavLink, Outlet, ScrollRestoration } from 'react-router'
+import { FlaskConical, Home, Package, Search, ShoppingCart, Store, User } from 'lucide-react'
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 
 import { CartSheet } from '@/components/cart-sheet'
+import { InstallApp } from '@/components/install-app'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
@@ -15,6 +16,7 @@ const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/shop', label: 'Shop' },
   { to: '/orders/track', label: 'Track order' },
+  { to: '/sell', label: 'Sell' },
 ]
 
 /** Shown only while payments go to BillPay's sandbox; with live keys real money moves, so it must not claim otherwise. */
@@ -83,7 +85,18 @@ function Header() {
   )
 }
 
-/** Phone navigation, as in the design. Only pages that exist today; Services, Sell and Chats join when they ship. */
+/** "Sell" opens the seller area (/seller/*) too, so it stays highlighted there. */
+function SellLink({ className }: { className: (s: { isActive: boolean }) => string }) {
+  const { pathname } = useLocation()
+  const active = pathname === '/sell' || pathname.startsWith('/seller')
+  return (
+    <Link to="/sell" className={className({ isActive: active })} aria-current={active ? 'page' : undefined}>
+      <Store className="size-[22px]" /> Sell
+    </Link>
+  )
+}
+
+/** Phone navigation, as in the design. Only pages that exist today; Services and Chats join when they ship. */
 function BottomNav() {
   const item = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -104,6 +117,7 @@ function BottomNav() {
       <NavLink to="/orders/track" className={item}>
         <Package className="size-[22px]" /> Orders
       </NavLink>
+      <SellLink className={item} />
       <NavLink to="/account" className={item}>
         <User className="size-[22px]" /> Account
       </NavLink>
@@ -116,6 +130,8 @@ const YEAR = new Date().getFullYear()
 function Footer() {
   return (
     <footer className="mt-20 border-t bg-card pb-20 md:pb-0">
+      {/* installable app (shown only when the browser offers it) */}
+      <InstallApp className="mx-4 mt-8 sm:mx-auto sm:max-w-xl" />
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div className="space-y-3 md:col-span-2">
           <Logo withPlace />
@@ -135,7 +151,7 @@ function Footer() {
           <ul className="space-y-2 text-muted-foreground">
             <li><Link to="/orders/track" className="hover:text-foreground">Track your order</Link></li>
             <li><a href="/#faq" className="hover:text-foreground">Questions</a></li>
-            <li><Link to="/register" className="hover:text-foreground">Sell on Sodo Gebeya</Link></li>
+            <li><Link to="/sell" className="hover:text-foreground">Sell on Sodo Gebeya</Link></li>
           </ul>
         </div>
       </div>

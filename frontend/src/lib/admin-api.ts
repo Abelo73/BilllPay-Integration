@@ -1,4 +1,5 @@
 import { ApiError, type Page } from '@/lib/api'
+import type { MyShop } from '@/lib/seller-api'
 import type { Session } from '@/store/session'
 
 const STAFF_KEY = 'tenashop-staff-session'
@@ -368,6 +369,12 @@ export type ProductRow = {
   active: boolean
   imageUrl: string | null
   updatedAt: string | null
+  /** null = sold by Sodo Gebeya itself */
+  shopId: number | null
+  shopName: string | null
+  shopStatus: string | null
+  /** Shoppers can see it: switched on, category shown, seller approved */
+  inStore: boolean
 }
 
 export type ProductImageView = {
@@ -409,7 +416,8 @@ export type ProductInput = {
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) })
 
 export const catalogApi = {
-  products: (p: { q?: string; categoryId?: number; status?: string; page?: number }) =>
+  /** seller: '' = everyone, 'house' = Sodo Gebeya's own, or a shop id */
+  products: (p: { q?: string; categoryId?: number; status?: string; page?: number; seller?: string }) =>
     request<Page<ProductRow>>(`/products?${qs(p)}`),
   product: (id: number) => request<ProductDetail>(`/products/${id}`),
   create: (body: ProductInput) => request<ProductDetail>('/products', json('POST', body)),
@@ -585,4 +593,23 @@ export const loadTestApi = {
     if (win) win.location.href = url
     else window.open(url, '_blank')
   },
+}
+
+// ---------- sellers (marketplace shops) ----------
+
+export type AdminShopRow = {
+  shop: MyShop
+  owner: { fullName: string; phone: string | null; email: string | null } | null
+  products: number
+  productsInStore: number
+  decidedBy: string | null
+}
+
+export type AdminShopList = { counts: Record<string, number>; page: Page<AdminShopRow> }
+
+export const shopAdminApi = {
+  list: (p: { status?: string; q?: string; page?: number }) => request<AdminShopList>(`/shops?${qs(p)}`),
+  get: (id: number) => request<AdminShopRow>(`/shops/${id}`),
+  decide: (id: number, status: 'APPROVED' | 'REJECTED' | 'SUSPENDED', note?: string) =>
+    request<AdminShopRow>(`/shops/${id}/decision`, json('POST', { status, note })),
 }

@@ -91,22 +91,36 @@ public class CatalogAdminController {
 
 	public record ImageView(Long id, int position, String url, String thumbUrl, Integer width, Integer height,
 			Integer sizeBytes) {
+
+		static ImageView of(ProductImage i, MediaProperties media) {
+			return new ImageView(i.getId(), i.getPosition(), media.urlFor(i.getLargeKey()),
+					media.urlFor(i.getThumbKey()), i.getWidth(), i.getHeight(), i.getSizeBytes());
+		}
 	}
 
+	/** {@code shopId}/{@code shopName} null = sold by Sodo Gebeya; {@code inStore} = actually visible to shoppers. */
 	public record ProductRow(Long id, String name, String slug, String categoryName, Long categoryId,
 			BigDecimal price, int stock, int reserved, int available, int lowStockThreshold, boolean lowStock,
-			boolean featured, boolean active, String imageUrl, Instant updatedAt) {
+			boolean featured, boolean active, String imageUrl, Instant updatedAt, Long shopId, String shopName,
+			String shopStatus, boolean inStore) {
 
-		static ProductRow of(Product p) {
+		public static ProductRow of(Product p) {
+			var shop = p.getShop();
 			return new ProductRow(p.getId(), p.getName(), p.getSlug(), p.getCategory().getName(),
 					p.getCategory().getId(), p.getPrice(), p.getStock(), p.getReserved(), p.available(),
 					p.getLowStockThreshold(), p.lowStock(), p.isFeatured(), p.isActive(), p.getImageUrl(),
-					p.getUpdatedAt());
+					p.getUpdatedAt(), shop == null ? null : shop.getId(), shop == null ? null : shop.getName(),
+					shop == null ? null : shop.getStatus().name(), p.sellable() && p.getCategory().isActive());
 		}
 	}
 
 	public record ProductDetail(ProductRow product, String description, List<ImageView> images,
 			int maxImages) {
+
+		public static ProductDetail of(Product p, List<ProductImage> gallery, MediaProperties media) {
+			return new ProductDetail(ProductRow.of(p), p.getDescription(),
+					gallery.stream().map(i -> ImageView.of(i, media)).toList(), CatalogAdminService.MAX_IMAGES);
+		}
 	}
 
 	public record CategoryRow(Long id, String name, String slug, int sortOrder, boolean active, long productCount,
@@ -115,7 +129,7 @@ public class CatalogAdminController {
 
 	public record ChangeRow(Long id, String action, String detail, String userEmail, Instant createdAt) {
 
-		static ChangeRow of(CatalogChange c) {
+		public static ChangeRow of(CatalogChange c) {
 			return new ChangeRow(c.getId(), c.getAction(), c.getDetail(), c.getUserEmail(), c.getCreatedAt());
 		}
 	}
@@ -126,10 +140,14 @@ public class CatalogAdminController {
 	@Transactional(readOnly = true)
 	public PageDto<ProductRow> list(@RequestParam(required = false) String q,
 			@RequestParam(required = false) Long categoryId, @RequestParam(required = false) String status,
+			@RequestParam(required = false) String seller,
 			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
 		String query = q == null || q.isBlank() ? null : q.trim();
 		String st = status == null || status.isBlank() || "all".equals(status) ? null : status;
-		return PageDto.of(products.adminSearch(query, categoryId, st,
+		// seller: empty = everyone, "house" = Sodo Gebeya's own, a number = that shop
+		boolean house = "house".equals(seller);
+		Long shopId = seller != null && seller.matches("\\d{1,18}") ? Long.valueOf(seller) : null;
+		return PageDto.of(products.adminSearch(query, categoryId, st, shopId, house,
 				PageRequest.of(page, Math.min(size, 100), Sort.by("id").descending())).map(ProductRow::of));
 	}
 
@@ -237,13 +255,6 @@ public class CatalogAdminController {
 	}
 
 	private ProductDetail detail(Product p) {
-		List<ImageView> gallery = images.findByProductIdOrderByPositionAsc(p.getId()).stream()
-				.map(this::view).toList();
-		return new ProductDetail(ProductRow.of(p), p.getDescription(), gallery, CatalogAdminService.MAX_IMAGES);
-	}
-
-	private ImageView view(ProductImage i) {
-		return new ImageView(i.getId(), i.getPosition(), media.urlFor(i.getLargeKey()), media.urlFor(i.getThumbKey()),
-				i.getWidth(), i.getHeight(), i.getSizeBytes());
+		return ProductDetail.of(p, images.findByProductIdOrderByPositionAsc(p.getId()), media);
 	}
 }

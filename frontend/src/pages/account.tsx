@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Trash2, UserRound } from 'lucide-react'
+import { ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Store, Trash2, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -333,6 +333,9 @@ export function AccountPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Hi, {session.user.fullName.split(' ')[0]}</h1>
           <p className="text-sm text-muted-foreground">{userContact(session.user)}</p>
         </div>
+        <Button asChild variant="outline" className="ml-auto rounded-full">
+          <Link to="/sell"><Store /> Sell</Link>
+        </Button>
       </div>
       <Tabs value={params.get('tab') ?? 'orders'} onValueChange={(tab) => setParams(tab === 'orders' ? {} : { tab }, { replace: true })}>
         <TabsList>

@@ -27,22 +27,31 @@ public class CatalogController {
 	private final CategoryRepository categories;
 	private final ProductImageRepository images;
 	private final MediaProperties media;
+	private final et.tenapay.shop.seller.ShopRepository shops;
 
 	public record ImageDto(String url, String thumbUrl) {
+	}
+
+	/** Who sells a product; null on the product = Sodo Gebeya itself. */
+	public record SellerDto(String name, String slug, String kind, String area) {
+
+		static SellerDto of(et.tenapay.shop.seller.Shop s) {
+			return s == null ? null : new SellerDto(s.getName(), s.getSlug(), s.getKind().name(), s.getArea());
+		}
 	}
 
 	/** {@code images} is filled on the product page only; lists use {@code imageUrl}. */
 	public record ProductDto(Long id, String name, String slug, String description, BigDecimal price,
 			String currency, int available, boolean lowStock, String imageUrl, boolean featured, String categorySlug,
-			String categoryName, List<ImageDto> images) {
+			String categoryName, List<ImageDto> images, SellerDto seller) {
 
-		static ProductDto from(Product p, List<ImageDto> images) {
+		public static ProductDto from(Product p, List<ImageDto> images) {
 			return new ProductDto(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
 					p.getCurrency(), Math.max(0, p.available()), p.lowStock(), p.getImageUrl(), p.isFeatured(),
-					p.getCategory().getSlug(), p.getCategory().getName(), images);
+					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()));
 		}
 
-		static ProductDto from(Product p) {
+		public static ProductDto from(Product p) {
 			return from(p, List.of());
 		}
 	}
@@ -53,6 +62,7 @@ public class CatalogController {
 	@GetMapping("/products")
 	public PageDto<ProductDto> list(@RequestParam(required = false) String category,
 			@RequestParam(required = false) String q,
+			@RequestParam(required = false) String shop,
 			@RequestParam(defaultValue = "newest") String sort,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "12") int size) {
@@ -64,7 +74,13 @@ public class CatalogController {
 		};
 		String query = (q == null || q.isBlank()) ? null : q.trim();
 		String cat = (category == null || category.isBlank()) ? null : category;
-		return PageDto.of(products.search(cat, query, PageRequest.of(page, Math.min(size, 48), order))
+		Long shopId = null;
+		if (shop != null && !shop.isBlank()) {
+			// one seller's products (their shop page); an unknown or unapproved shop has none
+			shopId = shops.findBySlug(shop).filter(s -> s.getStatus().selling()).map(et.tenapay.shop.seller.Shop::getId)
+					.orElse(-1L);
+		}
+		return PageDto.of(products.search(cat, query, shopId, PageRequest.of(page, Math.min(size, 48), order))
 				.map(ProductDto::from));
 	}
 

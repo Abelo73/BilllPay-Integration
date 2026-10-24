@@ -44,8 +44,14 @@ public class CatalogAdminService {
 	// ---------- products ----------
 
 	public Product create(ProductForm f) {
+		return create(f, null);
+	}
+
+	/** Creates a product sold by {@code shop} (null = Sodo Gebeya itself). */
+	public Product create(ProductForm f, et.tenapay.shop.seller.Shop shop) {
 		return tx.execute(s -> {
 			Product p = new Product();
+			p.setShop(shop);
 			p.setCategory(category(f.categoryId()));
 			p.setName(f.name().trim());
 			p.setSlug(uniqueProductSlug(f.slug() != null && !f.slug().isBlank() ? f.slug() : f.name(), null));
@@ -151,6 +157,7 @@ public class CatalogAdminService {
 		List<ProductImage> sourceImages = images.findByProductIdOrderByPositionAsc(id);
 		Product copy = tx.execute(s -> {
 			Product p = new Product();
+			p.setShop(source.getShop());
 			p.setCategory(source.getCategory());
 			p.setName(source.getName() + " (copy)");
 			p.setSlug(uniqueProductSlug(source.getSlug() + "-copy", null));

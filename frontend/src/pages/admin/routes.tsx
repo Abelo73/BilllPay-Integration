@@ -18,6 +18,7 @@ import { AdminProductsPage } from './products'
 import { AdminRefundsPage } from './refunds'
 import { AdminReportsPage } from './reports'
 import { AdminSetupPage } from './setup'
+import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
 import { AdminWebhooksPage } from './webhooks'
 
@@ -33,6 +34,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'products', element: <AdminProductsPage /> },
       { path: 'products/:productId', element: <AdminProductEditPage /> },
       { path: 'categories', element: <AdminCategoriesPage /> },
+      { path: 'shops', element: <AdminShopsPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

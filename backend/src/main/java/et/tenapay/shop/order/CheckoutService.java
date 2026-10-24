@@ -64,7 +64,7 @@ public class CheckoutService {
 		List<Map<String, Object>> problems = new ArrayList<>();
 		qtyByProduct.forEach((id, qty) -> {
 			Product p = byId.get(id);
-			if (p == null || !p.isActive()) {
+			if (p == null || !p.sellable()) {
 				problems.add(Map.of("productId", id, "problem", "UNAVAILABLE"));
 			} else if (p.available() < qty) {
 				problems.add(Map.of("productId", id, "problem", "INSUFFICIENT_STOCK", "available", p.available()));
@@ -91,6 +91,7 @@ public class CheckoutService {
 			int qty = e.getValue();
 			OrderItem item = new OrderItem();
 			item.setProductId(p.getId());
+			item.setShopId(p.getShop() == null ? null : p.getShop().getId());
 			item.setProductName(p.getName());
 			item.setUnitPrice(p.getPrice());
 			item.setQuantity(qty);
@@ -155,7 +156,7 @@ public class CheckoutService {
 		}
 		BigDecimal subtotal = BigDecimal.ZERO.setScale(2);
 		for (Product p : products.findAllById(qtyByProduct.keySet())) {
-			if (p.isActive()) {
+			if (p.sellable()) {
 				subtotal = subtotal.add(p.getPrice().multiply(BigDecimal.valueOf(qtyByProduct.get(p.getId()))));
 			}
 		}

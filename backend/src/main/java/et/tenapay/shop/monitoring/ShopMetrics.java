@@ -118,6 +118,11 @@ public class ShopMetrics {
 	}
 
 	/** A "finish paying" reminder was queued for an unpaid order. */
+	/** Marketplace sellers: opened, approved, rejected, suspended, resubmitted. */
+	public void shopEvent(String event) {
+		AfterCommit.run(() -> counter("tenashop.shops", "Seller shops opened and decided", "event", event).increment());
+	}
+
 	public void paymentReminder() {
 		AfterCommit.run(() -> Counter.builder("tenashop.payments.reminders").description("Finish-paying reminders sent")
 				.register(registry).increment());

@@ -19,6 +19,7 @@ import {
   Settings2,
   ShieldCheck,
   ShoppingBag,
+  Store,
   TicketPercent,
   UserRound,
   Users,
@@ -31,10 +32,10 @@ import { LogoMark } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { adminApi, adminToken } from '@/lib/admin-api'
+import { adminApi, adminToken, shopAdminApi } from '@/lib/admin-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -57,6 +58,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     label: 'Catalog',
     items: [
       { to: '/admin/products', label: 'Products', icon: ShoppingBag },
+      { to: '/admin/shops', label: 'Sellers', icon: Store, badge: 'sellers' },
       { to: '/admin/categories', label: 'Categories', icon: FolderTree },
     ],
   },
@@ -188,6 +190,12 @@ export function AdminLayout() {
   const signedIn = !!adminToken.get()
   const config = useQuery({ queryKey: ['admin-config'], queryFn: adminApi.config, enabled: signedIn })
   const dashboard = useQuery({ queryKey: ['admin-dashboard'], queryFn: () => adminApi.dashboard(), enabled: signedIn, refetchInterval: 30_000 })
+  const shopQueue = useQuery({
+    queryKey: ['admin-shops', 'badge'],
+    queryFn: () => shopAdminApi.list({ status: 'PENDING' }),
+    enabled: signedIn,
+    refetchInterval: 60_000,
+  })
 
   const staff = adminToken.session()
   if (!signedIn) {
@@ -197,6 +205,7 @@ export function AdminLayout() {
   const counts = {
     review: dashboard.data?.ordersByStatus.REVIEW_REQUIRED ?? 0,
     webhooks: dashboard.data?.webhooksAwaitingProcessing ?? 0,
+    sellers: shopQueue.data?.counts.PENDING ?? 0,
   }
 
   const toggle = () => {

@@ -17,32 +17,52 @@ import jakarta.persistence.LockModeType;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-	/** Store listing: active products in visible categories. */
-	@EntityGraph(attributePaths = "category")
+	// The store shows a product only when it is switched on, its category is shown, and its seller is approved
+	// (shop is null = sold by Sodo Gebeya itself). A pending, rejected or suspended shop's products stay hidden.
+
+	/** Store listing: active products in visible categories, from approved sellers; optionally one shop's. */
+	@EntityGraph(attributePaths = { "category", "shop" })
 	@Query("""
-			select p from Product p
+			select p from Product p left join p.shop s
 			where p.active = true and p.category.active = true
+			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
 			  and (:category is null or p.category.slug = :category)
+			  and (:shopId is null or s.id = :shopId)
 			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%')))
 			""")
-	Page<Product> search(@Param("category") String category, @Param("q") String q, Pageable pageable);
+	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
+			Pageable pageable);
 
-	/** Store product page: hidden products and products in hidden categories are not found. */
-	@EntityGraph(attributePaths = "category")
-	@Query("select p from Product p where p.slug = :slug and p.active = true and p.category.active = true")
+	/** Store product page: hidden products, hidden categories and unapproved sellers are not found. */
+	@EntityGraph(attributePaths = { "category", "shop" })
+	@Query("""
+			select p from Product p left join p.shop s
+			where p.slug = :slug and p.active = true and p.category.active = true
+			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			""")
 	Optional<Product> findVisibleBySlug(@Param("slug") String slug);
 
-	@EntityGraph(attributePaths = "category")
-	@Query("select p from Product p where p.featured = true and p.active = true and p.category.active = true order by p.id")
+	@EntityGraph(attributePaths = { "category", "shop" })
+	@Query("""
+			select p from Product p left join p.shop s
+			where p.featured = true and p.active = true and p.category.active = true
+			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			order by p.id
+			""")
 	List<Product> findFeaturedVisible();
 
-	/** Admin listing with status filter: active, hidden, low (low stock) or out (nothing available). */
-	@EntityGraph(attributePaths = "category")
+	/**
+	 * Admin and seller listing with status filter: active, hidden, low (low stock) or out (nothing available).
+	 * {@code shopId} limits it to one seller (sellers always pass their own); {@code houseOnly} to Sodo Gebeya's own.
+	 */
+	@EntityGraph(attributePaths = { "category", "shop" })
 	@Query("""
 			select p from Product p
 			where (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%'))
 			       or lower(p.slug) like lower(concat('%', cast(:q as string), '%')))
 			  and (:categoryId is null or p.category.id = :categoryId)
+			  and (:shopId is null or p.shop.id = :shopId)
+			  and (:houseOnly = false or p.shop is null)
 			  and (:status is null
 			       or (:status = 'active' and p.active = true)
 			       or (:status = 'hidden' and p.active = false)
@@ -50,10 +70,20 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			       or (:status = 'out' and p.stock - p.reserved <= 0))
 			""")
 	Page<Product> adminSearch(@Param("q") String q, @Param("categoryId") Long categoryId,
-			@Param("status") String status, Pageable pageable);
+			@Param("status") String status, @Param("shopId") Long shopId, @Param("houseOnly") boolean houseOnly,
+			Pageable pageable);
 
-	@EntityGraph(attributePaths = "category")
+	@EntityGraph(attributePaths = { "category", "shop" })
 	Optional<Product> findWithCategoryById(Long id);
+
+	/** For the seller dashboard: [products, shown in store, low stock, sold out]. */
+	@Query("""
+			select count(p), coalesce(sum(case when p.active = true then 1 else 0 end), 0),
+			    coalesce(sum(case when p.stock - p.reserved > 0 and p.stock - p.reserved <= p.lowStockThreshold then 1 else 0 end), 0),
+			    coalesce(sum(case when p.stock - p.reserved <= 0 then 1 else 0 end), 0)
+			from Product p where p.shop.id = :shopId
+			""")
+	List<Object[]> shopCounts(@Param("shopId") Long shopId);
 
 	boolean existsBySlug(String slug);
 

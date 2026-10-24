@@ -31,6 +31,9 @@ public class OrderItem {
 
 	private Long productId;
 
+	/** Seller of this line at checkout; null = Sodo Gebeya itself. */
+	private Long shopId;
+
 	private String productName;
 
 	private BigDecimal unitPrice;

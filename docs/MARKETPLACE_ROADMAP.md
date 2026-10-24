@@ -56,13 +56,20 @@ Result: green/amber palette and Plus Jakarta Sans + Noto Sans Ethiopic; new logo
 
 Result: `/login` and `/register` are phone-first (number → 6-digit code → name on the first sign-in), email and password still available. Ethiopian mobiles only (09/07). Codes: HMAC-stored, 5 minutes, 5 tries, one per minute and 5 per hour per phone, 20 per hour per network address. Only SMS-proven phones sign in; staff can't use the phone door; phone-only accounts have no password and their sign-in phone can't be edited away. SMS module: AfroMessage when `AFROMESSAGE_TOKEN` is set, otherwise test mode (logged, listed in Admin → SMS, code shown on screen only with `SMS_DEV_CODES_IN_RESPONSE=true` in sandbox). Admin → **SMS** log with provider status. Metrics `tenashop_sms_total`, `tenashop_auth_phone_total`. Tests: `PhoneSignInIntegrationTest` (7), `AfroMessageGatewayTest` (4). Language picker moved to M18 (full translations), so no half-working switch is shown.
 
-### M3. Sellers and shops (1.5 weeks)
+### M3. Sellers and shops (1.5 weeks) ✅ Done 2026-10-24
 - Account types: buyer, **shop**, **individual seller**, (later) pro
 - Shop page: logo, cover, description, location, rating; seller's own product list
 - Sellers manage **only their own** products and orders (reuse the existing catalog admin, scoped per seller)
 - Seller home on phone (**S17**) and web dashboard (**S20**), first version
 - Admin approves new shops
 - **Done when:** two different shops each list products and cannot see or edit each other's
+
+Result: any customer account opens one shop at **/sell** (a shop, or "just me" for an individual), with phone, area, address, about, logo and cover. New shops wait in Admin → **Sellers** (badge with the count); staff approve, reject with a reason (the seller fixes it and it comes back) or pause an open shop; the seller gets an SMS each time. Products of a shop show and can be bought only while it's approved (`Product.sellable()`; store queries, product page and checkout all check it). Existing products stay "sold by Sodo Gebeya" (`products.shop_id` null).
+- Seller area **/seller** (phone first, design S17): sales today and this month (their own lines only), to send / on the way / products shown / low stock, orders to pack, best sellers, "Add a product". Products use the admin's product editor limited to their own (no URL slug or Featured).
+- Seller orders: only **paid** orders with their items, and only their lines. They mark packing → on the way (with a rider note the buyer sees) → delivered; only Sodo Gebeya can cancel a paid order. An order that also holds other sellers' items stays with Sodo Gebeya until M5 splits orders: the seller sees just the first name and no phone or address.
+- Store: "Sold by" card on product pages, seller name on product cards, public shop page **/shops/{slug}** (no phone shown), "Sell" in the header and the phone menu; Admin → Products shows and filters by seller.
+- Isolation: every `/api/seller/**` call resolves the caller's own shop; another shop's product or order answers 404. Tests: `SellerIntegrationTest` (4: approval gating, two shops can't reach each other, seller orders and mixed orders, account rules), plus a browser walkthrough on a phone-size screen (open shop → add product with photo → approve → shop and product pages → pay → pack and send).
+- Still open: S20 desktop layout beyond the phone one, ratings (M12), payouts (M6), the real Sodo neighbourhood list (M4; the area field accepts any text and suggests four).
 
 ### M4. Verification and listings (1.5 weeks)
 - Verification flow (**S18**): ID front/back, selfie, shop or skill details; private storage, staff only

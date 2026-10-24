@@ -39,6 +39,7 @@ export function ProductCard({ product }: { product: Product }) {
         <Link to={`/product/${product.slug}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:underline">
           {product.name}
         </Link>
+        {product.seller && <p className="truncate text-xs text-muted-foreground">{product.seller.name}</p>}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <span className="text-base font-extrabold tabular-nums">{formatETB(product.price)}</span>
           <Button

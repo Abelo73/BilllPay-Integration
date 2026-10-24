@@ -16,7 +16,7 @@ import {
   Star,
   Trash2,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -29,7 +29,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { catalogApi, isAdmin, type ProductDetail, type ProductInput } from '@/lib/admin-api'
+import { catalogApi, isAdmin, type ChangeRow, type ProductDetail, type ProductInput } from '@/lib/admin-api'
+import type { Page } from '@/lib/api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StockBadge } from './products'
@@ -47,6 +48,40 @@ const ACTION_LABEL: Record<string, string> = {
   IMAGE_ADDED: 'Photo added',
   IMAGE_REMOVED: 'Photo removed',
   IMAGES_REORDERED: 'Photos reordered',
+}
+
+/** The calls the editor needs: the admin's catalogApi, or the seller's sellerCatalog (only their own products). */
+export type CatalogClient = {
+  product: (id: number) => Promise<ProductDetail>
+  create: (body: ProductInput) => Promise<ProductDetail>
+  update: (id: number, body: ProductInput) => Promise<ProductDetail>
+  setVisible: (id: number, active: boolean) => Promise<ProductDetail>
+  adjustStock: (id: number, delta: number, reason: string) => Promise<ProductDetail>
+  duplicate: (id: number) => Promise<ProductDetail>
+  changes: (id: number) => Promise<Page<ChangeRow>>
+  removeImage: (id: number, imageId: number) => Promise<ProductDetail>
+  reorderImages: (id: number, ids: number[]) => Promise<ProductDetail>
+  uploadImage: (id: number, file: File) => Promise<ProductDetail>
+  categories: () => Promise<{ id: number; name: string; active?: boolean }[]>
+}
+
+export type EditorConfig = {
+  client: CatalogClient
+  editable: boolean
+  /** List page; product pages live under it */
+  basePath: string
+  /** Prefix of the react-query keys, so admin and seller caches never mix */
+  keyPrefix: string
+  /** Seller mode: no URL slug or "featured" (Sodo Gebeya decides what's featured) */
+  seller?: boolean
+}
+
+const EditorContext = createContext<EditorConfig | null>(null)
+
+function useEditor() {
+  const cfg = useContext(EditorContext)
+  if (!cfg) throw new Error('ProductEditor config missing')
+  return cfg
 }
 
 type FormState = {
@@ -76,11 +111,11 @@ function initialForm(d?: ProductDetail): FormState {
 }
 
 function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d: ProductDetail) => void }) {
-  const editable = isAdmin()
+  const { editable, client, keyPrefix, seller } = useEditor()
   const isNew = !detail
   const [form, setForm] = useState<FormState>(() => initialForm(detail))
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const categories = useQuery({ queryKey: ['admin-categories'], queryFn: catalogApi.categories })
+  const categories = useQuery({ queryKey: [`${keyPrefix}-categories`], queryFn: client.categories })
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => setForm((f) => ({ ...f, [k]: v }))
 
   const save = useMutation({
@@ -96,7 +131,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
         active: form.active,
         ...(isNew ? { stock: Number(form.stock || 0) } : {}),
       }
-      return isNew ? catalogApi.create(body) : catalogApi.update(detail.product.id, body)
+      return isNew ? client.create(body) : client.update(detail.product.id, body)
     },
     onSuccess: onSaved,
     onError: (e) => {
@@ -130,18 +165,18 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
               <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} aria-invalid={!!errors.name} maxLength={200} />
               {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
             </div>
-            <div className="space-y-2">
+            {!seller && <div className="space-y-2">
               <Label htmlFor="slug">URL slug</Label>
               <Input id="slug" className="font-mono text-xs" placeholder="made from the name" value={form.slug} onChange={(e) => set('slug', e.target.value)} />
               <p className="text-xs text-muted-foreground">/product/{form.slug || '…'}</p>
-            </div>
+            </div>}
             <div className="space-y-2">
               <Label>Category</Label>
               <Select value={form.categoryId} onValueChange={(v) => set('categoryId', v)} disabled={!editable}>
                 <SelectTrigger className="w-full" aria-invalid={!!errors.categoryId}><SelectValue placeholder="Choose…" /></SelectTrigger>
                 <SelectContent>
                   {categories.data?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name}{!c.active && ' (hidden)'}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.active === false && ' (hidden)'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -174,13 +209,13 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
               </span>
               <Switch checked={form.active} onCheckedChange={(v) => set('active', v)} disabled={!editable} />
             </label>
-            <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
+            {!seller && <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <span>
                 <span className="block text-sm font-medium">Featured</span>
                 <span className="block text-xs text-muted-foreground">Shown on the home page</span>
               </span>
               <Switch checked={form.featured} onCheckedChange={(v) => set('featured', v)} disabled={!editable} />
-            </label>
+            </label>}
           </fieldset>
           {editable && (
             <div className="sm:col-span-2">
@@ -196,7 +231,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
 }
 
 function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: ProductDetail) => void }) {
-  const editable = isAdmin()
+  const { editable, client } = useEditor()
   const id = detail.product.id
   const input = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string | null>(null)
@@ -212,7 +247,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
       if (f.size > MAX_BYTES) { toast.error(`${f.name} is larger than 5 MB.`); continue }
       setUploading(`Uploading ${i + 1} of ${list.length}: ${f.name}`)
       try {
-        onChange(await catalogApi.uploadImage(id, f))
+        onChange(await client.uploadImage(id, f))
       } catch (e) {
         toast.error(`${f.name}: ${(e as Error).message}`)
       }
@@ -230,7 +265,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
     const next = [...order]
     const [x] = next.splice(from, 1)
     next.splice(to, 0, x)
-    run.mutate(() => catalogApi.reorderImages(id, next))
+    run.mutate(() => client.reorderImages(id, next))
   }
 
   return (
@@ -278,7 +313,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
                       size="icon-xs"
                       variant="destructive"
                       aria-label="Remove photo"
-                      onClick={() => confirm('Remove this photo?') && run.mutate(() => catalogApi.removeImage(id, img.id))}
+                      onClick={() => confirm('Remove this photo?') && run.mutate(() => client.removeImage(id, img.id))}
                     >
                       <Trash2 />
                     </Button>
@@ -327,12 +362,12 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
 }
 
 function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: ProductDetail) => void }) {
-  const editable = isAdmin()
+  const { editable, client } = useEditor()
   const p = detail.product
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('Restock')
   const adjust = useMutation({
-    mutationFn: (delta: number) => catalogApi.adjustStock(p.id, delta, reason),
+    mutationFn: (delta: number) => client.adjustStock(p.id, delta, reason),
     onSuccess: (d) => {
       onChange(d)
       setAmount('')
@@ -385,7 +420,8 @@ function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: Prod
 }
 
 function History({ id }: { id: number }) {
-  const { data } = useQuery({ queryKey: ['admin-product-changes', id], queryFn: () => catalogApi.changes(id) })
+  const { client, keyPrefix } = useEditor()
+  const { data } = useQuery({ queryKey: [`${keyPrefix}-product-changes`, id], queryFn: () => client.changes(id) })
   return (
     <Card>
       <CardHeader>
@@ -410,26 +446,40 @@ function History({ id }: { id: number }) {
 }
 
 export function AdminProductEditPage() {
+  return <ProductEditor client={catalogApi} editable={isAdmin()} basePath="/admin/products" keyPrefix="admin" />
+}
+
+/** The product page, for staff (any product) or a seller (their own, through sellerCatalog). */
+export function ProductEditor(config: EditorConfig) {
+  return (
+    <EditorContext.Provider value={config}>
+      <EditorPage />
+    </EditorContext.Provider>
+  )
+}
+
+function EditorPage() {
+  const { client, keyPrefix, basePath, editable, seller } = useEditor()
   const { productId = 'new' } = useParams()
   const isNew = productId === 'new'
   const id = Number(productId)
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ['admin-product', id], queryFn: () => catalogApi.product(id), enabled: !isNew })
+  const { data, isLoading } = useQuery({ queryKey: [`${keyPrefix}-product`, id], queryFn: () => client.product(id), enabled: !isNew })
 
   const refresh = (d: ProductDetail) => {
-    qc.setQueryData(['admin-product', d.product.id], d)
-    qc.invalidateQueries({ queryKey: ['admin-products'] })
-    qc.invalidateQueries({ queryKey: ['admin-product-changes', d.product.id] })
+    qc.setQueryData([`${keyPrefix}-product`, d.product.id], d)
+    qc.invalidateQueries({ queryKey: [`${keyPrefix}-products`] })
+    qc.invalidateQueries({ queryKey: [`${keyPrefix}-product-changes`, d.product.id] })
   }
   const toggle = useMutation({
-    mutationFn: () => catalogApi.setVisible(id, !data!.product.active),
+    mutationFn: () => client.setVisible(id, !data!.product.active),
     onSuccess: (d) => { refresh(d); toast.success(d.product.active ? 'Shown in the store' : 'Hidden from the store') },
     onError: (e) => toast.error(e.message),
   })
   const duplicate = useMutation({
-    mutationFn: () => catalogApi.duplicate(id),
-    onSuccess: (d) => { refresh(d); toast.success('Copy created (hidden, no stock)'); navigate(`/admin/products/${d.product.id}`) },
+    mutationFn: () => client.duplicate(id),
+    onSuccess: (d) => { refresh(d); toast.success('Copy created (hidden, no stock)'); navigate(`${basePath}/${d.product.id}`) },
     onError: (e) => toast.error(e.message),
   })
 
@@ -439,7 +489,7 @@ export function AdminProductEditPage() {
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
-        <Link to="/admin/products"><ChevronLeft /> Products</Link>
+        <Link to={basePath}><ChevronLeft /> Products</Link>
       </Button>
       <PageHeader
         title={isNew ? 'New product' : p!.name}
@@ -448,12 +498,12 @@ export function AdminProductEditPage() {
           !isNew && (
             <div className="flex flex-wrap items-center gap-2">
               <StockBadge p={p!} />
-              {p!.active && (
+              {p!.inStore && (
                 <Button asChild variant="outline" size="sm">
                   <a href={`/product/${p!.slug}`} target="_blank" rel="noreferrer"><ExternalLink /> View in store</a>
                 </Button>
               )}
-              {isAdmin() && (
+              {editable && (
                 <>
                   <Button variant="outline" size="sm" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy /> Duplicate</Button>
                   <Button variant="outline" size="sm" onClick={() => toggle.mutate()} disabled={toggle.isPending}>
@@ -465,6 +515,11 @@ export function AdminProductEditPage() {
           )
         }
       />
+      {seller && p && p.active && !p.inStore && (
+        <p className="rounded-lg bg-amber-soft p-3 text-sm text-amber-ink">
+          Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.
+        </p>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
           <DetailsForm
@@ -473,7 +528,7 @@ export function AdminProductEditPage() {
             onSaved={(d) => {
               refresh(d)
               toast.success(isNew ? 'Product created. Now add photos.' : 'Saved')
-              if (isNew) navigate(`/admin/products/${d.product.id}`, { replace: true })
+              if (isNew) navigate(`${basePath}/${d.product.id}`, { replace: true })
             }}
           />
           {data && <Photos detail={data} onChange={refresh} />}

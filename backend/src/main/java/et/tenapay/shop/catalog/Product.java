@@ -34,6 +34,11 @@ public class Product {
 	@JoinColumn(name = "category_id")
 	private Category category;
 
+	/** Who sells it; null = Sodo Gebeya itself. Shown in the store only while the shop is approved. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "shop_id")
+	private et.tenapay.shop.seller.Shop shop;
+
 	private String name;
 
 	private String slug;
@@ -67,6 +72,11 @@ public class Product {
 
 	@Version
 	private Integer version;
+
+	/** Shown and buyable: switched on, and its seller (if any) approved. */
+	public boolean sellable() {
+		return active && (shop == null || shop.getStatus().selling());
+	}
 
 	public int available() {
 		return stock - reserved;
