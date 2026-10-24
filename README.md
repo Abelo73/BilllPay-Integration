@@ -35,7 +35,7 @@ A small but realistic e-commerce app for integrating with and testing the **Bill
 | Kafka (from host) | `localhost:29492` |
 | Photo storage (SeaweedFS S3 API) | `localhost:9910` (bucket `tenashop-media`) |
 | Photo storage file browser | http://localhost:9911 |
-| Grafana (dashboards) | http://localhost:3300 (view without signing in; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
+| Grafana (dashboards) | http://localhost:8484 (view without signing in; `admin` / `GRAFANA_ADMIN_PASSWORD` to edit) |
 | Prometheus (metrics, alerts) | http://localhost:9390/alerts |
 | Emails (Mailpit test inbox) | http://localhost:8626 (SMTP on `localhost:2626`) |
 

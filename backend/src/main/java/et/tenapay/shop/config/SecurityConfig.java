@@ -57,6 +57,8 @@ public class SecurityConfig {
 						.requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "SUPPORT")
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/me/**").authenticated()
+						// buying needs a customer account (guests get 401, staff 403); tracking an order stays open
+						.requestMatchers(HttpMethod.POST, "/api/checkout").hasRole("CUSTOMER")
 						.requestMatchers("/api/**", "/actuator/health/**", "/actuator/info",
 								"/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
 						.anyRequest().denyAll())

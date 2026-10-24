@@ -139,8 +139,9 @@ public abstract class IntegrationTest {
 		return send(jsonRequest(path, body).POST(HttpRequest.BodyPublishers.ofString(toJson(body))), token);
 	}
 
+	/** Checkout needs a signed-in customer, so checkout calls without a token go in as a shared test shopper. */
 	protected Res post(String path, Object body) {
-		return post(path, body, null);
+		return post(path, body, "/api/checkout".equals(path) ? shopperToken() : null);
 	}
 
 	protected Res put(String path, Object body, String token) {
@@ -223,6 +224,22 @@ public abstract class IntegrationTest {
 
 	protected String adminToken() {
 		return login("/api/admin/auth/login", ADMIN_EMAIL, ADMIN_PASSWORD);
+	}
+
+	private static String shopperToken;
+
+	/** A customer account shared by tests that just need to buy something. */
+	protected synchronized String shopperToken() {
+		if (shopperToken == null) {
+			String email = unique("shopper") + "@it.test";
+			Res r = post("/api/auth/register", Map.of("fullName", "Test Buyer", "email", email, "phone", "0911223344",
+					"password", "Shopper-pass-2026"));
+			if (r.status() != 200) {
+				throw new AssertionError("shopper sign-up failed: " + r.status() + " " + r.raw());
+			}
+			shopperToken = r.body().path("token").asString();
+		}
+		return shopperToken;
 	}
 
 	protected String login(String path, String email, String password) {

@@ -35,6 +35,16 @@ class AccountsAndRolesIntegrationTest extends IntegrationTest {
 	}
 
 	@Test
+	void onlySignedInCustomersCanCheckOut() {
+		String admin = adminToken();
+		long productId = createProduct(admin, new java.math.BigDecimal("100.00"), 5);
+		String body = toJson(checkoutBody(productId, 1, "0911223344"));
+		assertThat(postRaw("/api/checkout", body, Map.of()).status()).as("guest").isEqualTo(401);
+		assertThat(post("/api/checkout", checkoutBody(productId, 1, "0911223344"), admin).status()).as("staff")
+				.isEqualTo(403);
+	}
+
+	@Test
 	void customerCanSignUpAndInButNeverReachAdmin() {
 		String email = unique("buyer").toLowerCase() + "@it.test";
 		String token = register(email);

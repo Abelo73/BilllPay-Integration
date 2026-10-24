@@ -7,11 +7,13 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatETB } from '@/lib/format'
 import { cartTotals, useCart } from '@/store/cart'
+import { useSession } from '@/store/session'
 
 export function CartSheet() {
   const { lines, open, setOpen, setQuantity, remove } = useCart()
   const { count, subtotal } = cartTotals(lines)
   const navigate = useNavigate()
+  const signedIn = useSession((s) => !!s.session)
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -66,15 +68,17 @@ export function CartSheet() {
               <span>Subtotal</span>
               <span>{formatETB(subtotal)}</span>
             </div>
-            <p className="text-xs text-muted-foreground">Final amount is confirmed at checkout.</p>
+            <p className="text-xs text-muted-foreground">
+              Final amount is confirmed at checkout.{!signedIn && ' You’ll sign in first; your cart is kept.'}
+            </p>
             <Button
               size="lg"
               onClick={() => {
                 setOpen(false)
-                navigate('/checkout')
+                navigate(signedIn ? '/checkout' : '/login?next=/checkout')
               }}
             >
-              Checkout
+              {signedIn ? 'Checkout' : 'Sign in to check out'}
             </Button>
           </SheetFooter>
         )}

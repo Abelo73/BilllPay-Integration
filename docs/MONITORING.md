@@ -4,7 +4,7 @@
 
 | What | Where |
 |------|-------|
-| Dashboards | http://localhost:3300 → *Dashboards → TenaShop* (no sign-in needed to view) |
+| Dashboards | http://localhost:8484 → *Dashboards → TenaShop* (no sign-in needed to view) |
 | Alerts | http://localhost:9390/alerts, also listed in Grafana → *Alerting* |
 | Raw metrics | `curl http://localhost:8181/actuator/prometheus` (only from this machine) |
 
