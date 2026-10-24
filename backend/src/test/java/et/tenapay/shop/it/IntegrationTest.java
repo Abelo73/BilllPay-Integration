@@ -59,6 +59,8 @@ import tools.jackson.databind.ObjectMapper;
 		"app.scheduling.enabled=false",
 		// SMS stays in test mode (no AfroMessage token); sign-in codes come back in the response so tests can use them
 		"sms.dev-codes-in-response=true",
+		// the SMS listener group joins after the first events are published; read from the start so none is missed
+		"sms.kafka-offset-reset=earliest",
 		"app.delivery.flat-fee=150",
 		"app.delivery.free-over=3000",
 		// no S3 in tests (InMemoryMediaStorage below); point the real client at a closed port so it fails fast

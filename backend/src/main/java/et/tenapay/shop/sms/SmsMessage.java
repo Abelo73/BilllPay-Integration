@@ -22,7 +22,8 @@ import lombok.Setter;
 @NoArgsConstructor
 public class SmsMessage {
 
-	public enum Status { SENT, FAILED, LOGGED }
+	/** SENDING: claimed by one Kafka delivery, provider call in flight. */
+	public enum Status { SENDING, SENT, FAILED, LOGGED }
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,6 +45,9 @@ public class SmsMessage {
 	private String error;
 
 	private String orderNumber;
+
+	/** One per event (e.g. "PAID:TS-...:2026-10-24T10:00:00Z"); null for messages that may repeat, like codes. */
+	private String dedupeKey;
 
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();

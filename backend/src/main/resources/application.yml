@@ -110,6 +110,8 @@ sms:
   timeout: ${SMS_TIMEOUT:PT10S}
   # local development only: show sign-in codes on screen in test mode (never with a real provider or BillPay live)
   dev-codes-in-response: ${SMS_DEV_CODES_IN_RESPONSE:false}
+  # order updates by SMS: finish-paying reminder, payment received, on the way, delivered
+  order-updates: ${SMS_ORDER_UPDATES:true}
   afromessage:
     base-url: ${AFROMESSAGE_BASE_URL:https://api.afromessage.com}
     token: ${AFROMESSAGE_TOKEN:}

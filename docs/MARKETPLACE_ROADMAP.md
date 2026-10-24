@@ -128,6 +128,8 @@ All of these must be true:
 - Each user picks what they get
 - **Done when:** each key event reaches the right person once, by the right channel
 
+🟡 Part done 2026-10-24 (built alongside M3): **order SMS**: finish-paying reminder, payment received, on the way (with the rider note), delivered. Each fits one 160-character plain-text SMS, goes only to Ethiopian mobiles, and is sent once per event (unique key, V16). Events older than 30 minutes are skipped, and a new SMS listener starts from the newest event, so switching SMS on never texts about old orders. Off with `SMS_ORDER_UPDATES=false`; in test mode they show in Admin → SMS as "logged". Test: `SmsOrderUpdatesIntegrationTest`. Still to do: in-app notifications (S15), per-user choices, "new quote" (needs M14), checkout email optional.
+
 ### M12. Reviews and ratings (1 week)
 - Review only after a completed order or job; star rating plus text; seller can reply once
 - Ratings on shop, product and pro pages; response time shown
@@ -173,6 +175,8 @@ All of these must be true:
 - Full Amharic translation; Wolaytta with a native speaker; language remembered per user; SMS in the user's language
 ### M19. Installable app (PWA) (1 week)
 - Add to home screen, works on slow connections, offline pages, push notifications on Android
+
+🟡 Mostly done 2026-10-24: web app manifest (name, green theme, shortcuts to Shop and My orders), PNG icons incl. maskable and Apple touch icon, service worker (`public/sw.js`, production builds only): pages network-first with an offline page, built files cache-first, images refreshed in the background, `/api` never cached. "Get the Sodo Gebeya app" banner in the footer when the browser offers install; nginx serves `sw.js` and the manifest uncached. Still to do: push notifications (needs a push service and M11 in-app notifications).
 ### M20. Telegram bot (1 week)
 - Order and chat alerts in Telegram; browse new listings; channel auto-posts
 

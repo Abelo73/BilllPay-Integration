@@ -16,7 +16,7 @@ import tools.jackson.databind.ObjectMapper;
 public class SmsService {
 
 	/** What a message is for; stored with it and used for metrics. */
-	public enum Kind { SIGN_IN_CODE, ORDER, PAYMENT, DELIVERY, JOB, CHAT, OTHER }
+	public enum Kind { SIGN_IN_CODE, ORDER, PAYMENT, DELIVERY, JOB, CHAT, SHOP, OTHER }
 
 	public record Sent(boolean ok, String status, String error) {
 	}
@@ -72,6 +72,34 @@ public class SmsService {
 		m.setBody(stored.length() > 480 ? stored.substring(0, 480) : stored);
 		m.setProvider(gateway.name());
 		m.setOrderNumber(orderNumber);
+		return finish(m, result);
+	}
+
+	/**
+	 * Sends at most once per {@code dedupeKey}: the row is claimed (unique key) before the provider is called, so a
+	 * re-delivered Kafka event, even one arriving at the same moment, sends nothing. Returns null when already handled.
+	 */
+	public Sent sendOnce(Kind kind, String to, String text, String orderNumber, String dedupeKey) {
+		SmsMessage m = new SmsMessage();
+		m.setKind(kind.name());
+		m.setRecipient(to);
+		m.setBody(text.length() > 480 ? text.substring(0, 480) : text);
+		m.setProvider(gateway.name());
+		m.setOrderNumber(orderNumber);
+		m.setDedupeKey(dedupeKey);
+		m.setStatus(SmsMessage.Status.SENDING);
+		try {
+			m = messages.saveAndFlush(m);
+		} catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
+			log.debug("SMS {} already handled", dedupeKey);
+			return null;
+		}
+		return finish(m, gateway.send(to, text));
+	}
+
+	private Sent finish(SmsMessage m, SmsGateway.Result result) {
+		String to = m.getRecipient();
+		Kind kind = Kind.valueOf(m.getKind());
 		m.setProviderRef(result.providerRef());
 		m.setError(result.error());
 		m.setStatus(!result.sent() ? SmsMessage.Status.FAILED

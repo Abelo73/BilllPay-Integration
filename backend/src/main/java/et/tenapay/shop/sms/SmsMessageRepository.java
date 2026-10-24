@@ -8,6 +8,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface SmsMessageRepository extends JpaRepository<SmsMessage, Long> {
 
+	java.util.List<SmsMessage> findByOrderNumberOrderByCreatedAtAsc(String orderNumber);
+
 	@Query("""
 			select m from SmsMessage m
 			where (:status is null or m.status = :status)

@@ -13,6 +13,12 @@
     </script>
     <meta name="description" content="Sodo Gebeya: the online market for Wolaita Sodo. Shops and people selling clothes, phones, furniture and more, with BillPay checkout and local delivery." />
     <meta name="theme-color" content="#146C43" />
+    <!-- installable app (PWA): manifest + icons; the service worker is registered in main.tsx (production builds only) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Sodo Gebeya" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <div id="root"></div>
