@@ -123,8 +123,15 @@ start_backend() {
   fi
   use_java21 || { bad "Java 21 missing"; return; }
   launch backend "$ROOT/backend" ./mvnw -q spring-boot:run
-  if wait_for "backend (first start compiles, up to 3 min)" 240 backend_up "$RUN/backend.log"; then ok "started" "log: .run/backend.log"
-  else bad "did not start"; grep -E 'Caused by|APPLICATION FAILED|ERROR' "$RUN/backend.log" | tail -3 | sed 's/^/      /'; fi
+  # On /mnt/c (Windows files) compile + startup can take 4-6 min, so wait up to 8.
+  if wait_for "backend (compiles first; slow on /mnt/c, up to 8 min)" 480 backend_up "$RUN/backend.log"; then ok "started" "log: .run/backend.log"
+  elif grep -qE 'APPLICATION FAILED|Application run failed|BUILD FAILURE|COMPILATION ERROR' "$RUN/backend.log"; then
+    bad "did not start" "log: .run/backend.log"
+    grep -E 'Caused by|APPLICATION FAILED|ERROR' "$RUN/backend.log" | tail -3 | sed 's/^/      /'
+  else
+    bad "still starting" "no error in .run/backend.log yet"
+    fix "give it a minute, then: scripts/dev.sh check"
+  fi
 }
 
 start_frontend() {

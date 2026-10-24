@@ -13,6 +13,7 @@ import { AdminPaymentsPage } from './payments'
 import { AdminProductEditPage } from './product-edit'
 import { AdminProductsPage } from './products'
 import { AdminRefundsPage } from './refunds'
+import { AdminReportsPage } from './reports'
 import { AdminSetupPage } from './setup'
 import { AdminUsersPage } from './users'
 import { AdminWebhooksPage } from './webhooks'
@@ -32,6 +33,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },
       { path: 'emails', element: <AdminEmailsPage /> },
+      { path: 'reports', element: <AdminReportsPage /> },
       { path: 'setup', element: <AdminSetupPage /> },
       { path: 'users', element: <AdminUsersPage /> },
       { path: 'login-history', element: <AdminLoginHistoryPage /> },

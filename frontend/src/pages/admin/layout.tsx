@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeftRight,
+  BarChart3,
   ExternalLink,
   FlaskConical,
   FolderTree,
@@ -31,6 +32,7 @@ const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/admin/orders', label: 'Orders', icon: Package },
   { to: '/admin/payments', label: 'Payments', icon: ArrowLeftRight },
+  { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { to: '/admin/products', label: 'Products', icon: ShoppingBag },
   { to: '/admin/categories', label: 'Categories', icon: FolderTree },
   { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook },

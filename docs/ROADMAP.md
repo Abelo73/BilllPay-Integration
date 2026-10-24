@@ -82,7 +82,8 @@ Result: emails for order placed, payment confirmed, payment failed (with the rea
 - Wishlist for signed-in customers
 - Discount codes (percentage / fixed, expiry, usage limit) applied before BillPay
 
-### P6. Reports
+### P6. Reports ✅ Done (2026-10-24)
+Admin → **Reports**: revenue, paid orders, average order, payment success, refunds; revenue per day; top products; success by payment method; failure reasons; Orders CSV and Payments CSV (formula-safe, UTF-8 for Excel). Tested end to end (`ReportsIntegrationTest`) and on the real dev data.
 - Sales by day/week, top products, payment success rate by method, failure reasons
 - CSV export of orders and payments (for BillPay settlement reconciliation)
 

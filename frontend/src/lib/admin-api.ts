@@ -233,6 +233,19 @@ export const adminApi = {
       body: JSON.stringify(body),
     }),
   retryRefund: (id: string) => request<Refund>(`/refunds/${id}/retry`, { method: 'POST' }),
+  report: (days: number) => request<Report>(`/reports?days=${days}`),
+  /** Downloads a CSV export with the staff token (a plain link can't send the Authorization header). */
+  downloadCsv: async (kind: 'orders' | 'payments', days: number) => {
+    const res = await fetch(`/api/admin/reports/${kind}.csv?days=${days}`, {
+      headers: adminToken.get() ? { Authorization: `Bearer ${adminToken.get()}` } : {},
+    })
+    if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
+    const name = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `tenashop-${kind}.csv`
+    const url = URL.createObjectURL(await res.blob())
+    const a = Object.assign(document.createElement('a'), { href: url, download: name })
+    a.click()
+    URL.revokeObjectURL(url)
+  },
   notifications: (p: { page?: number }) =>
     request<{ page: Page<NotificationRow>; mailboxUrl: string | null }>(`/notifications?${qs(p)}`),
 
@@ -391,4 +404,14 @@ export const EMAIL_KIND_LABEL: Record<string, string> = {
   EXPIRED: 'Expired',
   REFUNDED: 'Refunded',
   PASSWORD_CHANGED: 'Password changed',
+}
+
+export type Report = {
+  from: string
+  to: string
+  totals: { revenue: number; paidOrders: number; orders: number; averageOrder: number; paymentSuccessRate: number; refunded: number }
+  salesByDay: { day: string; orders: number; paidOrders: number; revenue: number }[]
+  topProducts: { productId: number; name: string; quantity: number; revenue: number }[]
+  byMethod: { method: string; finished: number; succeeded: number; successRate: number }[]
+  failureReasons: { reason: string; count: number }[]
 }
