@@ -56,8 +56,10 @@ public class CheckoutService {
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
 		}
+		// Read without locking; stock is reserved at the very end with one conditional update per product, so the
+		// product rows are locked only for the last moments of the transaction (see ProductRepository).
 		Map<Long, Product> byId = new LinkedHashMap<>();
-		products.lockAllById(qtyByProduct.keySet()).forEach(p -> byId.put(p.getId(), p));
+		products.findAllById(qtyByProduct.keySet()).forEach(p -> byId.put(p.getId(), p));
 
 		List<Map<String, Object>> problems = new ArrayList<>();
 		qtyByProduct.forEach((id, qty) -> {
@@ -87,7 +89,6 @@ public class CheckoutService {
 		for (Map.Entry<Long, Integer> e : qtyByProduct.entrySet()) {
 			Product p = byId.get(e.getKey());
 			int qty = e.getValue();
-			p.reserve(qty);
 			OrderItem item = new OrderItem();
 			item.setProductId(p.getId());
 			item.setProductName(p.getName());
@@ -125,6 +126,19 @@ public class CheckoutService {
 				+ (discount.signum() > 0 ? " - " + discount + " (" + order.getDiscountCode() + ")" : "")
 				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
 		publisher.publish(order, "order.placed", Map.of());
+
+		// Last step: reserve the stock. Ascending ids so two checkouts never wait on each other in a circle.
+		// Someone may have bought the last units since we read them; then nothing is kept (the whole order rolls back).
+		List<Map<String, Object>> soldOut = new ArrayList<>();
+		for (Long id : new java.util.TreeSet<>(qtyByProduct.keySet())) {
+			if (products.reserveIfAvailable(id, qtyByProduct.get(id)) == 0) {
+				soldOut.add(Map.of("productId", id, "problem", "INSUFFICIENT_STOCK"));
+			}
+		}
+		if (!soldOut.isEmpty()) {
+			throw new ApiException(HttpStatus.CONFLICT, "CART_INVALID", "Some items in your cart just sold out.",
+					Map.of("items", soldOut));
+		}
 		return order;
 	}
 

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -63,4 +64,35 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from Product p where p.id in :ids order by p.id")
 	List<Product> lockAllById(@Param("ids") Collection<Long> ids);
+
+	// Stock changes as single statements: the row is locked only from this statement to the commit, instead of for
+	// the whole transaction. Under load, shoppers buying the same product waited seconds for each other with
+	// SELECT ... FOR UPDATE at the start of checkout (docs/PERFORMANCE.md). Callers run them in product-id order.
+
+	/** Reserves qty if that much is still available; returns 0 (nothing changed) when it isn't. */
+	@Modifying(flushAutomatically = true)
+	@Query("""
+			update Product p set p.reserved = p.reserved + :qty, p.version = p.version + 1
+			where p.id = :id and p.active = true and p.stock - p.reserved >= :qty
+			""")
+	int reserveIfAvailable(@Param("id") Long id, @Param("qty") int qty);
+
+	/** Gives a reservation back (unpaid order cancelled or expired). */
+	@Modifying(flushAutomatically = true)
+	@Query("""
+			update Product p set p.reserved = case when p.reserved >= :qty then p.reserved - :qty else 0 end,
+			    p.version = p.version + 1
+			where p.id = :id
+			""")
+	int releaseReserved(@Param("id") Long id, @Param("qty") int qty);
+
+	/** Turns a reservation into a sale (order paid). */
+	@Modifying(flushAutomatically = true)
+	@Query("""
+			update Product p set p.reserved = case when p.reserved >= :qty then p.reserved - :qty else 0 end,
+			    p.stock = case when p.stock >= :qty then p.stock - :qty else 0 end,
+			    p.version = p.version + 1
+			where p.id = :id
+			""")
+	int commitReserved(@Param("id") Long id, @Param("qty") int qty);
 }

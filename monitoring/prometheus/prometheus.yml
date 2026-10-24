@@ -50,6 +50,20 @@ scrape_configs:
       - target_label: __address__
         replacement: host.docker.internal:9395   # the blackbox exporter on the host network
 
+  # The load-test copy of the shop (scripts/dev.sh perf). Its metrics get a perf_ prefix so load tests (which send
+  # forged webhooks and cause errors on purpose) never trip the real alerts or show on the normal dashboards.
+  # Shown on the "Load tests" dashboard. Down (no samples) whenever the test environment isn't running.
+  - job_name: tenashop-perf
+    metrics_path: /actuator/prometheus
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['perf-backend:8282']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: (.+)
+        target_label: __name__
+        replacement: perf_$1
+
   - job_name: alertmanager
     static_configs:
       - targets: ['alertmanager:9093']

@@ -92,8 +92,9 @@ export function buy(customer, products) {
   const hook = payViaWebhook(orderNumber, total)
   check(hook, { 'webhook accepted': (x) => x.status === 200 })
 
-  for (let i = 0; i < 40; i++) {
-    sleep(0.25)
+  // the real order page checks every 3 s; checking every 1 s keeps the test a bit stricter without flooding the shop
+  for (let i = 0; i < 15; i++) {
+    sleep(1)
     const s = http.get(`${BASE}/api/orders/${orderNumber}/status`, { ...auth(customer.token), tags: { name: 'order status' } })
     if (s.status === 200 && s.json('status') === 'PAID') {
       timeToPaid.add(Date.now() - started)
@@ -101,7 +102,7 @@ export function buy(customer, products) {
       return true
     }
   }
-  check(null, { 'order paid within 10 s': () => false })
+  check(null, { 'order paid within 15 s': () => false })
   return false
 }
 
@@ -131,5 +132,60 @@ export function publicProducts() {
 export function handleSummary(data) {
   const out = {}
   if (__ENV.SUMMARY_PATH) out[__ENV.SUMMARY_PATH] = JSON.stringify(data)
+  return out
+}
+
+/** A BillPay webhook body plus its signature header (wrong secret = a forged delivery). */
+export function webhookRequest(ref, amount, { secret = WEBHOOK_SECRET, paymentId = `perf-${ref}` } = {}) {
+  const body = JSON.stringify({
+    eventId: paymentId,
+    eventType: 'PaymentCaptured',
+    occurredAt: new Date().toISOString(),
+    data: { paymentId, merchantReference: ref, amount, currency: 'ETB', instrument: 'TEST_WALLET' },
+  })
+  const t = Math.floor(Date.now() / 1000)
+  const sig = crypto.hmac('sha256', secret, `${t}.${body}`, 'hex')
+  return { body, headers: { ...JSON_HEADERS, 'X-Billpay-Signature': `t=${t},v1=${sig}`, 'X-Billpay-Event': 'PaymentCaptured' } }
+}
+
+/** Signs up n customers, 20 at a time. */
+export function signUpMany(n) {
+  const out = []
+  for (let start = 0; start < n; start += 20) {
+    const batch = []
+    for (let i = start; i < Math.min(n, start + 20); i++) {
+      const phone = '09' + String(10000000 + ((i * 7919 + Date.now()) % 89999999))
+      batch.push({ phone, req: ['POST', `${BASE}/api/auth/register`, JSON.stringify({
+        fullName: `Perf Shopper ${i}`, email: `perf-bulk-${i}-${Date.now()}@perf.local`, phone, password: 'Perf-shopper-2026',
+      }), { headers: JSON_HEADERS, tags: { name: 'sign-up' } }] })
+    }
+    http.batch(batch.map((b) => b.req)).forEach((r, k) => {
+      if (r.status === 200) out.push({ token: r.json('token'), phone: batch[k].phone })
+    })
+  }
+  if (out.length < n) fail(`only ${out.length} of ${n} test customers could sign up`)
+  return out
+}
+
+/** Places n unpaid orders (10 at a time) and returns [{orderNumber, total}]. */
+export function placeOrders(customer, products, n) {
+  const out = []
+  for (let start = 0; start < n; start += 10) {
+    const reqs = []
+    for (let i = start; i < Math.min(n, start + 10); i++) {
+      const p = products[i % products.length]
+      reqs.push(['POST', `${BASE}/api/checkout`, JSON.stringify({
+        items: [{ productId: p.id, quantity: 1 }],
+        customer: { name: 'Perf Shopper', phone: customer.phone, email: 'perf-setup@perf.local' },
+        delivery: { address: 'Bole, load test lane 1', city: 'Addis Ababa' },
+      }), { ...auth(customer.token), tags: { name: 'checkout' } }])
+    }
+    for (const r of http.batch(reqs)) {
+      if (r.status !== 200) continue
+      const orderNumber = r.json('orderNumber')
+      const s = http.get(`${BASE}/api/orders/${orderNumber}/status`, auth(customer.token))
+      out.push({ orderNumber, total: s.json('total') })
+    }
+  }
   return out
 }

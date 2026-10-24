@@ -35,6 +35,10 @@ Numbers from a laptop under WSL are for finding bottlenecks and comparing before
 | Smoke | 1 shopper browses and buys | 0 errors, at least one order paid |
 | Browsing | Shoppers load home, categories, product lists, products, search (with think time) | 95% < 300 ms, < 1% errors |
 | Checkout | Shoppers sign up, check out (fake BillPay 0.3–0.8 s), get a signed `PaymentCaptured` webhook, wait for PAID | checkout 95% < 1.5 s, webhook 95% < 200 ms, paid within 5 s (95%), < 1% errors |
+| Webhook storm | Users = webhooks per second: 60% genuine, 20% repeats, 10% forged, 10% unknown payments | webhook 95% < 200 ms; afterwards every order PAID exactly once |
+| Last-item rush | Users = shoppers, each with an account, buying the last 10 units at the same moment | exactly 10 sold, everyone else a clean "sold out", no errors |
+| BillPay slow | Fake BillPay takes 8 s per new payment; shoppers browse while a quarter of them check out | browsing 95% < 500 ms; checkout still succeeds within 11 s |
+| BillPay down | Fake BillPay answers 503; same mix | browsing 95% < 500 ms; checkout answers "try again" (502, order kept) within 2 s |
 
 ## Results
 
@@ -60,7 +64,25 @@ Numbers from a laptop under WSL are for finding bottlenecks and comparing before
 | Webhook → paid, worst | 21.5 s | 5.3 s |
 | Checkout, worst | 11 s | 3.7 s |
 
-Still slightly over target. **Next (fix 2):** take the product row locks at the very end of the checkout transaction (one conditional `UPDATE … WHERE stock - reserved >= qty` per product) instead of `SELECT … FOR UPDATE` at the start, so shoppers buying the same products wait for each other for milliseconds instead of the whole transaction.
+Still slightly over target after fix 1.
 
 ### Admin page check
 Browsing, 20 users, 30 s, started from Admin → Load tests in a browser: live numbers updated every 2 s, run passed (95% within 21 ms, 0 errors), result saved in Past runs, k6 report opened.
+
+### 2026-10-24: fix 2, row locks only at the end of checkout
+
+Checkout read the products with `SELECT … FOR UPDATE` at the start and held those row locks for the whole transaction. Now it reads them without locking and reserves stock as the last step, with one conditional statement per product (`UPDATE products SET reserved = reserved + :qty WHERE id = :id AND stock - reserved >= :qty`, in product-id order so two checkouts never wait on each other in a circle). If someone bought the last units in between, nothing is kept and the shopper gets "sold out". Selling and releasing stock use single statements the same way. `StockRushIntegrationTest` proves it: 20 shoppers for 5 units sell exactly 5; orders for the same products in opposite order all go through.
+
+| Checkout, 20 users, 60 s | Start | Fix 1 | Fix 2 |
+|---|---:|---:|---:|
+| Orders paid | 162 | 253 | 321 |
+| Pay → "paid", 95% | 21 s | 5.9 s | 4.1 s (target met) |
+| Checkout, worst | 11 s | 3.7 s | 2.9 s |
+
+At that point the test shop used 100% of its 2 CPUs and all 10 database connections. Part of that load was the test itself: it checked the order status every 0.25 s while waiting for "paid", where the real order page checks every 3 s. The test now checks every 1 s (still stricter than real shoppers). With that, **checkout passed every target**: 561 orders paid in the minute, 95% of requests within 0.78 s, paid within 1.2 s (95%), 0 errors. (Not directly comparable to the columns above because the polling changed.)
+
+### Watching a run in Grafana
+**TenaShop · Load tests** dashboard (link on the running test): k6's numbers (users, requests/s, 95% response time per request type, errors, orders paid, time to paid) next to the test shop's CPU, heap, database pool, slowest endpoints, webhook delay, Kafka lag and fake-BillPay call times. The test shop is scraped with a `perf_` metric prefix, so load tests (which send forged webhooks and cause errors on purpose) never trigger the real alerts.
+
+### Not run yet
+Webhook storm, last-item rush, BillPay slow and BillPay down are built but haven't completed a run: during the webhook storm WSL's disk went read-only (same ext4 error as on 2026-10-23), which stopped Docker. They run as soon as WSL is repaired.

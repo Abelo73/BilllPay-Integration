@@ -14,7 +14,7 @@ import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { EmptyRow, PageHeader } from './shared'
 
-const GRAFANA = 'http://localhost:8484/d/tenashop-app'
+const GRAFANA = 'http://localhost:8484/d/tenashop-load-tests'
 
 const ms = (v: number | null | undefined) => (v == null ? '—' : v >= 1000 ? `${(v / 1000).toFixed(2)} s` : `${Math.round(v)} ms`)
 const pct = (v: number | null | undefined, digits = 1) => (v == null ? '—' : `${(v * 100).toFixed(digits)}%`)
@@ -128,8 +128,8 @@ function LivePanel({ run }: { run: NonNullable<LoadStatus['current']> }) {
           {isCheckout && <Tile label="Orders paid" value={num(live?.checkoutsPaid)} hint={`paid within ${ms(live?.timeToPaidP95)} (95%)`} />}
         </div>
         <LiveChart points={run.timeline} />
-        <a href={GRAFANA} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
-          <ExternalLink className="size-3.5" /> Watch the shop's CPU, memory and database in Grafana
+        <a href={`${GRAFANA}?var-testid=${encodeURIComponent(run.id)}&from=now-15m&to=now&refresh=5s`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
+          <ExternalLink className="size-3.5" /> Watch this run and the test shop's CPU, memory and database in Grafana
         </a>
       </CardContent>
     </Card>

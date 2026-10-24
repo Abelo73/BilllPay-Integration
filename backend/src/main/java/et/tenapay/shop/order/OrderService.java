@@ -1,12 +1,10 @@
 package et.tenapay.shop.order;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
-import et.tenapay.shop.catalog.Product;
 import et.tenapay.shop.catalog.ProductRepository;
 import et.tenapay.shop.events.OrderEventPublisher;
 import lombok.RequiredArgsConstructor;
@@ -45,19 +43,19 @@ public class OrderService {
 	/** An unpaid order ended (cancelled or expired): its stock and discount-code use go back. */
 	public void releaseReservations(Order order) {
 		discounts.release(order.getDiscountCode());
-		forEachLockedProduct(order, (product, qty) -> product.releaseReservation(qty));
+		forEachProduct(order, products::releaseReserved);
 	}
 
 	public void commitStock(Order order) {
-		forEachLockedProduct(order, (product, qty) -> product.commitReservation(qty));
+		forEachProduct(order, products::commitReserved);
 	}
 
-	private void forEachLockedProduct(Order order, java.util.function.ObjIntConsumer<Product> action) {
-		List<Long> ids = order.getItems().stream().map(OrderItem::getProductId).toList();
-		Map<Long, Product> byId = new HashMap<>();
-		products.lockAllById(ids).forEach(p -> byId.put(p.getId(), p));
+	/** One single-statement stock update per product, in ascending id order (no lock waits in a circle). */
+	private void forEachProduct(Order order, java.util.function.ToIntBiFunction<Long, Integer> update) {
+		Map<Long, Integer> qty = new java.util.TreeMap<>();
 		for (OrderItem item : order.getItems()) {
-			action.accept(byId.get(item.getProductId()), item.getQuantity());
+			qty.merge(item.getProductId(), item.getQuantity(), Integer::sum);
 		}
+		qty.forEach(update::applyAsInt);
 	}
 }

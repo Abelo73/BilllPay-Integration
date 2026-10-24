@@ -47,6 +47,22 @@ public final class BillPayFake {
 						now.plus(30, ChronoUnit.MINUTES), now))));
 	}
 
+	/** Like {@link #acceptsPayments} but every payment gets its own id ("pay-<merchantReference>"), for many orders. */
+	public static void acceptsEveryPayment(WireMockServer billPay) {
+		billPay.stubFor(post(urlEqualTo(CREATE_PATH)).willReturn(aResponse()
+				.withStatus(201)
+				.withHeader("Content-Type", "application/json")
+				.withTransformers("response-template")
+				.withBody("""
+						{"statusCode":201,"message":"Payment created successfully","body":{
+						 "id":"pay-{{jsonPath request.body '$.merchantReference'}}",
+						 "merchantReference":"{{jsonPath request.body '$.merchantReference'}}","status":"CREATED",
+						 "amount":{"amount":{{jsonPath request.body '$.amount'}},"currency":"ETB"},
+						 "checkoutUrl":"https://sandbox.checkout.billpay.et/checkout/pay-{{jsonPath request.body '$.merchantReference'}}",
+						 "expiresAt":"%s","attempts":[]}}
+						""".formatted(Instant.now().plus(30, ChronoUnit.MINUTES)))));
+	}
+
 	/** POST create → given HTTP status (e.g. 503 while BillPay is down). */
 	public static void createFails(WireMockServer billPay, int status) {
 		billPay.stubFor(post(urlEqualTo(CREATE_PATH)).willReturn(aResponse().withStatus(status)
