@@ -486,3 +486,86 @@ export type DiscountInput = {
   expiresAt?: string
   usageLimit?: number
 }
+
+export type LoadTestDef = {
+  id: string
+  title: string
+  description: string
+  vus: { default: number; min: number; max: number }
+  duration: { default: number; min: number; max: number }
+  targets?: string[]
+}
+
+export type LoadLive = {
+  t: string
+  vus: number
+  requests: number
+  rps: number
+  p95: number | null
+  avg: number | null
+  errorRate: number
+  checks: number | null
+  checkoutsPaid: number | null
+  timeToPaidP95: number | null
+}
+
+export type LoadRunResult = {
+  requests: number | null
+  rps: number | null
+  p95: number | null
+  avg: number | null
+  max: number | null
+  errorRate: number | null
+  checks: number | null
+  checkoutsPaid: number | null
+  timeToPaidP95: number | null
+  iterations: number | null
+  thresholds: { metric: string; rule: string; ok: boolean }[]
+}
+
+export type LoadRun = {
+  id: string
+  test: string
+  title: string
+  vus: number
+  duration: number
+  startedBy: string | null
+  startedAt: string
+  finishedAt: string | null
+  status: 'running' | 'passed' | 'failed' | 'stopped' | 'error'
+  exitCode: number | null
+  result: LoadRunResult | null
+  error?: string
+}
+
+export type LoadStatus = {
+  runner: boolean
+  target: string
+  targetUp: boolean
+  fakeBillPayUp: boolean
+  metricsToPrometheus: boolean
+  tests: LoadTestDef[]
+  current: (LoadRun & { live: LoadLive | null; timeline: { t: string; vus: number; rps: number; p95: number | null; errorRate: number }[] }) | null
+}
+
+export const loadTestApi = {
+  status: () => request<LoadStatus>('/load-tests'),
+  runs: () => request<LoadRun[]>('/load-tests/runs'),
+  start: (body: { test: string; vus: number; duration: number }) =>
+    request<LoadRun>('/load-tests/runs', { method: 'POST', body: JSON.stringify(body) }),
+  stop: () => request<{ stopping: boolean }>('/load-tests/stop', { method: 'POST' }),
+  /** Opens k6's HTML report in a new tab (fetched with the staff token). */
+  openReport: async (id: string) => {
+    const win = window.open('', '_blank')
+    const res = await fetch(`/api/admin/load-tests/runs/${encodeURIComponent(id)}/report`, {
+      headers: adminToken.get() ? { Authorization: `Bearer ${adminToken.get()}` } : {},
+    })
+    if (!res.ok) {
+      win?.close()
+      throw new ApiError(res.status, await res.json().catch(() => ({})))
+    }
+    const url = URL.createObjectURL(new Blob([await res.text()], { type: 'text/html' }))
+    if (win) win.location.href = url
+    else window.open(url, '_blank')
+  },
+}

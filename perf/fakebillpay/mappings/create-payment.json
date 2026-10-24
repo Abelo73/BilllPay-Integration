@@ -1,0 +1,12 @@
+{
+  "name": "Create payment (like sandbox.api.billpay.et, 300-800 ms)",
+  "priority": 5,
+  "request": { "method": "POST", "url": "/api/v1/checkout/payments" },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "delayDistribution": { "type": "uniform", "lower": 300, "upper": 800 },
+    "transformers": ["response-template"],
+    "body": "{\"statusCode\":201,\"message\":\"Payment created successfully\",\"body\":{\"id\":\"perf-{{jsonPath request.body '$.merchantReference'}}\",\"merchantReference\":\"{{jsonPath request.body '$.merchantReference'}}\",\"status\":\"CREATED\",\"amount\":{\"amount\":{{jsonPath request.body '$.amount'}},\"currency\":\"ETB\"},\"checkoutUrl\":\"https://sandbox.checkout.billpay.et/checkout/perf-{{jsonPath request.body '$.merchantReference'}}\",\"expiresAt\":\"{{now offset='30 minutes'}}\",\"attempts\":[]}}"
+  }
+}

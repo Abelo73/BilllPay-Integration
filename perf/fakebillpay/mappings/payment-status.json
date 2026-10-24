@@ -1,0 +1,12 @@
+{
+  "name": "Payment status (still open; the test pays through the webhook)",
+  "priority": 5,
+  "request": { "method": "GET", "urlPathPattern": "/api/v1/checkout/payments/[^/]+" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "delayDistribution": { "type": "uniform", "lower": 100, "upper": 300 },
+    "transformers": ["response-template"],
+    "body": "{\"statusCode\":200,\"message\":\"Payment fetched successfully\",\"body\":{\"id\":\"{{request.pathSegments.[4]}}\",\"status\":\"CREATED\",\"attempts\":[]}}"
+  }
+}

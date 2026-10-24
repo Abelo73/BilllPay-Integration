@@ -10,6 +10,7 @@
 #   scripts/dev.sh logs [backend|frontend|ngrok]   follow a log
 #   scripts/dev.sh stop       stop backend, frontend and ngrok started by this script
 #   scripts/dev.sh stop-all   same, plus stop the Docker containers (data is kept)
+#   scripts/dev.sh perf       start the load-test environment (Admin → Load tests); perf-down stops it
 #
 # Run inside WSL (Docker, ngrok and Java 21 live there). From PowerShell use scripts\dev.ps1.
 
@@ -296,7 +297,21 @@ stop_backend_any() {
   else printf "  ${G}✔${N} %-10s stopped (pid %s)\n" "backend" "$pid"; fi
 }
 
+# Load-test environment (Admin → Load tests): a separate copy of the shop, own database and Kafka, fake BillPay.
+perf_up() {
+  step "Load-test environment (separate shop copy, fake BillPay; your data is not touched)"
+  (cd "$ROOT" && docker compose --profile perf up -d --build perf-runner >"$RUN/perf.log" 2>&1) \
+    || { bad "docker compose --profile perf up" "see .run/perf.log"; tail -5 "$RUN/perf.log" | sed 's/^/      /'; return; }
+  ok "containers started" "first start builds the shop image (a few minutes)"
+  if wait_for "test shop on :8282" 300 perf_backend_up; then ok "test shop" "http://localhost:8282 (admin perf-admin@perf.local)"
+  else bad "test shop" "not healthy yet"; fix "docker compose --profile perf logs perf-backend | tail -40"; fi
+  [ "$(http_code http://localhost:9930/health)" = 200 ] && ok "load-test runner :9930" "open Admin → Load tests" || bad "load-test runner" "not answering on :9930"
+}
+perf_backend_up() { [ "$(http_code http://localhost:8282/actuator/health)" = 200 ]; }
+
 case "${1:-restart}" in
+  perf)      perf_up ;;
+  perf-down) step "Stopping the load-test environment"; (cd "$ROOT" && docker compose --profile perf stop perf-runner perf-backend perf-billpay perf-kafka >/dev/null 2>&1) && ok "stopped" "data kept; scripts/dev.sh perf starts it again" ;;
   up|start) prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
   restart)  step "Stopping backend (to load new code; 'scripts/dev.sh up' keeps it running)"; stop_backend_any
             prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
@@ -305,6 +320,6 @@ case "${1:-restart}" in
   logs)     f="$RUN/${2:-backend}.log"; [ -f "$f" ] && tail -f "$f" || echo "no log at $f (was it started by this script?)" ;;
   stop)     step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend ;;
   stop-all) step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend; (cd "$ROOT" && docker compose stop) ;;
-  *)        sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 [ "$FAILS" -eq 0 ]

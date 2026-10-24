@@ -5,6 +5,7 @@ import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
 import { AdminLayout } from './layout'
+import { AdminLoadTestsPage } from './load-tests'
 import { AdminLoginHistoryPage } from './login-history'
 import { AdminLoginPage } from './login'
 import { AdminMyAccountPage } from './my-account'
@@ -36,6 +37,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'refunds', element: <AdminRefundsPage /> },
       { path: 'emails', element: <AdminEmailsPage /> },
       { path: 'reports', element: <AdminReportsPage /> },
+      { path: 'load-tests', element: <AdminLoadTestsPage /> },
       { path: 'setup', element: <AdminSetupPage /> },
       { path: 'users', element: <AdminUsersPage /> },
       { path: 'login-history', element: <AdminLoginHistoryPage /> },

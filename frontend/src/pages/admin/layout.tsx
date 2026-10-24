@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   ArrowLeftRight,
   BarChart3,
+  Gauge,
   ExternalLink,
   FlaskConical,
   FolderTree,
@@ -63,6 +64,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/setup', label: 'BillPay setup', icon: Settings2 },
       { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook, badge: 'webhooks' },
       { to: '/admin/emails', label: 'Emails', icon: Mail },
+      { to: '/admin/load-tests', label: 'Load tests', icon: Gauge, adminOnly: true },
     ],
   },
   {

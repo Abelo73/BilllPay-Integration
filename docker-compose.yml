@@ -101,6 +101,8 @@ services:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
+      # load-test numbers from k6 (perf-runner) arrive here
+      - --web.enable-remote-write-receiver
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -188,6 +190,120 @@ services:
       timeout: 5s
       retries: 12
 
+  # ---------- Load testing (profile "perf"): scripts/dev.sh perf ----------
+  # A separate copy of the shop (own database tenashop_perf, own Kafka, fake BillPay, no emails), so load
+  # tests never touch your dev data and never call the real BillPay.
+  perf-db-init:
+    image: postgres:16-alpine
+    profiles: [perf]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        psql -h postgres -U ${POSTGRES_USER:-tenashop} -d postgres -tc "select 1 from pg_database where datname = 'tenashop_perf'" | grep -q 1 \
+          || psql -h postgres -U ${POSTGRES_USER:-tenashop} -d postgres -c "create database tenashop_perf"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  perf-kafka:
+    image: apache/kafka:3.9.1
+    profiles: [perf]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://perf-kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@perf-kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_HEAP_OPTS: -Xmx384m -Xms384m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server perf-kafka:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  # Answers like sandbox.api.billpay.et (300-800 ms); payment ids are "perf-<merchantReference>"
+  perf-billpay:
+    image: wiremock/wiremock:3.9.1
+    profiles: [perf]
+    command: ["--global-response-templating", "--disable-banner", "--no-request-journal"]
+    volumes:
+      - ./perf/fakebillpay/mappings:/home/wiremock/mappings:ro
+    ports:
+      - "127.0.0.1:${PERF_BILLPAY_PORT:-9919}:8080"
+
+  perf-backend:
+    build: ./backend
+    profiles: [perf]
+    environment:
+      BACKEND_PORT: 8282
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tenashop_perf
+      POSTGRES_USER: ${POSTGRES_USER:-tenashop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      KAFKA_BOOTSTRAP_SERVERS: perf-kafka:9092
+      MEDIA_S3_ENDPOINT: http://media:8333
+      MEDIA_S3_BUCKET: tenashop-perf
+      MEDIA_S3_ACCESS_KEY: ${MEDIA_S3_ACCESS_KEY:-tenashop}
+      MEDIA_S3_SECRET_KEY: ${MEDIA_S3_SECRET_KEY:-tenashop-local-secret}
+      MAIL_ENABLED: "false"
+      BILLPAY_MODE: SANDBOX
+      BILLPAY_SANDBOX_BASE_URL: http://perf-billpay:8080
+      BILLPAY_SANDBOX_API_KEY: BPG_TEST-perf-fake-key-0000
+      BILLPAY_SANDBOX_WEBHOOK_SECRET: whsec_perf_secret
+      BILLPAY_LIVE_API_KEY: ""
+      BILLPAY_WEBHOOK_VERIFICATION: HMAC_SHA256
+      BILLPAY_WEBHOOK_SIGNATURE_HEADER: X-Billpay-Signature
+      ADMIN_EMAIL: perf-admin@perf.local
+      ADMIN_PASSWORD: Perf-admin-2026
+      JWT_SECRET: perf-only-jwt-secret-0123456789abcdef0123
+      APP_PUBLIC_BASE_URL: http://localhost:8282
+      APP_REDIRECT_BASE_URL: ""
+      # same limits every run, so results compare
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+      # tuning knobs to try without rebuilding (defaults come from application.yml)
+      SPRING_KAFKA_LISTENER_CONCURRENCY: ${PERF_KAFKA_CONCURRENCY:-3}
+    mem_limit: 1g
+    cpus: 2
+    ports:
+      - "127.0.0.1:${PERF_BACKEND_PORT:-8282}:8282"
+    depends_on:
+      perf-db-init:
+        condition: service_completed_successfully
+      perf-kafka:
+        condition: service_healthy
+      perf-billpay:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8282/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  # k6 + a small control API; Admin → Load tests talks to it through the backend
+  perf-runner:
+    build: ./perf
+    profiles: [perf]
+    environment:
+      TARGET: http://perf-backend:8282
+      FAKE_BILLPAY: http://perf-billpay:8080
+      PROMETHEUS_RW_URL: http://prometheus:9090/api/v1/write
+    volumes:
+      - perfruns:/runner/runs
+    ports:
+      - "127.0.0.1:${PERF_RUNNER_PORT:-9930}:9930"
+    depends_on:
+      - perf-backend
+
   backend:
     build: ./backend
     env_file:
@@ -224,3 +340,4 @@ volumes:
   promdata:
   amdata:
   grafanadata:
+  perfruns:

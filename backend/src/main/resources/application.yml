@@ -30,6 +30,10 @@ spring:
       ddl-auto: validate
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:${KAFKA_HOST_PORT:29492}}
+    # One consumer thread per partition (topics have 3). With 1 thread, webhooks were applied one at a time and
+    # "paid" lagged up to 21 s under load (perf checkout test). Events of one payment share a key, so they stay in order.
+    listener:
+      concurrency: 3
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
@@ -112,6 +116,9 @@ app:
   admin-password: ${ADMIN_PASSWORD:change-me}
   jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
   # Delivery inside Addis Ababa: flat fee, free from a cart subtotal (ETB)
+  # Admin → Load tests talks to this runner (scripts/dev.sh perf starts it)
+  perf:
+    runner-url: ${PERF_RUNNER_URL:http://localhost:9930}
   delivery:
     flat-fee: ${DELIVERY_FLAT_FEE:150}
     free-over: ${DELIVERY_FREE_OVER:3000}
