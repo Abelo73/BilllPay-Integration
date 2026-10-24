@@ -37,6 +37,9 @@ public class User {
 
 	private String phone;
 
+	/** Set once the owner proved the phone with an SMS code; only then can it be used to sign in. */
+	private Instant phoneVerifiedAt;
+
 	@Enumerated(EnumType.STRING)
 	private Role role;
 
@@ -58,6 +61,14 @@ public class User {
 
 	@Version
 	private Integer version;
+
+	public boolean isPhoneVerified() {
+		return phoneVerifiedAt != null;
+	}
+
+	public boolean hasPassword() {
+		return passwordHash != null;
+	}
 
 	public boolean isLocked() {
 		return lockedUntil != null && lockedUntil.isAfter(Instant.now());

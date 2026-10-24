@@ -31,15 +31,18 @@ public class TokenService {
 	public IssuedToken issue(User user) {
 		Instant now = Instant.now();
 		Instant expires = now.plus(user.getRole().isStaff() ? STAFF_TTL : CUSTOMER_TTL);
-		JwtClaimsSet claims = JwtClaimsSet.builder()
+		JwtClaimsSet.Builder builder = JwtClaimsSet.builder()
 				.issuer("tenashop")
 				.subject(user.getId().toString())
 				.issuedAt(now)
 				.expiresAt(expires)
 				.claim(ROLE_CLAIM, user.getRole().name())
-				.claim(VERSION_CLAIM, user.getTokenVersion())
-				.claim("email", user.getEmail())
-				.build();
+				.claim(VERSION_CLAIM, user.getTokenVersion());
+		// phone-only customers have no email; a null claim is not allowed
+		if (user.getEmail() != null) {
+			builder.claim("email", user.getEmail());
+		}
+		JwtClaimsSet claims = builder.build();
 		String token = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
 				.getTokenValue();
 		return new IssuedToken(token, expires);

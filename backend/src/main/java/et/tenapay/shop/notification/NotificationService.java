@@ -33,10 +33,12 @@ public class NotificationService {
 
 	private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm")
 			.withZone(ZoneId.of("Africa/Addis_Ababa"));
+	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.of("Africa/Addis_Ababa"));
 
 	/** Kafka event type → email. Events not listed here send nothing. */
 	private static final Map<String, Kind> KINDS = Map.ofEntries(
 			Map.entry("order.placed", Kind.ORDER_PLACED),
+			Map.entry("order.payment.reminder", Kind.PAYMENT_REMINDER),
 			Map.entry("order.paid", Kind.PAYMENT_CONFIRMED),
 			Map.entry("order.review.resolved", Kind.PAYMENT_CONFIRMED),
 			Map.entry("order.payment.failed", Kind.PAYMENT_FAILED),
@@ -100,7 +102,8 @@ public class NotificationService {
 						.toList(),
 				o.getSubtotal(), o.getDiscountCode(), o.getDiscountAmount(), o.getDeliveryFee(), o.getTotal(),
 				o.getDeliveryAddress(), o.getDeliveryCity(),
-				o.getTrackingNote(), reason, base + "/orders/track?order=" + o.getOrderNumber());
+				o.getTrackingNote(), reason, base + "/orders/track?order=" + o.getOrderNumber(),
+				TIME.format(o.getCreatedAt().plus(app.paymentExpiry())));
 	}
 
 	private void send(Kind kind, String key, String orderNumber, String recipient, Email email) {

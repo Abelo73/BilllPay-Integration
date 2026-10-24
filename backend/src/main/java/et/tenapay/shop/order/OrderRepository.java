@@ -30,6 +30,10 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 	List<UUID> findIdsByStatusInAndCreatedAtBefore(@Param("statuses") Collection<OrderStatus> statuses,
 			@Param("before") Instant before);
 
+	@Query("select o.id from Order o where o.status in :statuses and o.createdAt > :after and o.createdAt <= :before order by o.createdAt")
+	List<UUID> findIdsByStatusInAndCreatedAtBetween(@Param("statuses") Collection<OrderStatus> statuses,
+			@Param("after") Instant after, @Param("before") Instant before);
+
 	@Query("""
 			select o from Order o
 			where (:status is null or o.status = :status)

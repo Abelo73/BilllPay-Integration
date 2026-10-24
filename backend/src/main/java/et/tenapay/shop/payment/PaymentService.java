@@ -117,7 +117,7 @@ public class PaymentService {
 			cancelUrl = app.publicBaseUrl() + "/checkout/cancelled?order=" + order.getOrderNumber();
 		}
 		return new CreatePaymentRequest(merchantReference, order.getTotal(), order.getCurrency(),
-				"TenaShop order " + order.getOrderNumber(),
+				"Sodo Gebeya order " + order.getOrderNumber(),
 				new Customer(order.getCustomerName(), order.getCustomerPhone(), order.getCustomerEmail()),
 				returnUrl, cancelUrl);
 	}

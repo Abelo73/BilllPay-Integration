@@ -18,7 +18,8 @@ final class EmailTemplates {
 	}
 
 	enum Kind {
-		ORDER_PLACED, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED, PASSWORD_CHANGED
+		ORDER_PLACED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
+		PASSWORD_CHANGED
 	}
 
 	record Email(String subject, String html, String text) {
@@ -30,10 +31,12 @@ final class EmailTemplates {
 	record OrderView(String orderNumber, String customerName, List<Item> items, BigDecimal subtotal, String discountCode,
 			BigDecimal discount,
 			BigDecimal deliveryFee, BigDecimal total, String deliveryAddress, String deliveryCity, String trackingNote,
-			String reasonCode, String trackUrl) {
+			String reasonCode, String trackUrl,
+			/** Local time the payment window closes (HH:mm, Addis Ababa), for unpaid orders. */
+			String payBy) {
 	}
 
-	private static final String BRAND = "#1d3a8a";
+	private static final String BRAND = "#146C43";
 
 	static Email order(Kind kind, OrderView o) {
 		String first = firstName(o.customerName());
@@ -41,6 +44,12 @@ final class EmailTemplates {
 			case ORDER_PLACED -> build("We got your order " + o.orderNumber(), "Thanks for your order, " + first + "!",
 					"Your order is saved. Finish paying on BillPay to confirm it; the items are held for you for 30 minutes.",
 					o, "Complete payment");
+			case PAYMENT_REMINDER -> build("Your order " + o.orderNumber() + " is waiting: pay by " + o.payBy(),
+					"Your items are still waiting, " + first,
+					"You started checkout but we haven't received a payment yet. We're holding your items until "
+							+ o.payBy() + " (Addis Ababa time); after that they go back on sale."
+							+ (o.reasonCode() != null ? " Your last try didn't go through: " + reason(o.reasonCode()) : ""),
+					o, "Finish paying");
 			case PAYMENT_CONFIRMED -> build("Payment confirmed for " + o.orderNumber(), "Payment confirmed",
 					"BillPay confirmed your payment. We're preparing your order and will let you know when it's on the way.",
 					o, "Track your order");
@@ -54,13 +63,13 @@ final class EmailTemplates {
 							+ (o.trackingNote() != null ? " Rider: " + o.trackingNote() + "." : ""),
 					o, "Track your order");
 			case DELIVERED -> build("Delivered: " + o.orderNumber(), "Delivered",
-					"Your order was delivered. Enjoy, " + first + ", and thank you for shopping with TenaShop!", o,
+					"Your order was delivered. Enjoy, " + first + ", and thank you for shopping on Sodo Gebeya!", o,
 					"View your order");
 			case CANCELLED -> build("Order " + o.orderNumber() + " cancelled", "Your order was cancelled",
 					"This order was cancelled. If you already paid, we'll refund you through BillPay.", o, "View your order");
 			case EXPIRED -> build("Order " + o.orderNumber() + " expired", "Your payment window closed",
-					"We didn't receive a payment in time, so the order was released. You can place a new order any time.",
-					o, "Shop again");
+					"We didn't receive a payment in time, so the order was released. Still want these items? Open the order and tap \"Order again\" to put them back in your cart.",
+					o, "Order again");
 			case REFUNDED -> build("Refund issued for " + o.orderNumber(), "Refund issued",
 					"We've sent a refund through BillPay to the method you paid with.", o, "View your order");
 			case PASSWORD_CHANGED -> throw new IllegalArgumentException("not an order email");
@@ -69,10 +78,10 @@ final class EmailTemplates {
 
 	static Email passwordChanged(String fullName, String when) {
 		String title = "Your password was changed";
-		String body = "Hi " + firstName(fullName) + ", the password of your TenaShop account was changed on " + when
+		String body = "Hi " + firstName(fullName) + ", the password of your Sodo Gebeya account was changed on " + when
 				+ ". All other devices were signed out. If this wasn't you, reset your password and contact us.";
 		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p>");
-		return new Email("Your TenaShop password was changed", html, title + "\n\n" + body + "\n\n— TenaShop");
+		return new Email("Your Sodo Gebeya password was changed", html, title + "\n\n" + body + "\n\n— Sodo Gebeya");
 	}
 
 	private static Email build(String subject, String title, String intro, OrderView o, String cta) {
@@ -102,7 +111,7 @@ final class EmailTemplates {
 					+ ", " + esc(o.deliveryCity()) + "</p>";
 			text.append("\nDeliver to: ").append(o.deliveryAddress()).append(", ").append(o.deliveryCity()).append("\n");
 		}
-		text.append("\n").append(cta).append(": ").append(o.trackUrl()).append("\n\n— TenaShop");
+		text.append("\n").append(cta).append(": ").append(o.trackUrl()).append("\n\n— Sodo Gebeya");
 
 		String body = "<p style=\"margin:0 0 16px\">" + esc(intro) + "</p>"
 				+ "<p style=\"margin:0 0 8px;color:#6b7280;font-size:13px\">Order <span style=\"font-family:monospace\">"
@@ -125,10 +134,10 @@ final class EmailTemplates {
 		return "<!doctype html><html><body style=\"margin:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827\">"
 				+ "<table role=\"presentation\" width=\"100%\" style=\"padding:24px 12px\"><tr><td align=\"center\">"
 				+ "<table role=\"presentation\" width=\"100%\" style=\"max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden\">"
-				+ "<tr><td style=\"background:" + BRAND + ";padding:18px 24px;color:#ffffff;font-size:18px;font-weight:700\">TenaShop</td></tr>"
+				+ "<tr><td style=\"background:" + BRAND + ";padding:18px 24px;color:#ffffff;font-size:18px;font-weight:700\">Sodo Gebeya</td></tr>"
 				+ "<tr><td style=\"padding:24px\"><h1 style=\"margin:0 0 12px;font-size:22px\">" + esc(title) + "</h1>" + body
 				+ "</td></tr>"
-				+ "<tr><td style=\"padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px\">TenaShop · Addis Ababa · Payments by BillPay</td></tr>"
+				+ "<tr><td style=\"padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px\">Sodo Gebeya · Wolaita Sodo · Payments by BillPay</td></tr>"
 				+ "</table></td></tr></table></body></html>";
 	}
 

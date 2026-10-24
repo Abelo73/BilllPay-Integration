@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, Clock, Home, Loader2, MapPin, Package, RotateCcw, Truck, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { AlertTriangle, CheckCircle2, Clock, Home, Loader2, MapPin, Package, RotateCcw, ShoppingCart, Truck, XCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 
@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { api, ApiError, type FulfilmentStatus, type OrderStatusView } from '@/lib/api'
 import { formatDate, formatETB, reasonMessage } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useCart } from '@/store/cart'
 
 const POLL_MS = 3000
 
@@ -88,9 +89,10 @@ export function OrderStatusPanel({
   const retryButton = o.canRetry && (
     <Button size="lg" className="h-11" disabled={pay.isPending} onClick={() => pay.mutate()}>
       {pay.isPending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-      {o.payment?.status === 'PENDING' ? 'Continue payment' : 'Try paying again'}
+      {o.payment?.status === 'PENDING' ? 'Continue payment' : o.payment ? 'Try paying again' : 'Pay now'}
     </Button>
   )
+  const canOrderAgain = (o.status === 'EXPIRED' || o.status === 'CANCELLED') && o.items.some((i) => i.productSlug)
 
   return (
     <Card className="mx-auto max-w-xl overflow-hidden pt-0">
@@ -103,6 +105,7 @@ export function OrderStatusPanel({
             <Loader2 className="size-3 animate-spin" /> Checking with BillPay every few seconds
           </p>
         )}
+        {o.canRetry && o.payBy && <PayCountdown payBy={o.payBy} onElapsed={() => query.refetch()} />}
       </div>
       <CardContent className="space-y-4 pt-2">
         <div className="flex items-center justify-between text-sm">
@@ -150,6 +153,7 @@ export function OrderStatusPanel({
         {o.delivery?.address && <DeliveryBlock o={o} />}
         <div className="flex flex-col gap-2 pt-2 sm:flex-row-reverse">
           {retryButton}
+          {canOrderAgain && <OrderAgainButton items={o.items} />}
           <Button asChild size="lg" variant="outline" className="h-11">
             <Link to="/shop">Continue shopping</Link>
           </Button>
@@ -175,6 +179,78 @@ export function OrderStatusPanel({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** "Items held for 12:34": counts down to the moment the unpaid order is released. */
+function PayCountdown({ payBy, onElapsed }: { payBy: string; onElapsed: () => void }) {
+  const deadline = new Date(payBy).getTime()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(t)
+  }, [])
+  const left = Math.max(0, deadline - now)
+  useEffect(() => {
+    // the server expires the order within a minute of the deadline; look again shortly after
+    if (left === 0) {
+      const t = window.setTimeout(onElapsed, 5000)
+      return () => window.clearTimeout(t)
+    }
+  }, [left === 0]) // eslint-disable-line react-hooks/exhaustive-deps
+  const min = Math.floor(left / 60000)
+  const sec = Math.floor((left % 60000) / 1000)
+  const urgent = left < 5 * 60000
+  return (
+    <p
+      className={cn(
+        'flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium tabular-nums',
+        urgent ? 'bg-destructive/10 text-destructive' : 'bg-background/70 text-foreground',
+      )}
+      role="timer"
+      aria-live="off"
+    >
+      <Clock className="size-4" />
+      {left > 0 ? `Items held for you for ${min}:${String(sec).padStart(2, '0')}` : 'Payment window closing…'}
+    </p>
+  )
+}
+
+/** Puts the items of an expired or cancelled order back in the cart, at today's price and stock. */
+function OrderAgainButton({ items }: { items: OrderStatusView['items'] }) {
+  const add = useCart((s) => s.add)
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true)
+    let added = 0
+    const missing: string[] = []
+    for (const item of items) {
+      if (!item.productSlug) {
+        missing.push(item.productName)
+        continue
+      }
+      try {
+        const product = await api.product(item.productSlug)
+        const qty = Math.min(item.quantity, product.available)
+        if (qty > 0) {
+          add(product, qty)
+          added++
+        } else {
+          missing.push(product.name)
+        }
+      } catch {
+        missing.push(item.productName)
+      }
+    }
+    setBusy(false)
+    if (added === 0) toast.error('These items aren’t available any more.')
+    else if (missing.length > 0) toast.warning(`Added to your cart. Not available now: ${missing.join(', ')}`)
+    else toast.success('Items added to your cart')
+  }
+  return (
+    <Button size="lg" className="h-11" disabled={busy} onClick={run}>
+      {busy ? <Loader2 className="animate-spin" /> : <ShoppingCart />} Order again
+    </Button>
   )
 }
 
@@ -241,7 +317,7 @@ function describe(o: OrderStatusView, cancelled: boolean) {
         case 'SHIPPED':
           return { icon: Truck, iconClass: 'text-brand', tone: 'bg-accent', title: 'Your order is on the way', text: 'The rider will call you before arriving.' }
         case 'DELIVERED':
-          return { icon: Home, iconClass: 'text-success', tone: 'bg-success/10', title: 'Delivered', text: `Enjoy your order, ${o.customerName.split(' ')[0]}! Thank you for shopping with TenaShop.` }
+          return { icon: Home, iconClass: 'text-success', tone: 'bg-success/10', title: 'Delivered', text: `Enjoy your order, ${o.customerName.split(' ')[0]}! Thank you for shopping on Sodo Gebeya.` }
         case 'CANCELLED':
           return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Delivery cancelled', text: 'We couldn’t deliver this order. Our team will contact you about a refund.' }
         case 'PROCESSING':
@@ -252,7 +328,7 @@ function describe(o: OrderStatusView, cancelled: boolean) {
     case 'PAYMENT_FAILED':
       return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Payment didn’t go through', text: `${reason} Your items are still reserved — you can try again.` }
     case 'EXPIRED':
-      return { icon: Clock, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment window closed', text: 'We didn’t receive a payment in time, so the order was released. You can place a new order any time.' }
+      return { icon: Clock, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment window closed', text: 'We didn’t receive a payment in time, so the order was released. Still want these items? Order them again in one tap.' }
     case 'REVIEW_REQUIRED':
       return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'We’re checking your payment', text: 'Something about this payment needs a manual check. Our team will contact you shortly.' }
     case 'REFUNDED':

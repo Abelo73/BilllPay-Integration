@@ -54,6 +54,7 @@ public class CheckoutController {
 	private final et.tenapay.shop.user.CustomerAddressRepository addresses;
 	private final et.tenapay.shop.config.AppProperties app;
 	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
+	private final et.tenapay.shop.catalog.ProductRepository products;
 
 	public record CheckoutItem(@NotNull Long productId, @Min(1) @Max(20) int quantity) {
 	}
@@ -94,7 +95,9 @@ public class CheckoutController {
 	public record DeliveryQuote(BigDecimal flatFee, BigDecimal freeOver, String currency) {
 	}
 
-	public record ItemView(String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
+	/** productSlug is null when the product was removed; the shop uses it for "Order again". */
+	public record ItemView(long productId, String productSlug, String productName, BigDecimal unitPrice, int quantity,
+			BigDecimal lineTotal) {
 	}
 
 	public record PaymentView(int attemptNo, String status, String reasonCode, String paymentMethod) {
@@ -111,7 +114,9 @@ public class CheckoutController {
 	public record OrderStatusView(String orderNumber, String status, BigDecimal subtotal, String discountCode,
 			BigDecimal discountAmount, BigDecimal deliveryFee, BigDecimal total, String currency, String customerName, List<ItemView> items, PaymentView payment,
 			boolean canRetry, boolean canCancel, DeliveryView delivery, List<StepView> timeline, Instant createdAt,
-			Instant paidAt) {
+			Instant paidAt,
+			/** When an unpaid order's items are released (null once it's paid or closed). */
+			Instant payBy) {
 	}
 
 	private static final java.util.Set<String> CUSTOMER_STEPS = java.util.Set.of("ORDER_CREATED", "PAID", "EXPIRED",
@@ -234,6 +239,9 @@ public class CheckoutController {
 		DeliveryView delivery = new DeliveryView(order.getDeliveryAddress(), order.getDeliveryCity(),
 				order.getDeliveryNotes(), order.getFulfilmentStatus() == null ? null : order.getFulfilmentStatus().name(),
 				order.getTrackingNote(), order.getShippedAt(), order.getDeliveredAt());
+		Map<Long, String> slugs = new java.util.HashMap<>();
+		products.findAllById(order.getItems().stream().map(OrderItem::getProductId).toList())
+				.forEach(p -> slugs.put(p.getId(), p.getSlug()));
 		List<StepView> timeline = orderEvents.findByOrderIdOrderByCreatedAtAscIdAsc(order.getId()).stream()
 				.filter(e -> CUSTOMER_STEPS.contains(e.getType()))
 				.map(e -> new StepView(e.getType(), e.getCreatedAt()))
@@ -241,9 +249,11 @@ public class CheckoutController {
 		return new OrderStatusView(order.getOrderNumber(), order.getStatus().name(), order.getSubtotal(),
 				order.getDiscountCode(), order.getDiscountAmount(), order.getDeliveryFee(), order.getTotal(), order.getCurrency(), order.getCustomerName(),
 				order.getItems().stream()
-						.map(i -> new ItemView(i.getProductName(), i.getUnitPrice(), i.getQuantity(), i.getLineTotal()))
+						.map(i -> new ItemView(i.getProductId(), slugs.get(i.getProductId()), i.getProductName(),
+								i.getUnitPrice(), i.getQuantity(), i.getLineTotal()))
 						.toList(),
 				payment, order.getStatus().awaitingPayment(), order.getStatus().awaitingPayment(), delivery, timeline,
-				order.getCreatedAt(), order.getPaidAt());
+				order.getCreatedAt(), order.getPaidAt(),
+				order.getStatus().awaitingPayment() ? order.getCreatedAt().plus(app.paymentExpiry()) : null);
 	}
 }

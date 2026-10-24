@@ -26,6 +26,7 @@ const TONES: Record<string, string> = {
   REFUNDED: 'bg-chart-5/10 text-foreground',
   SENT: 'bg-success/15 text-success border-success/30',
   SKIPPED: 'bg-muted text-muted-foreground',
+  LOGGED: 'bg-warning/20 text-foreground border-warning/40',
   // delivery
   UNFULFILLED: 'bg-warning/15 text-foreground border-warning/40',
   PROCESSING: 'bg-brand/10 text-brand border-brand/30',

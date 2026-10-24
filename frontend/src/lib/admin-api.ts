@@ -216,6 +216,21 @@ export type NotificationRow = {
   sentAt: string | null
 }
 
+export type SmsRow = {
+  id: number
+  kind: string
+  recipient: string
+  body: string
+  provider: string
+  status: 'SENT' | 'FAILED' | 'LOGGED'
+  error: string | null
+  orderNumber: string | null
+  createdAt: string
+}
+
+/** delivering=false: test mode (no AfroMessage token), messages are only logged. */
+export type SmsSetup = { provider: string; delivering: boolean; sender: string | null; identifierSet: boolean }
+
 export type OrderDetail = {
   order: OrderRow
   customerEmail: string
@@ -281,6 +296,8 @@ export const adminApi = {
   },
   notifications: (p: { page?: number }) =>
     request<{ page: Page<NotificationRow>; mailboxUrl: string | null }>(`/notifications?${qs(p)}`),
+  sms: (p: { status?: string; q?: string; page?: number }) =>
+    request<{ setup: SmsSetup; page: Page<SmsRow> }>(`/sms?${qs(p)}`),
 
   users: (p: { kind?: string; q?: string; page?: number }) => request<Page<UserRow>>(`/users?${qs(p)}`),
   createStaff: (body: { email: string; fullName: string; role: 'ADMIN' | 'SUPPORT'; password: string }) =>

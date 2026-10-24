@@ -85,6 +85,15 @@ Discount codes: percentage (with optional cap) or fixed ETB, minimum cart, start
 - Wishlist for signed-in customers
 - Discount codes (percentage / fixed, expiry, usage limit) applied before BillPay
 
+### P5b. Checkout recovery ✅ Done (2026-10-24)
+Why: of 46 orders placed in testing only 11 were paid and 29 expired.
+- **Reminder email** once per unpaid order, 10 min before it expires (`PAYMENT_REMINDER_BEFORE`), with the last decline reason; recorded as a `PAYMENT_REMINDER` step; metric `tenashop_payments_reminders_total`
+- Order page: **countdown** ("Items held for you for 12:34"), "Pay now / Continue payment / Try paying again", and **Order again** on expired or cancelled orders (current price and stock); My account flags unpaid orders
+- Expired email now points to "Order again"
+- Grafana → Business → **Checkout recovery**: funnel (placed → BillPay link → tried → paid), reminders sent, paid after the reminder, recovered after a failed try, revenue recovered
+- Tested: `PaymentRecoveryIntegrationTest` (one reminder, never two; paid orders not reminded; pay-by and product links)
+- Next: send the reminder by **SMS** too (AfroMessage)
+
 ### P6. Reports ✅ Done (2026-10-24)
 Admin → **Reports**: revenue, paid orders, average order, payment success, refunds; revenue per day; top products; success by payment method; failure reasons; Orders CSV and Payments CSV (formula-safe, UTF-8 for Excel). Tested end to end (`ReportsIntegrationTest`) and on the real dev data.
 - Sales by day/week, top products, payment success rate by method, failure reasons

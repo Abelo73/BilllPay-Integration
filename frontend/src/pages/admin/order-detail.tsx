@@ -327,7 +327,7 @@ export function AdminOrderDetailPage() {
                   <CardTitle className="font-mono text-sm">{r.merchantReference}</CardTitle>
                   <StatusBadge status={r.status} />
                   {r.reasonCode && <span className="font-mono text-xs text-destructive">{r.reasonCode}</span>}
-                  {r.external && <span className="text-xs text-muted-foreground">issued outside TenaShop</span>}
+                  {r.external && <span className="text-xs text-muted-foreground">issued outside Sodo Gebeya</span>}
                   <span className="ml-auto font-medium tabular-nums">{formatETB(r.amount)}</span>
                   {isAdmin() && (r.status === 'ERROR' || r.status === 'REQUESTED') && (
                     <Button size="sm" variant="outline" onClick={() => retryRefund.mutate(r.id)} disabled={retryRefund.isPending}>

@@ -1541,6 +1541,322 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 27,
+      "type": "row",
+      "title": "Checkout recovery",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 28,
+      "type": "bargauge",
+      "title": "Checkout funnel",
+      "description": "Orders placed in the range and how far they got. \"Tried to pay\" = BillPay reported a try (paid or declined).",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 54,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT step AS \"Step\", n AS \"Orders\" FROM (\n  SELECT 1 AS k, '1 · Placed' AS step, count(*) AS n FROM orders o WHERE $env AND $__timeFilter(o.created_at)\n  UNION ALL SELECT 2, '2 · BillPay link created', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at)\n    AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type = 'PAYMENT_REQUESTED')\n  UNION ALL SELECT 3, '3 · Tried to pay', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at)\n    AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_TRY_FAILED', 'PAYMENT_FAILED', 'PAID'))\n  UNION ALL SELECT 4, '4 · Paid', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at) AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED')\n) f ORDER BY k",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "continuous-BlPu"
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": true,
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "stat",
+      "title": "Reminders sent",
+      "description": "One \"finish paying\" email per unpaid order, 10 minutes before it expires (PAYMENT_REMINDER_BEFORE)",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 54,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT count(*) AS \"Reminders\" FROM order_events e JOIN orders o ON o.id = e.order_id WHERE $env AND e.type = 'PAYMENT_REMINDER' AND $__timeFilter(e.created_at)",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 30,
+      "type": "stat",
+      "title": "Paid after the reminder",
+      "description": "Reminded orders that ended up paid",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 54,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT (count(*) FILTER (WHERE o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED')))::float / nullif(count(*), 0) AS \"Recovered\" FROM orders o WHERE $env AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type = 'PAYMENT_REMINDER' AND $__timeFilter(e.created_at))",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 31,
+      "type": "stat",
+      "title": "Recovered after a failed try",
+      "description": "Paid orders whose first try was declined: the \"try again\" flow working",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 58,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT count(*) AS \"Recovered\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at) AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_TRY_FAILED', 'PAYMENT_FAILED'))",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 32,
+      "type": "stat",
+      "title": "Revenue recovered",
+      "description": "Paid orders that were reminded or had a declined try first",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "tenashop-db"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 58,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "tenashop-db"
+          },
+          "rawSql": "SELECT coalesce(sum(o.total), 0) AS \"Recovered\" FROM orders o WHERE $env AND o.status IN ('PAID', 'PARTIALLY_REFUNDED', 'REFUNDED') AND $__timeFilter(o.paid_at) AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_REMINDER', 'PAYMENT_TRY_FAILED', 'PAYMENT_FAILED'))",
+          "format": "table",
+          "rawQuery": true,
+          "editorMode": "code",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix: ETB",
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "auto",
+        "justifyMode": "auto"
+      }
     }
   ]
 }

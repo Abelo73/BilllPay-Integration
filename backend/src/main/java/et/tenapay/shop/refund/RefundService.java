@@ -263,7 +263,7 @@ public class RefundService {
 			r.setBillpayRefundId(reported.refundId());
 			r.setAmount(reported.amount());
 			r.setCurrency(a.getCurrency());
-			r.setReason("Issued outside TenaShop");
+			r.setReason("Issued outside Sodo Gebeya");
 			r.setStatus(RefundStatus.PENDING);
 			r.setExternal(true);
 			r.setResponsePayload(reported.raw());

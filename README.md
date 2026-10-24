@@ -1,6 +1,6 @@
-# TenaShop: BillPay Integration Test Store
+# Sodo Gebeya: the online market for Wolaita Sodo
 
-A small but realistic e-commerce app for integrating with and testing the **BillPay** payment gateway, sandbox first and then live.
+A marketplace where shops and people in Wolaita Sodo, Ethiopia sell goods (and later services), with **BillPay** payments and local delivery. It grew out of TenaShop, a BillPay integration test store; the plan is in [docs/MARKETPLACE_PLAN.md](docs/MARKETPLACE_PLAN.md) and the build order in [docs/MARKETPLACE_ROADMAP.md](docs/MARKETPLACE_ROADMAP.md).
 
 - **Backend:** Spring Boot 4.1 (Java 21), PostgreSQL 16, Flyway, Spring Kafka. Lives in [backend/](backend/).
 - **Frontend:** React 19 + Vite 8 + TypeScript + Tailwind 4 + shadcn/ui, managed with **pnpm**. Lives in [frontend/](frontend/).

@@ -47,7 +47,7 @@ export function AdminRefundsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="max-w-56 truncate text-sm text-muted-foreground">
-                    {r.external ? 'Issued outside TenaShop' : (r.reason ?? '—')}
+                    {r.external ? 'Issued outside Sodo Gebeya' : (r.reason ?? '—')}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{formatETB(r.amount)}</TableCell>
                   <TableCell className="pr-4 text-xs text-muted-foreground">{formatDate(r.createdAt)}</TableCell>

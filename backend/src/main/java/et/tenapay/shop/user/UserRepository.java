@@ -16,6 +16,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
 	boolean existsByEmail(String email);
 
+	/** The account that proved this phone (at most one: unique index on verified phones). */
+	Optional<User> findByPhoneAndPhoneVerifiedAtIsNotNull(String phone);
+
 	long countByRoleAndEnabledTrue(Role role);
 
 	java.util.List<User> findByRoleAndEnabledTrue(Role role);

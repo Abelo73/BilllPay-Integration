@@ -105,6 +105,18 @@ media:
   # served by the backend, so the bucket can stay private
   public-path: /api/media
 
+# Text messages. No AFROMESSAGE_TOKEN = test mode: messages go to the backend log and Admin → SMS, never to phones.
+sms:
+  timeout: ${SMS_TIMEOUT:PT10S}
+  # local development only: show sign-in codes on screen in test mode (never with a real provider or BillPay live)
+  dev-codes-in-response: ${SMS_DEV_CODES_IN_RESPONSE:false}
+  afromessage:
+    base-url: ${AFROMESSAGE_BASE_URL:https://api.afromessage.com}
+    token: ${AFROMESSAGE_TOKEN:}
+    identifier-id: ${AFROMESSAGE_IDENTIFIER_ID:}
+    sender: ${AFROMESSAGE_SENDER:}
+    callback: ${AFROMESSAGE_CALLBACK:}
+
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5280}
   # BillPay requires https return/cancel URLs; locally set this to the ngrok URL (see BillPayRedirectController)
@@ -112,6 +124,8 @@ app:
   cors-origins: ${APP_CORS_ORIGINS:http://localhost:5280}
   reconcile-after: ${RECONCILE_AFTER:PT3M}
   payment-expiry: ${PAYMENT_EXPIRY:PT30M}
+  # one "finish paying" email this long before an unpaid order expires (PT0S = off)
+  payment-reminder-before: ${PAYMENT_REMINDER_BEFORE:PT10M}
   admin-email: ${ADMIN_EMAIL:admin@tenashop.local}
   admin-password: ${ADMIN_PASSWORD:change-me}
   jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
@@ -124,7 +138,7 @@ app:
     free-over: ${DELIVERY_FREE_OVER:3000}
   mail:
     enabled: ${MAIL_ENABLED:true}
-    from: ${MAIL_FROM:TenaShop <orders@tenashop.local>}
+    from: ${MAIL_FROM:Sodo Gebeya <orders@sodogebeya.local>}
     # shown in the admin as "Open test inbox" (Mailpit); leave empty with a real mail server
     inbox-url: ${MAIL_INBOX_URL:http://localhost:8626}
 

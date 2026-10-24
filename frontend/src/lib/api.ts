@@ -91,7 +91,7 @@ export type OrderStatusView = {
   total: number
   currency: string
   customerName: string
-  items: { productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
+  items: { productId: number; productSlug: string | null; productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
   payment: { attemptNo: number; status: string; reasonCode: string | null; paymentMethod: string | null } | null
   canRetry: boolean
   canCancel: boolean
@@ -107,6 +107,18 @@ export type OrderStatusView = {
   timeline: { type: string; at: string }[]
   createdAt: string
   paidAt: string | null
+  /** When an unpaid order's items are released; null once paid or closed */
+  payBy: string | null
+}
+
+/** Reply to "text me a code". devCode is only filled in local test mode (no SMS provider). */
+export type PhoneCodeSent = {
+  phone: string
+  maskedPhone: string
+  expiresInSeconds: number
+  resendInSeconds: number
+  testMode: boolean
+  devCode: string | null
 }
 
 /** RFC 7807 problem returned by the backend. */
@@ -196,6 +208,10 @@ export const api = {
     request<Session>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (email: string, password: string) =>
     request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  phoneStart: (phone: string) =>
+    request<PhoneCodeSent>('/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone }) }),
+  phoneVerify: (phone: string, code: string, fullName?: string) =>
+    request<Session>('/auth/phone/verify', { method: 'POST', body: JSON.stringify({ phone, code, fullName }) }),
   me: () => request<SessionUser>('/me'),
   updateMe: (body: { fullName: string; phone: string }) =>
     request<SessionUser>('/me', { method: 'PATCH', body: JSON.stringify(body) }),

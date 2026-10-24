@@ -248,6 +248,26 @@ const business = dashboard('tenashop-business', 'TenaShop · Business', 'Revenue
     { x: 12, y: 39, w: 12, h: 7, bars: true, stack: true, description: 'Wrong passwords, locked or disabled accounts, by portal. A sudden spike can mean password guessing.' }),
   table('Discount codes', `SELECT d.code AS "Code", d.kind AS "Type", d.value AS "Value", d.times_used AS "Used", d.usage_limit AS "Limit", d.active AS "Active", d.expires_at AS "Expires" FROM discount_codes d ORDER BY d.times_used DESC, d.code LIMIT 15`,
     { x: 0, y: 46, w: 24, h: 7 }),
+
+  // Checkout recovery: where unpaid orders drop off, and how many come back after a reminder or a failed try
+  row('Checkout recovery', 53),
+  pgBars('Checkout funnel', `SELECT step AS "Step", n AS "Orders" FROM (
+  SELECT 1 AS k, '1 · Placed' AS step, count(*) AS n FROM orders o WHERE $env AND $__timeFilter(o.created_at)
+  UNION ALL SELECT 2, '2 · BillPay link created', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at)
+    AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type = 'PAYMENT_REQUESTED')
+  UNION ALL SELECT 3, '3 · Tried to pay', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at)
+    AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_TRY_FAILED', 'PAYMENT_FAILED', 'PAID'))
+  UNION ALL SELECT 4, '4 · Paid', count(*) FROM orders o WHERE $env AND $__timeFilter(o.created_at) AND ${PAID}
+) f ORDER BY k`,
+    { x: 0, y: 54, w: 12, h: 8, description: 'Orders placed in the range and how far they got. "Tried to pay" = BillPay reported a try (paid or declined).' }),
+  pgStat('Reminders sent', `SELECT count(*) AS "Reminders" FROM order_events e JOIN orders o ON o.id = e.order_id WHERE $env AND e.type = 'PAYMENT_REMINDER' AND $__timeFilter(e.created_at)`,
+    { x: 12, y: 54, w: 6, decimals: 0, description: 'One "finish paying" email per unpaid order, 10 minutes before it expires (PAYMENT_REMINDER_BEFORE)' }),
+  pgStat('Paid after the reminder', `SELECT (count(*) FILTER (WHERE ${PAID}))::float / nullif(count(*), 0) AS "Recovered" FROM orders o WHERE $env AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type = 'PAYMENT_REMINDER' AND $__timeFilter(e.created_at))`,
+    { x: 18, y: 54, w: 6, unit: 'percentunit', decimals: 0, thresholds: { mode: 'absolute', steps: [{ color: 'text', value: null }, { color: 'green', value: 0.1 }] }, description: 'Reminded orders that ended up paid' }),
+  pgStat('Recovered after a failed try', `SELECT count(*) AS "Recovered" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at) AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_TRY_FAILED', 'PAYMENT_FAILED'))`,
+    { x: 12, y: 58, w: 6, decimals: 0, thresholds: green, description: 'Paid orders whose first try was declined: the "try again" flow working' }),
+  pgStat('Revenue recovered', `SELECT coalesce(sum(o.total), 0) AS "Recovered" FROM orders o WHERE $env AND ${PAID} AND $__timeFilter(o.paid_at) AND EXISTS (SELECT 1 FROM order_events e WHERE e.order_id = o.id AND e.type IN ('PAYMENT_REMINDER', 'PAYMENT_TRY_FAILED', 'PAYMENT_FAILED'))`,
+    { x: 18, y: 58, w: 6, unit: ETB, decimals: 0, thresholds: green, description: 'Paid orders that were reminded or had a declined try first' }),
 ], ['business', 'sql'], { variables: businessVars, time: 'now-7d', refresh: '1m' })
 
 // ---------- Uptime & Alerts (blackbox probes + Prometheus alerts) ----------

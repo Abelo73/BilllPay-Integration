@@ -69,7 +69,7 @@ public class StaffBootstrap implements ApplicationRunner {
 		}
 		User admin = new User();
 		admin.setEmail(email);
-		admin.setFullName("TenaShop Admin");
+		admin.setFullName("Sodo Gebeya Admin");
 		admin.setRole(Role.ADMIN);
 		admin.setPasswordHash(passwords.encode(app.adminPassword()));
 		users.save(admin);

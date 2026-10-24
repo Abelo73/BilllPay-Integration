@@ -1,218 +1,183 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  Armchair,
   ArrowRight,
-  BadgeCheck,
-  Building2,
-  CheckCircle2,
-  Coffee,
-  CreditCard,
-  Headphones,
-  Lamp,
+  Bike,
+  CookingPot,
+  Droplet,
+  Footprints,
   Lock,
-  RotateCcw,
+  type LucideIcon,
+  Package,
+  Search,
   Shirt,
   ShoppingBag,
-  Star,
+  Smartphone,
+  Store,
+  Tag,
   Truck,
-  Wallet,
   Wheat,
+  Coffee,
 } from 'lucide-react'
-import { Link } from 'react-router'
-import { toast } from 'sonner'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 
 import { ProductCard } from '@/components/product-card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 
-const CATEGORIES = [
-  { slug: 'coffee-tea', name: 'Coffee & Tea', icon: Coffee, blurb: 'Single origin, roasted fresh', image: '/products/yirgacheffe-beans.jpg' },
-  { slug: 'fashion', name: 'Fashion', icon: Shirt, blurb: 'Hand-woven & leather goods', image: '/products/habesha-netela.jpg' },
-  { slug: 'electronics', name: 'Electronics', icon: Headphones, blurb: 'Gadgets that keep up', image: '/products/wireless-earbuds-pro.jpg' },
-  { slug: 'home-living', name: 'Home & Living', icon: Lamp, blurb: 'Pieces with a story', image: '/products/woven-mesob.jpg' },
-  { slug: 'pantry', name: 'Pantry', icon: Wheat, blurb: 'Honey, spices & more', image: '/products/berbere-spice.jpg' },
+/** Category icon by slug keyword; categories are managed in the admin, so unknown ones get a tag. */
+const ICONS: [RegExp, LucideIcon][] = [
+  [/cloth|fashion|dress|wear/, Shirt],
+  [/shoe|sandal|boot/, Footprints],
+  [/phone|electronic|gadget|computer/, Smartphone],
+  [/furniture|sofa|home|living/, Armchair],
+  [/kitchen|cook/, CookingPot],
+  [/beauty|cosmetic|hair/, Droplet],
+  [/vehicle|bike|motor|car|part/, Bike],
+  [/coffee|tea/, Coffee],
+  [/food|pantry|spice|grain/, Wheat],
+  [/used|second/, Tag],
 ]
-
-const HERO_TILES = [
-  { src: '/products/clay-jebena.jpg', alt: 'Coffee poured from a clay jebena' },
-  { src: '/products/habesha-netela.jpg', alt: 'Women in traditional habesha dress' },
-  { src: '/products/woven-mesob.jpg', alt: 'Colourful hand-woven basket' },
-  { src: '/products/yirgacheffe-beans.jpg', alt: 'Roasted coffee beans in a burlap sack' },
-]
+const iconFor = (slug: string) => ICONS.find(([re]) => re.test(slug))?.[1] ?? ShoppingBag
 
 const STEPS = [
-  { icon: ShoppingBag, title: 'Pick your favourites', text: 'Browse curated Ethiopian goods and everyday essentials.' },
-  { icon: Lock, title: 'Pay securely with BillPay', text: 'Wallet, bank or card on BillPay’s hosted checkout. We never see your details.' },
-  { icon: Truck, title: 'Delivered to your door', text: 'Confirmed instantly once BillPay verifies your payment.' },
-]
-
-const TESTIMONIALS = [
-  { name: 'Hanna T.', role: 'Bole, Addis Ababa', quote: 'The Yirgacheffe beans are the best I have had outside a ceremony. Paying by wallet took seconds.' },
-  { name: 'Dawit M.', role: 'CMC, Addis Ababa', quote: 'Clear order tracking and the payment confirmation came right away. Exactly how online shopping should feel.' },
-  { name: 'Selam G.', role: 'Hawassa', quote: 'Beautiful netela, carefully packed. I liked that I could pay with my bank account directly.' },
+  { icon: Search, title: 'Find it in Sodo', text: 'Search shops and sellers in town by name, category or price.' },
+  { icon: Lock, title: 'Pay with BillPay', text: 'Mobile wallet or bank on BillPay’s secure page. We never see your details.' },
+  { icon: Truck, title: 'Delivered in town', text: 'The seller packs your order and it comes to your door, or pick it up.' },
 ]
 
 const FAQ = [
-  { q: 'Which payment methods can I use?', a: 'All payments go through BillPay. You can pay with a mobile wallet, a bank account or a card on BillPay’s secure hosted page.' },
-  { q: 'Is my payment information safe?', a: 'Yes. You enter your payment details on BillPay, never on TenaShop. We only receive a confirmation that the payment succeeded.' },
-  { q: 'What if I close the page during payment?', a: 'Your order is saved. Use “Track order” with your order number and phone to see its status or retry the payment.' },
+  { q: 'Which payment methods can I use?', a: 'All online payments go through BillPay: a mobile wallet or a bank account on BillPay’s secure page.' },
+  { q: 'Is my payment information safe?', a: 'Yes. You enter your payment details on BillPay, never on Sodo Gebeya. We only receive a confirmation that the payment succeeded.' },
+  { q: 'What if I close the page while paying?', a: 'Your order is saved and your items are held for 30 minutes. Open “Orders” to finish paying, or try again.' },
   { q: 'How do refunds work?', a: 'Approved refunds are sent back through BillPay to the method you paid with.' },
-  { q: 'Is this a real store?', a: 'TenaShop is a demo store for testing the BillPay integration. In sandbox mode no real money moves.' },
+  { q: 'Can I sell on Sodo Gebeya?', a: 'Soon. Shops and individuals in Wolaita Sodo will be able to open a shop or post used items. Create an account now and we’ll let you know.' },
 ]
+
+function SearchBox() {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  return (
+    <form
+      role="search"
+      className="flex h-12 items-center gap-2 rounded-2xl border bg-card pl-4 pr-1.5 shadow-sm focus-within:border-primary"
+      onSubmit={(e) => {
+        e.preventDefault()
+        navigate(q.trim() ? `/shop?q=${encodeURIComponent(q.trim())}` : '/shop')
+      }}
+    >
+      <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      <label htmlFor="home-search" className="sr-only">Search Sodo Gebeya</label>
+      <input
+        id="home-search"
+        type="search"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="Search clothes, phones, furniture…"
+        className="h-full min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
+      />
+      <Button type="submit" className="h-9 rounded-xl px-4">Search</Button>
+    </form>
+  )
+}
 
 function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      <div className="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black_30%,transparent_75%)]" />
-      <div className="absolute -top-40 left-1/2 size-[36rem] -translate-x-1/2 rounded-full bg-brand/20 blur-3xl" />
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-2 lg:pt-24">
-        <div className="space-y-8">
-          <Badge variant="outline" className="gap-1.5 rounded-full px-3 py-1 text-xs">
-            <span className="size-1.5 rounded-full bg-success" /> Now accepting BillPay Wallet, Bank & Card
-          </Badge>
-          <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
-            Ethiopian craft,{' '}
-            <span className="bg-gradient-to-r from-brand to-primary bg-clip-text text-transparent dark:to-chart-2">
-              delivered
-            </span>{' '}
-            with one tap checkout.
-          </h1>
-          <p className="max-w-xl text-lg text-muted-foreground text-pretty">
-            From Yirgacheffe coffee to hand-woven netela, shop what you love and pay securely with BillPay in seconds.
+    <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 md:pt-12">
+      <div className="grid items-center gap-6 md:grid-cols-[1.2fr_1fr] md:gap-12">
+        <div className="space-y-4 md:space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-[26px] font-extrabold leading-tight tracking-tight text-balance md:text-5xl">
+              Buy and sell in <span className="text-brand">Wolaita Sodo</span>
+            </h1>
+            <p className="font-ethiopic text-sm text-muted-foreground md:text-base">በወላይታ ሶዶ ይግዙ፣ ይሽጡ</p>
+          </div>
+          <p className="hidden max-w-lg text-lg text-muted-foreground md:block">
+            Clothes, shoes, phones, furniture and more from shops and people in town. Pay with BillPay, get it delivered.
           </p>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="h-11 px-6 text-base">
-              <Link to="/shop">
-                Shop now <ArrowRight />
-              </Link>
-            </Button>
-            <Button asChild size="lg" variant="outline" className="h-11 px-6 text-base">
-              <a href="#how-it-works">How it works</a>
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1.5"><BadgeCheck className="size-4 text-success" /> Verified payments</span>
-            <span className="flex items-center gap-1.5"><Truck className="size-4 text-success" /> Fast delivery</span>
-            <span className="flex items-center gap-1.5"><RotateCcw className="size-4 text-success" /> Easy refunds</span>
-          </div>
+          <SearchBox />
         </div>
-
-        <div className="relative mx-auto w-full max-w-lg">
-          <div className="grid grid-cols-2 gap-5 pb-10">
-            {HERO_TILES.map((t, i) => (
-              <img
-                key={t.src}
-                src={t.src}
-                alt={t.alt}
-                className={`aspect-square w-full rounded-3xl object-cover shadow-xl ring-1 ring-black/5 ${i % 2 ? 'translate-y-10' : ''}`}
-                fetchPriority={i < 2 ? 'high' : undefined}
-              />
-            ))}
-          </div>
-          <div className="absolute -bottom-4 left-1/2 w-72 -translate-x-1/2 rounded-2xl border bg-card/95 p-4 shadow-2xl backdrop-blur sm:left-auto sm:right-[-1rem] sm:translate-x-0">
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-full bg-success/15">
-                <CheckCircle2 className="size-5 text-success" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">Payment confirmed</p>
-                <p className="truncate text-xs text-muted-foreground">ETB 1,450.00 · BillPay Wallet</p>
-              </div>
-            </div>
-          </div>
+        <div className="hidden grid-cols-2 gap-4 md:grid">
+          {['/products/habesha-netela.jpg', '/products/leather-tote.jpg', '/products/canvas-sneakers.jpg', '/products/woven-mesob.jpg'].map((src, i) => (
+            <img key={src} src={src} alt="" className={cn('aspect-square w-full rounded-3xl object-cover ring-1 ring-black/5', i % 2 && 'translate-y-6')} />
+          ))}
         </div>
       </div>
     </section>
-  )
-}
-
-function PaymentStrip() {
-  const methods = [
-    { icon: Wallet, label: 'BillPay Wallet' },
-    { icon: Building2, label: 'Bank transfer' },
-    { icon: CreditCard, label: 'Debit & credit card' },
-    { icon: Lock, label: 'Hosted secure checkout' },
-  ]
-  return (
-    <section className="border-y bg-muted/40">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 py-6 sm:px-6">
-        <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Payments by BillPay</span>
-        {methods.map((m) => (
-          <span key={m.label} className="flex items-center gap-2 text-sm font-medium">
-            <m.icon className="size-4 text-brand" /> {m.label}
-          </span>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function SectionHeading({ eyebrow, title, text }: { eyebrow: string; title: string; text?: string }) {
-  return (
-    <div className="mx-auto max-w-2xl space-y-3 text-center">
-      <p className="text-sm font-medium text-brand">{eyebrow}</p>
-      <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h2>
-      {text && <p className="text-muted-foreground">{text}</p>}
-    </div>
   )
 }
 
 function Categories() {
+  const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: api.categories, staleTime: 5 * 60_000 })
   return (
-    <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6">
-      <SectionHeading eyebrow="Categories" title="Shop by what you love" />
-      <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-5">
-        {CATEGORIES.map((c) => (
-          <Link
-            key={c.slug}
-            to={`/shop?category=${c.slug}`}
-            className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
-          >
-            <img
-              src={c.image}
-              alt=""
-              loading="lazy"
-              className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-            <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-              <span className="mb-2 grid size-8 place-items-center rounded-lg bg-white/15 backdrop-blur">
-                <c.icon className="size-4" />
+    <section aria-labelledby="cats" className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 md:pt-16">
+      <div className="flex items-baseline justify-between">
+        <h2 id="cats" className="text-lg font-bold md:text-2xl">Categories</h2>
+        <Link to="/shop" className="text-sm font-semibold text-brand hover:underline">See all</Link>
+      </div>
+      <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-6 lg:grid-cols-8">
+        {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-square rounded-2xl" />)}
+        {data?.map((c, i) => {
+          const Icon = iconFor(c.slug)
+          return (
+            <Link key={c.slug} to={`/shop?category=${c.slug}`} className="group flex flex-col items-center gap-1.5 text-center">
+              <span
+                className={cn(
+                  'grid size-14 place-items-center rounded-2xl transition group-hover:scale-105 md:size-16',
+                  i % 2 ? 'bg-amber-soft text-amber-ink' : 'bg-accent text-accent-foreground',
+                )}
+              >
+                <Icon className="size-6 md:size-7" strokeWidth={1.8} />
               </span>
-              <p className="font-medium">{c.name}</p>
-              <p className="text-xs text-white/75">{c.blurb}</p>
-            </div>
-          </Link>
-        ))}
+              <span className="line-clamp-2 text-xs font-semibold leading-tight">{c.name}</span>
+            </Link>
+          )
+        })}
       </div>
     </section>
   )
 }
 
-function Featured() {
-  const { data, isLoading, isError } = useQuery({ queryKey: ['featured'], queryFn: api.featured })
+function SellBanner() {
   return (
-    <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-brand">Featured</p>
-          <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Customer favourites</h2>
+    <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 md:pt-12">
+      <div className="flex flex-col gap-4 rounded-3xl bg-primary p-5 text-primary-foreground sm:flex-row sm:items-center md:p-8">
+        <span className="hidden size-14 shrink-0 place-items-center rounded-2xl bg-white/15 sm:grid">
+          <Store className="size-7" />
+        </span>
+        <div className="flex-1 space-y-1">
+          <p className="text-lg font-bold md:text-xl">Sell on Sodo Gebeya</p>
+          <p className="text-sm text-primary-foreground/85">
+            Shops and individuals can soon open a shop or post used items, free for the first 3 months. Create your account to be first.
+          </p>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/shop">
-            View all <ArrowRight />
-          </Link>
+        <Button asChild size="lg" variant="secondary" className="h-11 shrink-0 bg-white text-primary hover:bg-white/90">
+          <Link to="/register">Get ready to sell</Link>
         </Button>
       </div>
-      <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {isLoading &&
-          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="aspect-[4/4] rounded-2xl" />)}
+    </section>
+  )
+}
+
+function Fresh() {
+  const { data, isLoading, isError } = useQuery({ queryKey: ['featured'], queryFn: api.featured })
+  return (
+    <section aria-labelledby="fresh" className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 md:pt-16">
+      <div className="flex items-baseline justify-between">
+        <h2 id="fresh" className="text-lg font-bold md:text-2xl">Popular in Sodo</h2>
+        <Link to="/shop" className="flex items-center gap-1 text-sm font-semibold text-brand hover:underline">
+          More <ArrowRight className="size-4" />
+        </Link>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
+        {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4] rounded-2xl" />)}
         {isError && (
           <p className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-            Products could not be loaded. Is the backend running on port 8181?
+            Products could not be loaded right now. Please try again in a moment.
           </p>
         )}
         {data?.map((p) => <ProductCard key={p.id} product={p} />)}
@@ -223,46 +188,26 @@ function Featured() {
 
 function HowItWorks() {
   return (
-    <section id="how-it-works" className="mx-auto max-w-7xl scroll-mt-20 px-4 pt-24 sm:px-6">
-      <SectionHeading eyebrow="How it works" title="From cart to doorstep in three steps" />
-      <div className="mt-12 grid gap-6 md:grid-cols-3">
-        {STEPS.map((s, i) => (
-          <div key={s.title} className="relative rounded-2xl border bg-card p-6">
-            <span className="absolute right-6 top-6 text-5xl font-semibold text-muted/80 dark:text-muted">0{i + 1}</span>
-            <div className="grid size-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+    <section aria-labelledby="how" className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 md:pt-20">
+      <h2 id="how" className="text-lg font-bold md:text-2xl">How it works</h2>
+      <div className="mt-4 grid gap-3 md:grid-cols-3 md:gap-5">
+        {STEPS.map((s) => (
+          <div key={s.title} className="flex gap-4 rounded-2xl border bg-card p-4 md:flex-col md:p-6">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-accent-foreground">
               <s.icon className="size-5" />
+            </span>
+            <div className="space-y-1">
+              <h3 className="font-bold">{s.title}</h3>
+              <p className="text-sm text-muted-foreground">{s.text}</p>
             </div>
-            <h3 className="mt-5 font-semibold">{s.title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{s.text}</p>
           </div>
         ))}
       </div>
-    </section>
-  )
-}
-
-function Testimonials() {
-  return (
-    <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6">
-      <SectionHeading eyebrow="Reviews" title="Loved across Ethiopia" />
-      <div className="mt-12 grid gap-6 md:grid-cols-3">
-        {TESTIMONIALS.map((t) => (
-          <figure key={t.name} className="flex flex-col rounded-2xl border bg-card p-6">
-            <div className="flex gap-0.5 text-warning">
-              {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="size-4 fill-current" />)}
-            </div>
-            <blockquote className="mt-4 flex-1 text-pretty">“{t.quote}”</blockquote>
-            <figcaption className="mt-6 flex items-center gap-3">
-              <span className="grid size-9 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
-                {t.name[0]}
-              </span>
-              <span>
-                <span className="block text-sm font-medium">{t.name}</span>
-                <span className="block text-xs text-muted-foreground">{t.role}</span>
-              </span>
-            </figcaption>
-          </figure>
-        ))}
+      <div className="mt-4 flex items-center gap-3 rounded-2xl border bg-card p-4 text-sm">
+        <Package className="size-5 shrink-0 text-brand" />
+        <span>
+          Already ordered? <Link to="/orders/track" className="font-semibold text-brand hover:underline">Track your order</Link>
+        </span>
       </div>
     </section>
   )
@@ -270,9 +215,9 @@ function Testimonials() {
 
 function Faq() {
   return (
-    <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-4 pt-24 sm:px-6">
-      <SectionHeading eyebrow="FAQ" title="Questions, answered" />
-      <Accordion type="single" collapsible className="mt-10">
+    <section id="faq" aria-labelledby="faq-title" className="mx-auto max-w-3xl scroll-mt-20 px-4 pt-12 sm:px-6 md:pt-20">
+      <h2 id="faq-title" className="text-lg font-bold md:text-2xl">Questions</h2>
+      <Accordion type="single" collapsible className="mt-2">
         {FAQ.map((f, i) => (
           <AccordionItem key={f.q} value={`item-${i}`}>
             <AccordionTrigger className="text-base">{f.q}</AccordionTrigger>
@@ -284,52 +229,15 @@ function Faq() {
   )
 }
 
-function Newsletter() {
-  return (
-    <section className="mx-auto max-w-7xl px-4 pt-24 sm:px-6">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[oklch(0.30_0.10_262)] to-[oklch(0.22_0.08_265)] px-6 py-14 text-white ring-1 ring-white/10 sm:px-12">
-        <div className="absolute -right-20 -top-20 size-72 rounded-full bg-brand/40 blur-3xl" />
-        <div className="relative grid items-center gap-8 md:grid-cols-2">
-          <div className="space-y-3">
-            <h2 className="text-3xl font-semibold tracking-tight">Get first dibs on new arrivals</h2>
-            <p className="text-white/75">Fresh roasts, limited crafts and member-only offers. No spam.</p>
-          </div>
-          <form
-            className="flex flex-col gap-3 sm:flex-row"
-            onSubmit={(e) => {
-              e.preventDefault()
-              e.currentTarget.reset()
-              toast.success('Thanks! You’re on the list.')
-            }}
-          >
-            <Input
-              type="email"
-              required
-              placeholder="you@example.et"
-              aria-label="Email address"
-              className="h-11 border-white/20 bg-white/10 text-white placeholder:text-white/50"
-            />
-            <Button type="submit" size="lg" className="h-11 bg-white px-6 text-[oklch(0.30_0.10_262)] hover:bg-white/90">
-              Subscribe
-            </Button>
-          </form>
-        </div>
-      </div>
-    </section>
-  )
-}
-
 export function HomePage() {
   return (
     <>
       <Hero />
-      <PaymentStrip />
       <Categories />
-      <Featured />
+      <Fresh />
+      <SellBanner />
       <HowItWorks />
-      <Testimonials />
       <Faq />
-      <Newsletter />
     </>
   )
 }

@@ -1,0 +1,227 @@
+# Sodo Gebeya: Roadmap
+
+**Draft, 2026-10-24.** Turns TenaShop into the Sodo Gebeya marketplace described in [MARKETPLACE_PLAN.md](MARKETPLACE_PLAN.md). Screen numbers (S1–S21) refer to the design canvas: https://claude.ai/artifact/BSK6pvdE3TYwE5BMSvpwz7
+
+Each milestone ends with automated tests, a demo, and a commit. Durations are estimates for one developer working with Claude; adjust as we learn.
+
+---
+
+## Overview
+
+| Phase | Milestones | Result | Estimate |
+|---|---|---|---|
+| **0. Prepare** | Decisions, legal, accounts | Ready to build and to launch | runs alongside phase 1 |
+| **1. Foundation** | M1–M4 | Many sellers can sign in by phone, get verified and list items | 4–5 weeks |
+| **2. Buying and money** | M5–M8 | Real orders, held payments, payouts, cash on delivery | 4–5 weeks |
+| 🚀 **Pilot launch** | | 50 shops, real orders in Sodo | |
+| **3. Engagement** | M9–M12 | Search, chat, notifications, reviews | 4 weeks |
+| **4. Services** | M13–M15 | Hire electricians, tailors and other pros | 3–4 weeks |
+| **5. Income** | M16–M17 | Boosts, Pro shop plan, ads | 2 weeks |
+| **6. Local reach** | M18–M20 | Amharic and Wolaytta, installable app, Telegram bot | 3 weeks |
+| **7. Delivery network** | M21–M22 | Rider pool and rider app | 3 weeks |
+| **8. Scale** | M23–M25 | Security, performance, other towns | ongoing |
+
+---
+
+## Phase 0: Prepare (no code, starts now)
+
+| # | Task | Owner | Done when |
+|---|---|---|---|
+| P0.1 | Answer the 8 decisions in [MARKETPLACE_PLAN.md §12](MARKETPLACE_PLAN.md#12-decisions-needed-from-you-before-we-start) | You | Written down |
+| P0.2 | Pick the final name; buy the domain (.com and/or .et) | You | Domain registered |
+| P0.3 | Business registration, trade licence covering online marketplace, TIN | You + accountant | Licence in hand |
+| P0.4 | BillPay **live** merchant: finish KYC (the 13 missing details), ask about holding funds and paying out to sellers, live fees, refund limit | You | Live keys + written answer on payouts |
+| P0.5 | AfroMessage: new token, top-up, sender name "SodoGebeya" approved | You | Test SMS received |
+| P0.6 | Terms of use, seller agreement, privacy policy, prohibited items list | You + lawyer | Drafts reviewed |
+| P0.7 | Hosting: a server (or cloud), backups, a business email | You + Claude | Server reachable |
+| P0.8 | Line up the first 20 shops and 10 pros who agree to try it | You | Names and phones in a list |
+
+---
+
+## Phase 1: Foundation
+
+### M1. Rebrand and clean base (1 week) ✅ Done 2026-10-24
+- Rename TenaShop → Sodo Gebeya: logo, colours and fonts from the design; new home page **S1**
+- Keep everything that works: BillPay, admin, monitoring, tests, emails
+- Mobile-first layout and the bottom menu used on every phone screen
+- **Done when:** the site looks like the design on a phone, and all existing tests pass
+
+Result: green/amber palette and Plus Jakarta Sans + Noto Sans Ethiopic; new logo, favicon and page title; phone header with place line, search and cart; bottom menu (Home, Shop, Orders, Account; Services, Sell and Chats join when built); new home (search, categories from the admin with icons, popular items, "Sell on Sodo Gebeya", how it works, FAQ); fake testimonials and newsletter removed; product cards for 2-column phone grids; emails, admin logo and the BillPay payment description renamed. Code packages keep their `et.tenapay.shop` names. Amharic line on the home page needs a native-speaker check.
+
+### M2. Phone sign-in (1 week) ✅ Done 2026-10-24
+- Sign in with phone number and SMS code through AfroMessage (**S13**); email becomes optional
+- Rate limits and lockout for code requests; codes expire after 5 minutes
+- Language picker shown (English / Amharic now, Wolaytta later)
+- **Done when:** a new user signs up with only a phone number; code abuse is blocked; tests cover expiry and limits
+
+Result: `/login` and `/register` are phone-first (number → 6-digit code → name on the first sign-in), email and password still available. Ethiopian mobiles only (09/07). Codes: HMAC-stored, 5 minutes, 5 tries, one per minute and 5 per hour per phone, 20 per hour per network address. Only SMS-proven phones sign in; staff can't use the phone door; phone-only accounts have no password and their sign-in phone can't be edited away. SMS module: AfroMessage when `AFROMESSAGE_TOKEN` is set, otherwise test mode (logged, listed in Admin → SMS, code shown on screen only with `SMS_DEV_CODES_IN_RESPONSE=true` in sandbox). Admin → **SMS** log with provider status. Metrics `tenashop_sms_total`, `tenashop_auth_phone_total`. Tests: `PhoneSignInIntegrationTest` (7), `AfroMessageGatewayTest` (4). Language picker moved to M18 (full translations), so no half-working switch is shown.
+
+### M3. Sellers and shops (1.5 weeks)
+- Account types: buyer, **shop**, **individual seller**, (later) pro
+- Shop page: logo, cover, description, location, rating; seller's own product list
+- Sellers manage **only their own** products and orders (reuse the existing catalog admin, scoped per seller)
+- Seller home on phone (**S17**) and web dashboard (**S20**), first version
+- Admin approves new shops
+- **Done when:** two different shops each list products and cannot see or edit each other's
+
+### M4. Verification and listings (1.5 weeks)
+- Verification flow (**S18**): ID front/back, selfie, shop or skill details; private storage, staff only
+- Admin verification queue (**S21**): approve, reject, ask for a better photo; Verified badge
+- Post a listing from the phone (**S16**): item or service switch, up to 5 photos (built), condition, price, negotiable, area
+- Used items from individuals; neighbourhood list for Sodo
+- Report a listing; admin hides it
+- **Done when:** a verified shop and a private seller both post listings from a phone; admin can hide a reported one
+
+---
+
+## Phase 2: Buying and money
+
+### M5. Multi-seller cart and orders (1 week)
+- Cart grouped by seller (**S4**); one checkout makes **one order per seller**, each with its own delivery fee
+- Order tracking per order (**S6**) with seller steps: packed → on the way → delivered
+- **Done when:** a cart with items from 2 shops becomes 2 orders, each tracked separately
+
+### M6. Protected payments and payouts (1.5 weeks)
+- BillPay payment held by the platform; **released** when the buyer taps "I received my items" (**S6**) or 48 h after delivery with no complaint
+- Commission per seller and category (configurable in admin, 0% at launch if you choose)
+- Seller balance: held, available, paid out (**S17**, **S20**); payout requests and payout history
+- Admin payouts screen; export for accounting
+- **Done when:** a test sale moves money held → available → paid out, with the commission recorded, and the numbers match BillPay settlements
+- **Depends on:** P0.4 (BillPay's answer on payouts)
+
+### M7. Cash on delivery (0.5 week)
+- Checkout choice BillPay / cash (**S5**); cash only for verified sellers and under a limit
+- Seller marks "cash received"; commission for cash orders is charged to the seller's balance
+- **Done when:** a cash order completes and the commission shows on the seller's statement
+
+### M8. Disputes v1 (1 week)
+- "Problem with this order?" with reason and photos (**S6**)
+- Admin dispute queue with deadline (**S21**): refund (full or partial through BillPay), release to seller, or split
+- Payout of a disputed order stays held until decided
+- **Done when:** a dispute is opened, decided, and the money goes the right way
+
+### 🚀 Pilot launch gate
+All of these must be true:
+- [ ] M1–M8 done and tested; BillPay **live** working with a small real payment
+- [ ] At least 20 verified shops with 10+ products each
+- [ ] Legal pages published; support phone number on the site
+- [ ] Backups tested by restoring; monitoring alerts go to a real phone or email
+- [ ] Staff know how to handle verifications and disputes
+
+---
+
+## Phase 3: Engagement
+
+### M9. Search and browse (1 week)
+- Full-text search (Amharic and English), filters: category, price, new/used, area, "delivers today" (**S2**)
+- Sort: nearest, newest, price, best rated; saved items (heart)
+- **Done when:** searching "shoes" under 3,000 ETB near the university returns the right items quickly
+
+### M10. Chat (1.5 weeks)
+- Buyer ↔ seller and customer ↔ pro chat (**S11**, **S12**): text, photos, listing card
+- **Make an offer** / counter / accept → goes straight to the cart at the agreed price
+- Safety warning when a phone number or "transfer" appears; report and block; staff can read reported chats only
+- **Done when:** a buyer and seller agree a price in chat and the order uses that price
+
+### M11. Notifications (0.5 week)
+- In-app notifications (**S15**), SMS for key events (order paid, on the way, new quote, payment reminder), emails kept
+- Each user picks what they get
+- **Done when:** each key event reaches the right person once, by the right channel
+
+### M12. Reviews and ratings (1 week)
+- Review only after a completed order or job; star rating plus text; seller can reply once
+- Ratings on shop, product and pro pages; response time shown
+- **Done when:** reviews can't be posted without a completed purchase
+
+---
+
+## Phase 4: Services
+
+### M13. Pro profiles (1 week)
+- Pro profile (**S8**): skills, price list, past work photos, area, hours, Verified badge
+- Services home (**S7**) with categories and top-rated pros
+- **Done when:** 10 real pros have complete profiles
+
+### M14. Job requests and quotes (1.5 weeks)
+- Describe a job (**S9**): type, text, photos, when, where, budget
+- Sent to matching pros nearby; pros send quotes; customer compares (**S10**)
+- **Done when:** a job gets 2+ quotes and the customer accepts one
+
+### M15. Deposits and job completion (1 week)
+- Accepting pays a deposit through BillPay (held); "job done" releases deposit and balance to the pro
+- Job disputes use the M8 flow
+- **Done when:** a job goes request → quote → deposit → done → paid → reviewed
+
+---
+
+## Phase 5: Income
+
+### M16. Boosts (1 week)
+- Boost a listing (**S19**): 3/7/14 days, paid with BillPay; Boosted label; top of search and home; auto-post to Telegram channel
+- **Done when:** a paid boost moves a listing to the top and ends on time
+
+### M17. Pro shop plan and ads (1 week)
+- Free vs **Pro shop** monthly plan (more products, banner, statistics, lower commission), renewal reminders
+- Simple banner ads managed in admin
+- **Done when:** a shop upgrades, pays, and its limits and commission change automatically
+
+---
+
+## Phase 6: Local reach
+
+### M18. Amharic and Wolaytta (1 week)
+- Full Amharic translation; Wolaytta with a native speaker; language remembered per user; SMS in the user's language
+### M19. Installable app (PWA) (1 week)
+- Add to home screen, works on slow connections, offline pages, push notifications on Android
+### M20. Telegram bot (1 week)
+- Order and chat alerts in Telegram; browse new listings; channel auto-posts
+
+---
+
+## Phase 7: Delivery network
+
+### M21. Delivery zones and riders (1.5 weeks)
+- Zones and fees for Sodo and outskirts; admin assigns orders to partner riders; rider phone shown to buyer (**S6**)
+### M22. Rider app (1.5 weeks)
+- Rider sees jobs, accepts, pickup photo, delivered photo or code, cash collection for COD orders, daily earnings
+
+---
+
+## Phase 8: Scale (ongoing)
+- **M23 Security:** penetration test, rate limits everywhere, fraud rules (new account + high price + many reports), 2-step login for staff
+- **M24 Performance:** image CDN, caching, database indexes, load tests (the load-test tool already started)
+- **M25 Expansion:** add towns (Areka, Boditi, Arba Minch, Hawassa) as areas; local agents; Android app in the Play Store
+
+---
+
+## What we reuse vs build
+
+| Already built in TenaShop | New |
+|---|---|
+| BillPay payments, webhooks, sandbox/live switch | Many sellers, shops, payouts and commission |
+| Products, categories, 5 photos, stock | Phone/SMS sign-in, verification, badges |
+| Cart, checkout, delivery fee, discount codes | Split orders, held payments, cash on delivery, disputes |
+| Order tracking, emails, payment reminders | Chat, offers, notifications by SMS/Telegram |
+| Admin, roles, reports, CSV | Services: pros, jobs, quotes, deposits |
+| Grafana, alerts, tests, CI | Boosts, plans, ads, languages, riders |
+
+---
+
+## Numbers we watch at each stage
+
+| Stage | Watch |
+|---|---|
+| Phase 1 | Shops signed up, verified, listings posted |
+| Phase 2 / pilot | Paid orders per week, payment success rate, disputes per 100 orders, time to payout |
+| Phase 3 | Search → product → order conversion, chats that turn into orders, repeat buyers |
+| Phase 4 | Jobs requested, quotes per job, jobs completed, pro rating |
+| Phase 5 | Boost revenue, Pro shop subscriptions, platform income vs costs |
+
+The Grafana Business dashboard gets a new panel for each of these as the features ship.
+
+---
+
+## Next step
+1. You: finish Phase 0 items P0.1, P0.4 and P0.5 first (they unblock the most work).
+2. Review the design canvas and comment on anything to change.
+3. Say **"go M1"** and we start: rebrand and the new home screen.

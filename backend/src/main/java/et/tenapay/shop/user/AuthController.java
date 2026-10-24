@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
 	private final AuthService auth;
+	private final PhoneAuthService phoneAuth;
 
 	public record LoginRequest(@NotBlank @Email String email, @NotBlank @Size(max = 200) String password) {
 	}
@@ -40,6 +41,25 @@ public class AuthController {
 	@PostMapping("/api/auth/login")
 	public Session login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
 		return auth.login(req.email(), req.password(), Portal.SHOP, client(http));
+	}
+
+	public record PhoneStartRequest(@NotBlank @Size(max = 30) String phone) {
+	}
+
+	public record PhoneVerifyRequest(@NotBlank @Size(max = 30) String phone, @NotBlank @Size(max = 12) String code,
+			@Size(max = 200) String fullName) {
+	}
+
+	/** Step 1 of phone sign-in: text a 6-digit code to the number. */
+	@PostMapping("/api/auth/phone/start")
+	public PhoneAuthService.CodeSent phoneStart(@Valid @RequestBody PhoneStartRequest req, HttpServletRequest http) {
+		return phoneAuth.sendCode(req.phone(), client(http));
+	}
+
+	/** Step 2: check the code and sign in (creating the account on a first sign-in, which needs fullName). */
+	@PostMapping("/api/auth/phone/verify")
+	public Session phoneVerify(@Valid @RequestBody PhoneVerifyRequest req, HttpServletRequest http) {
+		return phoneAuth.verify(req.phone(), req.code(), req.fullName(), client(http));
 	}
 
 	@PostMapping("/api/admin/auth/login")

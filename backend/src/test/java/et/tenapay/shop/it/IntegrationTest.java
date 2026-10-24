@@ -57,6 +57,8 @@ import tools.jackson.databind.ObjectMapper;
 		"app.redirect-base-url=https://shop.test",
 		"app.public-base-url=http://localhost:5280",
 		"app.scheduling.enabled=false",
+		// SMS stays in test mode (no AfroMessage token); sign-in codes come back in the response so tests can use them
+		"sms.dev-codes-in-response=true",
 		"app.delivery.flat-fee=150",
 		"app.delivery.free-over=3000",
 		// no S3 in tests (InMemoryMediaStorage below); point the real client at a closed port so it fails fast

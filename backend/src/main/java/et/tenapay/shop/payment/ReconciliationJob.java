@@ -15,7 +15,10 @@ import et.tenapay.shop.order.OrderStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/** Safety net for missing webhooks: polls BillPay for stale payments and expires unpaid orders. */
+/**
+ * Safety net for missing webhooks: polls BillPay for stale payments, reminds customers who haven't paid yet, and
+ * expires unpaid orders.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -26,6 +29,7 @@ public class ReconciliationJob {
 	private final PaymentAttemptRepository attempts;
 	private final OrderRepository orders;
 	private final PaymentService payments;
+	private final et.tenapay.shop.order.PaymentReminders reminders;
 	private final AppProperties app;
 
 	@Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT30S")
@@ -36,6 +40,12 @@ public class ReconciliationJob {
 		for (UUID id : due) {
 			PaymentService.Outcome outcome = payments.reconcile(id);
 			log.debug("Reconciled attempt {}: {}", id, outcome);
+		}
+
+		try {
+			reminders.sendDue(now);
+		} catch (RuntimeException e) {
+			log.warn("Payment reminders failed: {}", e.getMessage());
 		}
 
 		List<UUID> stale = orders.findIdsByStatusInAndCreatedAtBefore(OrderStatus.AWAITING_PAYMENT,

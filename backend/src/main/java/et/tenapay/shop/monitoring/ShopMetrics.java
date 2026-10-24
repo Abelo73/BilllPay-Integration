@@ -41,6 +41,7 @@ public class ShopMetrics {
 		for (String r : new String[] { "accepted", "duplicate", "rejected_signature", "invalid_json" }) {
 			counter("tenashop.webhooks.received", "BillPay webhook deliveries", "result", r);
 		}
+		Counter.builder("tenashop.payments.reminders").description("Finish-paying reminders sent").register(registry);
 	}
 
 	private Counter paymentStatusCounter(String status) {
@@ -103,6 +104,23 @@ public class ShopMetrics {
 
 	public void refundStatus(String status) {
 		AfterCommit.run(() -> counter("tenashop.refunds.status", "Refunds reaching a status", "status", status).increment());
+	}
+
+	/** One SMS attempt: kind (SIGN_IN_CODE, ORDER, ...) and status (SENT, FAILED, LOGGED). */
+	public void sms(String kind, String status) {
+		Counter.builder("tenashop.sms").description("Text messages by kind and outcome").tag("kind", kind).tag("status", status)
+				.register(registry).increment();
+	}
+
+	/** A sign-in code was requested, verified or refused (result = sent, verified, wrong_code, rate_limited, ...). */
+	public void phoneSignIn(String result) {
+		counter("tenashop.auth.phone", "Phone sign-in steps by result", "result", result).increment();
+	}
+
+	/** A "finish paying" reminder was queued for an unpaid order. */
+	public void paymentReminder() {
+		AfterCommit.run(() -> Counter.builder("tenashop.payments.reminders").description("Finish-paying reminders sent")
+				.register(registry).increment());
 	}
 
 	private Counter counter(String name, String description, String tagKey, String tagValue) {

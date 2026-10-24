@@ -42,10 +42,13 @@ public class AuthService {
 	public record ClientInfo(String ip, String userAgent) {
 	}
 
-	public record UserView(UUID id, String email, String fullName, String phone, Role role) {
+	/** phoneVerified: signs in with this phone; hasPassword: false for phone-only accounts (no password to change). */
+	public record UserView(UUID id, String email, String fullName, String phone, Role role, boolean phoneVerified,
+			boolean hasPassword) {
 
 		public static UserView of(User u) {
-			return new UserView(u.getId(), u.getEmail(), u.getFullName(), u.getPhone(), u.getRole());
+			return new UserView(u.getId(), u.getEmail(), u.getFullName(), u.getPhone(), u.getRole(), u.isPhoneVerified(),
+					u.hasPassword());
 		}
 	}
 
@@ -83,7 +86,7 @@ public class AuthService {
 			result = new Attempt(null, "UNKNOWN_EMAIL");
 		} else if (user.isLocked()) {
 			result = new Attempt(user, "LOCKED");
-		} else if (!passwords.matches(password, user.getPasswordHash())) {
+		} else if (!user.hasPassword() || !passwords.matches(password, user.getPasswordHash())) {
 			user.setFailedLogins(user.getFailedLogins() + 1);
 			if (user.getFailedLogins() >= MAX_FAILED_LOGINS) {
 				user.setFailedLogins(0);
@@ -134,6 +137,10 @@ public class AuthService {
 		PasswordPolicy.check(newPassword);
 		User user = tx.execute(s -> {
 			User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("User"));
+			if (!u.hasPassword()) {
+				throw new ApiException(HttpStatus.BAD_REQUEST, "NO_PASSWORD",
+						"You sign in with your phone, so this account has no password to change.");
+			}
 			if (!passwords.matches(currentPassword, u.getPasswordHash())) {
 				throw new ApiException(HttpStatus.BAD_REQUEST, "WRONG_PASSWORD", "Your current password is not correct.");
 			}
@@ -156,7 +163,8 @@ public class AuthService {
 		return new Session(t.token(), t.expiresAt(), UserView.of(user));
 	}
 
-	private void record(User user, String email, Portal portal, boolean success, String reason, ClientInfo client) {
+	/** Records a sign-in attempt; {@code who} is the email or phone the person used. */
+	void record(User user, String email, Portal portal, boolean success, String reason, ClientInfo client) {
 		LoginEvent e = new LoginEvent();
 		e.setUserId(user == null ? null : user.getId());
 		e.setEmail(email);

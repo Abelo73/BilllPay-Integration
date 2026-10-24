@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { api, type Address, type AddressInput } from '@/lib/api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useSession } from '@/store/session'
+import { userContact, useSession } from '@/store/session'
 
 const STATUS_TONE: Record<string, string> = {
   PAID: 'bg-success/15 text-success border-success/30',
@@ -52,6 +52,9 @@ function MyOrders() {
             <p className="font-mono text-sm font-medium">{o.orderNumber}</p>
             <p className="text-xs text-muted-foreground">
               {formatDate(o.createdAt)} · {o.itemCount} item{o.itemCount === 1 ? '' : 's'}
+              {(o.status === 'PENDING_PAYMENT' || o.status === 'PAYMENT_FAILED') && (
+                <span className="font-medium text-brand"> · Not paid yet, open to finish paying</span>
+              )}
             </p>
           </div>
           <Badge variant="outline" className={cn('hidden sm:inline-flex', STATUS_TONE[o.status])}>
@@ -204,7 +207,10 @@ function Profile() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base"><UserRound className="size-4" /> Profile</CardTitle>
-        <CardDescription>Used to prefill checkout. Your email is {user.email}.</CardDescription>
+        <CardDescription>
+          Used to prefill checkout.{' '}
+          {user.phoneVerified ? `You sign in with ${user.phone}.` : user.email ? `You sign in with ${user.email}.` : ''}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4 sm:grid-cols-2" onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
@@ -214,7 +220,8 @@ function Profile() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone</Label>
-            <Input id="phone" className="h-10" type="tel" placeholder="0911 234 567" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Input id="phone" className="h-10" type="tel" placeholder="0911 234 567" value={form.phone} disabled={user.phoneVerified} aria-describedby={user.phoneVerified ? 'phone-locked' : undefined} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            {user.phoneVerified && <p id="phone-locked" className="text-xs text-muted-foreground">Verified by SMS. You sign in with this number.</p>}
           </div>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} Save</Button>
@@ -226,7 +233,10 @@ function Profile() {
 }
 
 function Security() {
-  const { setSession, clear } = useSession()
+  const { session, setSession, clear } = useSession()
+  // accounts from before phone sign-in don't carry the flag: they have a password
+  const hasPassword = session?.user.hasPassword !== false
+  const phone = session?.user.phone ?? ''
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' })
@@ -252,6 +262,7 @@ function Security() {
   })
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      {hasPassword ? (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="size-4" /> Change password</CardTitle>
@@ -285,6 +296,14 @@ function Security() {
           </form>
         </CardContent>
       </Card>
+      ) : (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="size-4" /> Signing in</CardTitle>
+          <CardDescription>You sign in with your phone {phone} and a code we text you. There is no password to remember or change.</CardDescription>
+        </CardHeader>
+      </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base"><ShieldAlert className="size-4" /> Sessions</CardTitle>
@@ -312,7 +331,7 @@ export function AccountPage() {
         </span>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Hi, {session.user.fullName.split(' ')[0]}</h1>
-          <p className="text-sm text-muted-foreground">{session.user.email}</p>
+          <p className="text-sm text-muted-foreground">{userContact(session.user)}</p>
         </div>
       </div>
       <Tabs value={params.get('tab') ?? 'orders'} onValueChange={(tab) => setParams(tab === 'orders' ? {} : { tab }, { replace: true })}>

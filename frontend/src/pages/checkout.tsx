@@ -17,7 +17,7 @@ import { api, ApiError, deliveryFee, type Address, type PriceQuote } from '@/lib
 import { formatETB, orderContact } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
-import { useSession } from '@/store/session'
+import { userContact, useSession } from '@/store/session'
 
 const schema = z.object({
   name: z.string().trim().min(2, 'Enter your full name').max(200),
@@ -149,7 +149,7 @@ export function CheckoutPage() {
         </div>
         <h1 className="text-2xl font-semibold">Staff accounts can’t place orders</h1>
         <p className="text-sm text-muted-foreground">
-          You’re signed in as {user.email}. Sign out, then sign in with a customer account to buy.
+          You’re signed in as {userContact(user)}. Sign out, then sign in with a customer account to buy.
         </p>
         <Button onClick={() => { clearSession(); navigate('/login?next=/checkout') }}>Sign out and continue</Button>
       </div>

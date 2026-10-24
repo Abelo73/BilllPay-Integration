@@ -22,6 +22,7 @@ WITH wanted(tbl, cols) AS (VALUES
   ('orders', ARRAY['id', 'order_number', 'status', 'subtotal', 'total', 'currency', 'paid_at', 'created_at', 'updated_at',
                    'discount_code', 'discount_amount', 'delivery_city', 'delivery_fee', 'fulfilment_status',
                    'shipped_at', 'delivered_at', 'cancelled_at', 'environment']),
+  ('order_events', ARRAY['id', 'order_id', 'type', 'created_at']),
   ('order_items', ARRAY['id', 'order_id', 'product_id', 'product_name', 'unit_price', 'quantity', 'line_total']),
   ('payment_attempts', ARRAY['id', 'order_id', 'attempt_no', 'status', 'amount', 'currency', 'payment_method',
                              'reason_code', 'expires_at', 'created_at', 'updated_at', 'environment']),

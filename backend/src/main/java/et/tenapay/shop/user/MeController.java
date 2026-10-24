@@ -63,8 +63,14 @@ public class MeController {
 	@Transactional
 	public UserView update(@Valid @RequestBody ProfileUpdate req) {
 		User u = load();
+		String phone = req.phone() == null || req.phone().isBlank() ? null : CheckoutService.normalizePhone(req.phone());
+		// a proven phone is how this person signs in; changing it needs a new code (not built yet), so it stays
+		if (u.isPhoneVerified() && !java.util.Objects.equals(phone, u.getPhone())) {
+			throw new ApiException(org.springframework.http.HttpStatus.CONFLICT, "PHONE_LOCKED",
+					"You sign in with " + u.getPhone() + ", so it can't be changed here yet.");
+		}
 		u.setFullName(req.fullName().trim());
-		u.setPhone(req.phone() == null || req.phone().isBlank() ? null : CheckoutService.normalizePhone(req.phone()));
+		u.setPhone(phone);
 		return UserView.of(u);
 	}
 

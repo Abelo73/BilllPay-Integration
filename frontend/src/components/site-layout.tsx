@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { FlaskConical, Menu, ShoppingCart } from 'lucide-react'
+import { FlaskConical, Home, Package, Search, ShoppingCart, User } from 'lucide-react'
 import { Link, NavLink, Outlet, ScrollRestoration } from 'react-router'
 
 import { CartSheet } from '@/components/cart-sheet'
@@ -7,7 +7,6 @@ import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
@@ -23,63 +22,92 @@ function SandboxBanner() {
   const info = useQuery({ queryKey: ['store-info'], queryFn: api.storeInfo, staleTime: 5 * 60_000 })
   if (!info.data?.sandbox) return null
   return (
-    <div className="flex items-center justify-center gap-2 bg-warning/15 px-4 py-1.5 text-center text-xs font-medium text-foreground">
+    <div className="flex items-center justify-center gap-2 bg-warning/20 px-4 py-1.5 text-center text-xs font-medium text-foreground">
       <FlaskConical className="size-3.5 shrink-0" />
-      Sandbox mode: payments go through BillPay test. No real money moves.
+      Test mode: payments go through BillPay's sandbox. No real money moves.
     </div>
   )
 }
 
-function Header() {
+function CartButton({ className }: { className?: string }) {
   const lines = useCart((s) => s.lines)
   const setOpen = useCart((s) => s.setOpen)
   const { count } = cartTotals(lines)
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className={cn('relative size-11 rounded-full bg-card', className)}
+      aria-label={count > 0 ? `Open cart, ${count} items` : 'Open cart'}
+      onClick={() => setOpen(true)}
+    >
+      <ShoppingCart className="size-5" />
+      {count > 0 && (
+        <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">
+          {count}
+        </span>
+      )}
+    </Button>
+  )
+}
+
+function Header() {
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    cn('text-sm font-medium transition-colors hover:text-foreground', isActive ? 'text-foreground' : 'text-muted-foreground')
+    cn('text-sm font-semibold transition-colors hover:text-foreground', isActive ? 'text-foreground' : 'text-muted-foreground')
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-lg">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
-        <Logo />
-        <nav className="hidden items-center gap-6 md:flex">
+        <Logo withPlace />
+        <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
           {NAV.map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={linkClass}>
               {n.label}
             </NavLink>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-1">
-          <ThemeToggle />
-          <UserMenu />
-          <Button variant="ghost" size="icon" className="relative" aria-label="Open cart" onClick={() => setOpen(true)}>
-            <ShoppingCart />
-            {count > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-semibold text-brand-foreground">
-                {count}
-              </span>
-            )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button asChild variant="ghost" size="icon" className="size-11 md:hidden" aria-label="Search">
+            <Link to="/shop">
+              <Search className="size-5" />
+            </Link>
           </Button>
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Menu">
-                <Menu />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-6">
-              <SheetTitle className="sr-only">Menu</SheetTitle>
-              <Logo />
-              <nav className="mt-8 flex flex-col gap-4">
-                {NAV.map((n) => (
-                  <NavLink key={n.to} to={n.to} end={n.end} className={linkClass}>
-                    {n.label}
-                  </NavLink>
-                ))}
-              </nav>
-            </SheetContent>
-          </Sheet>
+          <ThemeToggle />
+          <div className="hidden md:block">
+            <UserMenu />
+          </div>
+          <CartButton />
         </div>
       </div>
     </header>
+  )
+}
+
+/** Phone navigation, as in the design. Only pages that exist today; Services, Sell and Chats join when they ship. */
+function BottomNav() {
+  const item = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      'flex min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors',
+      isActive ? 'font-bold text-primary' : 'font-semibold text-muted-foreground',
+    )
+  return (
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
+      <NavLink to="/" end className={item}>
+        <Home className="size-[22px]" /> Home
+      </NavLink>
+      <NavLink to="/shop" className={item}>
+        <Search className="size-[22px]" /> Shop
+      </NavLink>
+      <NavLink to="/orders/track" className={item}>
+        <Package className="size-[22px]" /> Orders
+      </NavLink>
+      <NavLink to="/account" className={item}>
+        <User className="size-[22px]" /> Account
+      </NavLink>
+    </nav>
   )
 }
 
@@ -87,32 +115,32 @@ const YEAR = new Date().getFullYear()
 
 function Footer() {
   return (
-    <footer className="mt-24 border-t">
+    <footer className="mt-20 border-t bg-card pb-20 md:pb-0">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div className="space-y-3 md:col-span-2">
-          <Logo />
+          <Logo withPlace />
           <p className="max-w-sm text-sm text-muted-foreground">
-            Ethiopian-made goods and everyday essentials, delivered across Addis Ababa. Payments secured by BillPay.
+            The online market for Wolaita Sodo: buy from local shops and people, pay with BillPay, get it delivered in town.
           </p>
         </div>
         <div className="space-y-3 text-sm">
-          <p className="font-medium">Shop</p>
+          <p className="font-semibold">Shop</p>
           <ul className="space-y-2 text-muted-foreground">
-            <li><Link to="/shop?category=coffee-tea" className="hover:text-foreground">Coffee & Tea</Link></li>
-            <li><Link to="/shop?category=fashion" className="hover:text-foreground">Fashion</Link></li>
-            <li><Link to="/shop?category=electronics" className="hover:text-foreground">Electronics</Link></li>
+            <li><Link to="/shop" className="hover:text-foreground">All products</Link></li>
+            <li><Link to="/shop?sort=newest" className="hover:text-foreground">New arrivals</Link></li>
           </ul>
         </div>
         <div className="space-y-3 text-sm">
-          <p className="font-medium">Help</p>
+          <p className="font-semibold">Help</p>
           <ul className="space-y-2 text-muted-foreground">
             <li><Link to="/orders/track" className="hover:text-foreground">Track your order</Link></li>
-            <li><a href="/#faq" className="hover:text-foreground">FAQ</a></li>
+            <li><a href="/#faq" className="hover:text-foreground">Questions</a></li>
+            <li><Link to="/register" className="hover:text-foreground">Sell on Sodo Gebeya</Link></li>
           </ul>
         </div>
       </div>
       <div className="border-t py-6 text-center text-xs text-muted-foreground">
-        © {YEAR} TenaShop by TenaPay. A BillPay integration test store.
+        © {YEAR} Sodo Gebeya · Wolaita Sodo, Ethiopia · Payments by BillPay
       </div>
     </footer>
   )
@@ -127,6 +155,7 @@ export function SiteLayout() {
         <Outlet />
       </main>
       <Footer />
+      <BottomNav />
       <CartSheet />
       <ScrollRestoration />
     </div>

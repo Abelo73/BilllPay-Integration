@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
+  MessageSquareText,
   Menu,
   Package,
   PanelLeftClose,
@@ -26,6 +27,7 @@ import {
 import { useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
 
+import { LogoMark } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -64,6 +66,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/setup', label: 'BillPay setup', icon: Settings2 },
       { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook, badge: 'webhooks' },
       { to: '/admin/emails', label: 'Emails', icon: Mail },
+      { to: '/admin/sms', label: 'SMS', icon: MessageSquareText },
       { to: '/admin/load-tests', label: 'Load tests', icon: Gauge, adminOnly: true },
     ],
   },
@@ -142,12 +145,10 @@ function Nav({ collapsed = false, counts, onNavigate }: { collapsed?: boolean; c
 function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
     <Link to="/admin" className={cn('flex items-center gap-2 font-semibold tracking-tight', collapsed && 'justify-center')}>
-      <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-        <ShoppingBag className="size-3.5" />
-      </span>
+      <LogoMark className="size-7" />
       {!collapsed && (
-        <span className="leading-tight">
-          Tena<span className="text-brand">Shop</span>
+        <span className="leading-tight font-extrabold">
+          Sodo <span className="text-brand">Gebeya</span>
           <span className="block text-[11px] font-normal text-muted-foreground">Admin</span>
         </span>
       )}

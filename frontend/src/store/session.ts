@@ -5,11 +5,19 @@ export type Role = 'CUSTOMER' | 'SUPPORT' | 'ADMIN'
 
 export type SessionUser = {
   id: string
-  email: string
+  /** null for accounts created with a phone number */
+  email: string | null
   fullName: string
   phone: string | null
   role: Role
+  /** signs in with this phone (proven by an SMS code) */
+  phoneVerified?: boolean
+  /** false for phone-only accounts: there is no password to change */
+  hasPassword?: boolean
 }
+
+/** What to show for "signed in as …": the email, else the phone. */
+export const userContact = (u: SessionUser) => u.email ?? u.phone ?? ''
 
 export type Session = { token: string; expiresAt: string; user: SessionUser }
 

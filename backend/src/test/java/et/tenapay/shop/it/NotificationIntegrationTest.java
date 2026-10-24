@@ -156,7 +156,7 @@ class NotificationIntegrationTest extends IntegrationTest {
 		Res r = post("/api/me/password", Map.of("currentPassword", "Str0ng-pass", "newPassword", "Even-str0nger"), token);
 		assertThat(r.status()).as(r.raw()).isEqualTo(200);
 		await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> assertThat(subjects(email))
-				.containsExactly("Your TenaShop password was changed"));
+				.containsExactly("Your Sodo Gebeya password was changed"));
 		assertThat(inbox(email).getFirst().text()).contains("Hi Meron").contains("signed out");
 
 		Res list = get("/api/admin/notifications", admin);

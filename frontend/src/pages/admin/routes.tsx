@@ -4,6 +4,7 @@ import { AdminCategoriesPage } from './categories'
 import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
+import { AdminSmsPage } from './sms'
 import { AdminLayout } from './layout'
 import { AdminLoadTestsPage } from './load-tests'
 import { AdminLoginHistoryPage } from './login-history'
@@ -36,6 +37,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },
       { path: 'emails', element: <AdminEmailsPage /> },
+      { path: 'sms', element: <AdminSmsPage /> },
       { path: 'reports', element: <AdminReportsPage /> },
       { path: 'load-tests', element: <AdminLoadTestsPage /> },
       { path: 'setup', element: <AdminSetupPage /> },

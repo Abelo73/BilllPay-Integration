@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useSession } from '@/store/session'
+import { userContact, useSession } from '@/store/session'
 
 /** "Sign in" for guests; an account menu for signed-in customers. */
 export function UserMenu() {
@@ -47,7 +47,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
           <p className="truncate font-medium">{session.user.fullName}</p>
-          <p className="truncate text-xs font-normal text-muted-foreground">{session.user.email}</p>
+          <p className="truncate text-xs font-normal text-muted-foreground">{userContact(session.user)}</p>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

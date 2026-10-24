@@ -13,6 +13,8 @@ public record AppProperties(
 		List<String> corsOrigins,
 		Duration reconcileAfter,
 		Duration paymentExpiry,
+		/** How long before expiry an unpaid order gets one "finish paying" email; zero turns reminders off. */
+		Duration paymentReminderBefore,
 		String adminEmail,
 		String adminPassword,
 		String jwtSecret,
