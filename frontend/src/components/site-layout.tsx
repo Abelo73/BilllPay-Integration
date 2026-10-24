@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-rou
 
 import { CartSheet } from '@/components/cart-sheet'
 import { ChatsNavLink } from '@/components/chat-nav'
+import { InboxBell } from '@/components/inbox-bell'
 import { InstallApp } from '@/components/install-app'
 import { Logo } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -77,7 +78,10 @@ function Header() {
               <Search className="size-5" />
             </Link>
           </Button>
-          <ThemeToggle />
+          <InboxBell />
+          <div className="hidden md:block">
+            <ThemeToggle />
+          </div>
           <div className="hidden md:block">
             <UserMenu />
           </div>

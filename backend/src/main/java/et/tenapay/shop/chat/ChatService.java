@@ -64,11 +64,12 @@ public class ChatService {
 	private final SmsService sms;
 	private final AppProperties app;
 	private final TransactionTemplate tx;
+	private final et.tenapay.shop.inbox.InboxService inbox;
 
 	public ChatService(ConversationRepository conversations, ChatMessageRepository messages, ChatOfferRepository offers,
 			ChatReportRepository reports, ShopRepository shops, ProductRepository products, UserRepository users,
 			ImageProcessor images, MediaStorage storage, MediaProperties media, SmsService sms, AppProperties app,
-			TransactionTemplate tx) {
+			TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox) {
 		this.conversations = conversations;
 		this.messages = messages;
 		this.offers = offers;
@@ -82,6 +83,7 @@ public class ChatService {
 		this.sms = sms;
 		this.app = app;
 		this.tx = tx;
+		this.inbox = inbox;
 	}
 
 	// ---------- views ----------
@@ -219,6 +221,7 @@ public class ChatService {
 			p.c().markRead(p.side(), m.getCreatedAt());
 			return new Saved(messageViews(List.of(m), userId, p).getFirst(), p, preview);
 		});
+		notifyInbox(saved.party(), userId, saved.preview());
 		nudgeBySms(saved.party(), userId);
 		return saved.view();
 	}
@@ -501,6 +504,17 @@ public class ChatService {
 		return out;
 	}
 
+	/** The other side gets one in-app notification per conversation per hour, not one per message. */
+	private void notifyInbox(Party p, UUID senderId, String preview) {
+		boolean toSeller = p.side() == Conversation.Side.BUYER;
+		UUID recipient = toSeller ? (p.shop() == null ? null : p.shop().getOwnerId()) : p.c().getBuyerId();
+		String from = toSeller ? users.findById(senderId).map(User::getFullName).orElse("A buyer")
+				: (p.shop() == null ? "A shop" : p.shop().getName());
+		long hour = Instant.now().getEpochSecond() / 3600;
+		inbox.notify(recipient, et.tenapay.shop.inbox.InboxItem.Kind.CHAT, "New message from " + from, preview,
+				"/chats/" + p.c().getId(), "INBOX:CHAT:" + p.c().getId() + ":" + (toSeller ? "S" : "B") + ":" + hour);
+	}
+
 	/** Texts the other side about new messages, at most once per conversation every 6 hours. */
 	private void nudgeBySms(Party p, UUID senderId) {
 		try {
@@ -518,6 +532,10 @@ public class ChatService {
 				from = p.shop() == null ? "a shop" : p.shop().getName();
 			}
 			if (phone == null || !phone.matches("^\\+251[79]\\d{8}$")) {
+				return;
+			}
+			UUID recipient = toSeller ? (p.shop() == null ? null : p.shop().getOwnerId()) : p.c().getBuyerId();
+			if (!inbox.wantsSms(recipient, et.tenapay.shop.inbox.InboxService.SmsTopic.CHAT)) {
 				return;
 			}
 			long bucket = Instant.now().getEpochSecond() / SMS_NUDGE_EVERY.toSeconds();

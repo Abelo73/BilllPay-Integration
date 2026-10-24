@@ -37,18 +37,20 @@ public class SmsOrderNotifier {
 	private final TransactionTemplate tx;
 	private final AppProperties app;
 	private final boolean enabled;
+	private final et.tenapay.shop.inbox.InboxService inbox;
 
 	public SmsOrderNotifier(SmsService sms, OrderRepository orders, TransactionTemplate tx, AppProperties app,
-			@Value("${sms.order-updates:true}") boolean enabled) {
+			@Value("${sms.order-updates:true}") boolean enabled, et.tenapay.shop.inbox.InboxService inbox) {
 		this.sms = sms;
 		this.orders = orders;
 		this.tx = tx;
 		this.app = app;
 		this.enabled = enabled;
+		this.inbox = inbox;
 	}
 
 	private record OrderInfo(String number, String phone, BigDecimal total, String trackingNote, Instant payBy,
-			boolean awaitingPayment) {
+			boolean awaitingPayment, java.util.UUID userId) {
 	}
 
 	/** Events older than this are not texted. */
@@ -81,6 +83,9 @@ public class SmsOrderNotifier {
 		if (type.equals("order.payment.reminder") && !o.awaitingPayment()) {
 			return; // paid, cancelled or expired since the reminder was queued
 		}
+		if (!inbox.wantsSms(o.userId(), et.tenapay.shop.inbox.InboxService.SmsTopic.ORDERS)) {
+			return; // the customer turned order texts off (they still see it in the app)
+		}
 		String text = text(type, o);
 		// one reminder per order; the others once per event
 		String key = type.equals("order.payment.reminder") ? "SMS:REMINDER:" + o.number()
@@ -91,7 +96,7 @@ public class SmsOrderNotifier {
 	private OrderInfo info(Order o) {
 		return new OrderInfo(o.getOrderNumber(), o.getCustomerPhone(), o.getTotal(), o.getTrackingNote(),
 				o.getCreatedAt() == null || app.paymentExpiry() == null ? null : o.getCreatedAt().plus(app.paymentExpiry()),
-				o.getStatus() != null && o.getStatus().awaitingPayment());
+				o.getStatus() != null && o.getStatus().awaitingPayment(), o.getUserId());
 	}
 
 	String text(String type, OrderInfo o) {

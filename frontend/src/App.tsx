@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { AccountPage } from '@/pages/account'
 import { ChatPage } from '@/pages/chat'
 import { ChatsPage } from '@/pages/chats'
+import { NotificationsPage } from '@/pages/notifications'
 import { JobPage, MyJobsPage, NewJobPage } from '@/pages/jobs'
 import { ProDashboardPage } from '@/pages/pro-dashboard'
 import { ProProfilePage, ServicesPage } from '@/pages/services'
@@ -68,6 +69,7 @@ const router = createBrowserRouter([
       { path: '/account', element: <AccountPage /> },
       { path: '/chats', element: <ChatsPage /> },
       { path: '/chats/:id', element: <ChatPage /> },
+      { path: '/notifications', element: <NotificationsPage /> },
       { path: '/services', element: <ServicesPage /> },
       { path: '/pros/:id', element: <ProProfilePage /> },
       { path: '/jobs', element: <MyJobsPage /> },

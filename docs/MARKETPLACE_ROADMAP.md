@@ -146,6 +146,8 @@ All of these must be true:
 
 🟡 Part done 2026-10-24 (built alongside M3): **order SMS**: finish-paying reminder, payment received, on the way (with the rider note), delivered. Each fits one 160-character plain-text SMS, goes only to Ethiopian mobiles, and is sent once per event (unique key, V16). Events older than 30 minutes are skipped, and a new SMS listener starts from the newest event, so switching SMS on never texts about old orders. Off with `SMS_ORDER_UPDATES=false`; in test mode they show in Admin → SMS as "logged". Test: `SmsOrderUpdatesIntegrationTest`. Still to do: in-app notifications (S15), per-user choices, "new quote" (needs M14), checkout email optional.
 
+✅ Done 2026-10-24: **in-app notifications** (S15, `/notifications`, V21). A bell in the header shows the unread count. Items come from order events (payment received, new order to pack for the seller, payment failed, reminder, on the way, delivered, expired, cancelled, refunded), chats (one per conversation per hour), and jobs (direct request, new price, accepted, cancelled). Each item is stored once (unique key); tap opens the order, chat or job and marks it read; "Mark all read". Items older than 90 days are cleaned daily. **Per-user SMS choices** for orders, chats and jobs on the same page (no saved row = all on); the app inbox always gets everything. Test: `InboxIntegrationTest`. Still open: checkout email optional, push notifications (M18 PWA).
+
 ### M12. Reviews and ratings (1 week)
 - Review only after a completed order or job; star rating plus text; seller can reply once
 - Ratings on shop, product and pro pages; response time shown

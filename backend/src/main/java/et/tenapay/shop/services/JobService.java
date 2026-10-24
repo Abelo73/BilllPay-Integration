@@ -51,10 +51,11 @@ public class JobService {
 	private final SmsService sms;
 	private final AppProperties app;
 	private final TransactionTemplate tx;
+	private final et.tenapay.shop.inbox.InboxService inbox;
 
 	public JobService(JobRequestRepository jobs, JobQuoteRepository quotes, JobPhotoRepository photos, ProProfileRepository pros,
 			ProService proService, UserRepository users, ImageProcessor images, MediaStorage storage, MediaProperties media,
-			SmsService sms, AppProperties app, TransactionTemplate tx) {
+			SmsService sms, AppProperties app, TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox) {
 		this.jobs = jobs;
 		this.quotes = quotes;
 		this.photos = photos;
@@ -67,6 +68,7 @@ public class JobService {
 		this.sms = sms;
 		this.app = app;
 		this.tx = tx;
+		this.inbox = inbox;
 	}
 
 	// ---------- views ----------
@@ -134,8 +136,9 @@ public class JobService {
 			return jobs.save(n);
 		});
 		if (directPro != null) {
-			text(directPro.getPhone(), "Sodo Gebeya: new job request for you: " + snippet(description) + " Reply with a price: " + link("/pro/jobs/" + j.getId()),
-					"JOB:DIRECT:" + j.getId());
+			tell(directPro.getOwnerId(), directPro.getPhone(),
+					"Sodo Gebeya: new job request for you: " + snippet(description) + " Reply with a price: " + link("/pro/jobs/" + j.getId()),
+					"JOB:DIRECT:" + j.getId(), "New job request for you", description, "/pro/jobs/" + j.getId());
 		}
 		return tx.execute(s -> view(jobs.findById(j.getId()).orElseThrow(), customerId, null));
 	}
@@ -181,7 +184,7 @@ public class JobService {
 	}
 
 	public JobView accept(UUID customerId, Long jobId, Long quoteId) {
-		record Accepted(JobView view, String proPhone, String customer) {
+		record Accepted(JobView view, String proPhone, String customer, UUID proOwner) {
 		}
 		Accepted a = tx.execute(s -> {
 			JobRequest j = ownLocked(customerId, jobId);
@@ -200,32 +203,32 @@ public class JobService {
 			ProProfile pro = pros.findById(q.getProId()).orElseThrow();
 			String customer = users.findById(customerId).map(u -> publicName(u.getFullName()) + (u.getPhone() == null ? "" : " " + u.getPhone()))
 					.orElse("the customer");
-			return new Accepted(view(j, customerId, null), pro.getPhone(), customer);
+			return new Accepted(view(j, customerId, null), pro.getPhone(), customer, pro.getOwnerId());
 		});
-		text(a.proPhone(), "Sodo Gebeya: your quote was accepted. Contact " + a.customer() + ". Details: " + link("/pro/jobs/" + jobId),
-				"JOB:ACCEPTED:" + jobId);
+		tell(a.proOwner(), a.proPhone(), "Sodo Gebeya: your quote was accepted. Contact " + a.customer() + ". Details: " + link("/pro/jobs/" + jobId),
+				"JOB:ACCEPTED:" + jobId, "Your price was accepted", "Contact " + a.customer() + " to plan the work.", "/pro/jobs/" + jobId);
 		return a.view();
 	}
 
 	public JobView cancel(UUID customerId, Long jobId) {
-		record Cancelled(JobView view, String proPhone) {
+		record Cancelled(JobView view, String proPhone, UUID proOwner) {
 		}
 		Cancelled c = tx.execute(s -> {
 			JobRequest j = ownLocked(customerId, jobId);
 			if (j.getStatus() != JobRequest.Status.OPEN && j.getStatus() != JobRequest.Status.ASSIGNED) {
 				throw new ApiException(HttpStatus.CONFLICT, "JOB_CLOSED", "This job is already closed.");
 			}
-			String phone = null;
-			if (j.getStatus() == JobRequest.Status.ASSIGNED && j.getAcceptedQuoteId() != null) {
-				phone = quotes.findById(j.getAcceptedQuoteId()).flatMap(q -> pros.findById(q.getProId())).map(ProProfile::getPhone).orElse(null);
-			}
+			ProProfile assigned = j.getStatus() == JobRequest.Status.ASSIGNED && j.getAcceptedQuoteId() != null
+					? quotes.findById(j.getAcceptedQuoteId()).flatMap(q -> pros.findById(q.getProId())).orElse(null) : null;
 			j.setStatus(JobRequest.Status.CANCELLED);
 			quotes.findByJobIdOrderByCreatedAtAsc(jobId).stream().filter(q -> q.getStatus() == JobQuote.Status.SENT)
 					.forEach(q -> q.setStatus(JobQuote.Status.DECLINED));
-			return new Cancelled(view(j, customerId, null), phone);
+			return new Cancelled(view(j, customerId, null), assigned == null ? null : assigned.getPhone(),
+					assigned == null ? null : assigned.getOwnerId());
 		});
-		if (c.proPhone() != null) {
-			text(c.proPhone(), "Sodo Gebeya: the customer cancelled job #" + jobId + ". No need to go.", "JOB:CANCELLED:" + jobId);
+		if (c.proOwner() != null) {
+			tell(c.proOwner(), c.proPhone(), "Sodo Gebeya: the customer cancelled job #" + jobId + ". No need to go.", "JOB:CANCELLED:" + jobId,
+					"Job cancelled", "The customer cancelled job #" + jobId + ". No need to go.", "/pro/jobs/" + jobId);
 		}
 		return c.view();
 	}
@@ -259,7 +262,7 @@ public class JobService {
 		if (price == null || price.signum() <= 0) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PRICE", "Enter your price in ETB.");
 		}
-		record Quoted(JobView view, String customerPhone, String proName, BigDecimal price) {
+		record Quoted(JobView view, String customerPhone, String proName, BigDecimal price, UUID customerId) {
 		}
 		Quoted q;
 		try {
@@ -285,15 +288,17 @@ public class JobService {
 				n.setAvailable(ProService.trim(available, 120));
 				quotes.saveAndFlush(n);
 				String phone = users.findById(j.getCustomerId()).map(User::getPhone).orElse(null);
-				return new Quoted(view(j, null, pro), phone, pro.getDisplayName(), n.getPrice());
+				return new Quoted(view(j, null, pro), phone, pro.getDisplayName(), n.getPrice(), j.getCustomerId());
 			});
 		} catch (DataIntegrityViolationException twice) {
 			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_QUOTED", "You already sent a price for this job.");
 		}
 		// at most one "new quote" text per job per hour
-		text(q.customerPhone(), "Sodo Gebeya: new quote for your job: " + q.price().stripTrailingZeros().toPlainString() + " ETB from "
+		String priceText = q.price().stripTrailingZeros().toPlainString() + " ETB";
+		tell(q.customerId(), q.customerPhone(), "Sodo Gebeya: new quote for your job: " + priceText + " from "
 				+ ascii(q.proName(), 30) + ". Compare: " + link("/jobs/" + jobId),
-				"JOB:QUOTE:" + jobId + ":" + Instant.now().getEpochSecond() / 3600);
+				"JOB:QUOTE:" + jobId + ":" + Instant.now().getEpochSecond() / 3600,
+				"New price for your job", priceText + " from " + q.proName(), "/jobs/" + jobId);
 		return q.view();
 	}
 
@@ -359,6 +364,18 @@ public class JobService {
 		ProProfile pro = pros.findById(q.getProId()).orElseThrow();
 		return new QuoteView(q.getId(), proService.card(pro), q.getPrice(), q.getMessage(), q.getAvailable(), q.getStatus().name(),
 				q.getCreatedAt(), showPhone ? pro.getPhone() : null);
+	}
+
+	/**
+	 * Tells a person about a job event: always in the app (once per {@code key}), and by SMS unless they turned job SMS
+	 * off. In-app keys get their own prefix; the SMS key throttles texts (e.g. one "new quote" per hour).
+	 */
+	private void tell(UUID userId, String phone, String smsBody, String key, String title, String body, String link) {
+		inbox.notify(userId, et.tenapay.shop.inbox.InboxItem.Kind.JOB, title, body, link,
+				"INBOX:" + key + (key.startsWith("JOB:QUOTE:") ? ":" + UUID.randomUUID() : ""));
+		if (inbox.wantsSms(userId, et.tenapay.shop.inbox.InboxService.SmsTopic.JOBS)) {
+			text(phone, smsBody, key);
+		}
 	}
 
 	private void text(String phone, String body, String key) {
