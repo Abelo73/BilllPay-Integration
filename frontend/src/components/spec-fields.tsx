@@ -3,6 +3,7 @@ import { Check, Loader2 } from 'lucide-react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { optionsFor, specsApi, type SpecField, type Specs, type SpecValue } from '@/lib/specs-api'
 
@@ -27,6 +28,7 @@ export function SpecFields({
   errors?: Record<string, string>
   disabled?: boolean
 }) {
+  const t = useT()
   const fields = useQuery({
     queryKey: ['category-fields', categoryId],
     queryFn: () => specsApi.byId(categoryId!),
@@ -49,7 +51,7 @@ export function SpecFields({
 
   return (
     <fieldset disabled={disabled} className="grid gap-4 sm:grid-cols-2">
-      <legend className="mb-1 text-sm font-semibold">Details</legend>
+      <legend className="mb-1 text-sm font-semibold">{t('Details')}</legend>
       {list.map((f) => (
         <FieldInput key={f.key} field={f} specs={value} onSet={(v) => set(f, v)} error={errors[`specs.${f.key}`]} />
       ))}
@@ -58,6 +60,7 @@ export function SpecFields({
 }
 
 function FieldInput({ field: f, specs, onSet, error }: { field: SpecField; specs: Specs; onSet: (v: SpecValue | undefined) => void; error?: string }) {
+  const t = useT()
   const id = `spec-${f.key}`
   const v = specs[f.key]
   const wide = f.type === 'MULTI' || f.type === 'TEXT'
@@ -75,7 +78,7 @@ function FieldInput({ field: f, specs, onSet, error }: { field: SpecField; specs
     if (options && !f.allowOther) {
       input = (
         <select id={id} className={selectClass} value={String(v ?? '')} onChange={(e) => onSet(e.target.value)} aria-invalid={!!error}>
-          <option value="">Choose…</option>
+          <option value="">{t('Choose…')}</option>
           {options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       )
@@ -84,7 +87,7 @@ function FieldInput({ field: f, specs, onSet, error }: { field: SpecField; specs
       input = (
         <>
           <Input id={id} list={`${id}-list`} className="h-10" value={String(v ?? '')} onChange={(e) => onSet(e.target.value)} aria-invalid={!!error}
-            placeholder={waiting ? `Choose ${labelOf(f.dependsOn!)} first, or type` : options ? 'Choose or type…' : 'Type…'} autoComplete="off" />
+            placeholder={waiting ? t('Choose {field} first, or type', { field: labelOf(f.dependsOn!) }) : options ? t('Choose or type…') : t('Type…')} autoComplete="off" />
           {options && <datalist id={`${id}-list`}>{options.map((o) => <option key={o} value={o} />)}</datalist>}
         </>
       )
@@ -111,7 +114,7 @@ function FieldInput({ field: f, specs, onSet, error }: { field: SpecField; specs
         {([[true, 'Yes'], [false, 'No']] as const).map(([b, l]) => (
           <button key={l} type="button" aria-pressed={v === b} onClick={() => onSet(v === b ? undefined : b)}
             className={cn('h-10 flex-1 rounded-lg border px-3 text-sm font-medium', v === b ? 'border-2 border-primary bg-primary/5 text-primary' : 'hover:bg-muted')}>
-            {l}
+            {t(l)}
           </button>
         ))}
       </div>

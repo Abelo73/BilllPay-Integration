@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
 import { useFeatures } from '@/lib/features'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import {
   JOB_TYPE_LABEL, TALENT_STATUS_LABEL, WORK_PLACE_LABEL, WORK_PLACES, WORK_TYPES, workApi,
@@ -34,6 +35,7 @@ const toInput = (p: Profile): ProfileInput => ({
 /** /work/profile: one profile for every job (J1), with CVs and certificates, and the student ID (J7). */
 export function ProfilePage() {
   const redirect = useRequireSession('/work/profile')
+  const t = useT()
   const f = useFeatures()
   const [params] = useSearchParams()
   const navigate = useNavigate()
@@ -52,7 +54,7 @@ export function ProfilePage() {
     mutationFn: (input: ProfileInput) => workApi.saveProfile(input),
     onSuccess: (p) => {
       qc.setQueryData(['work-profile'], p)
-      toast.success('Profile saved')
+      toast.success(t('Profile saved'))
       const next = params.get('next')
       if (next?.startsWith('/work')) navigate(next)
     },
@@ -60,7 +62,7 @@ export function ProfilePage() {
   })
 
   if (redirect) return redirect
-  if (f.loaded && !f.on('talent_profiles')) return <><WorkNav /><Notice title="Profiles are coming soon" /></>
+  if (f.loaded && !f.on('talent_profiles')) return <><WorkNav /><Notice title={t('Profiles are coming soon')} /></>
   if (!form) return <><WorkNav /><div className="grid min-h-[40vh] place-items-center"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div></>
 
   const set = <K extends keyof ProfileInput>(k: K, v: ProfileInput[K]) => setForm({ ...form, [k]: v })
@@ -80,86 +82,86 @@ export function ProfilePage() {
         >
           <div className="space-y-1">
             <h1 className="flex flex-wrap items-center gap-2 text-2xl font-extrabold tracking-tight">
-              {missing && !profile.data ? 'Make your free profile' : 'My profile'}
+              {missing && !profile.data ? t('Make your free profile') : t('My profile')}
               {profile.data?.verifiedStudent && <StudentBadge />}
             </h1>
-            <p className="text-muted-foreground">Fill it once. Apply to any job in one tap, and get a free CV made from it.</p>
+            <p className="text-muted-foreground">{t('Fill it once. Apply to any job in one tap, and get a free CV made from it.')}</p>
           </div>
 
-          <Section title="About you">
-            <Field label="Full name" id="name">
+          <Section title={t('About you')}>
+            <Field label={t('Full name')} id="name">
               <Input id="name" required maxLength={120} value={form.fullName} onChange={(e) => set('fullName', e.target.value)} className="h-11" />
             </Field>
             <fieldset className="space-y-1.5">
-              <legend className="text-sm font-medium">Right now I am</legend>
+              <legend className="text-sm font-medium">{t('Right now I am')}</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(Object.keys(TALENT_STATUS_LABEL) as TalentStatus[]).map((s) => (
                   <Button key={s} type="button" variant={form.status === s ? 'default' : 'outline'} aria-pressed={form.status === s}
-                    className="h-auto min-h-11 whitespace-normal py-2" onClick={() => set('status', s)}>{TALENT_STATUS_LABEL[s]}</Button>
+                    className="h-auto min-h-11 whitespace-normal py-2" onClick={() => set('status', s)}>{t(TALENT_STATUS_LABEL[s])}</Button>
                 ))}
               </div>
             </fieldset>
-            <Field label="Headline" id="headline" hint="One line employers see first, e.g. “Accountant, 2 years experience”">
+            <Field label={t('Headline')} id="headline" hint={t('One line employers see first, e.g. “Accountant, 2 years experience”')}>
               <Input id="headline" maxLength={160} value={form.headline} onChange={(e) => set('headline', e.target.value)} className="h-11" />
             </Field>
-            <Field label="About me" id="about">
+            <Field label={t('About me')} id="about">
               <Textarea id="about" rows={4} maxLength={1500} value={form.about} onChange={(e) => set('about', e.target.value)}
-                placeholder="What you're good at and the work you want." />
+                placeholder={t("What you're good at and the work you want.")} />
             </Field>
           </Section>
 
-          <Section title="Education">
+          <Section title={t('Education')}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="School or university" id="school">
+              <Field label={t('School or university')} id="school">
                 <Input id="school" maxLength={160} value={form.school} onChange={(e) => set('school', e.target.value)} className="h-11" placeholder="Wolaita Sodo University" />
               </Field>
-              <Field label="Field of study" id="field">
+              <Field label={t('Field of study')} id="field">
                 <Input id="field" maxLength={160} value={form.fieldOfStudy} onChange={(e) => set('fieldOfStudy', e.target.value)} className="h-11" />
               </Field>
-              <Field label="Graduation year" id="year">
+              <Field label={t('Graduation year')} id="year">
                 <Input id="year" type="number" inputMode="numeric" min={1970} max={new Date().getFullYear() + 8} value={form.graduationYear ?? ''}
                   onChange={(e) => set('graduationYear', e.target.value ? Number(e.target.value) : null)} className="h-11" />
               </Field>
             </div>
           </Section>
 
-          <Section title="Skills and languages">
+          <Section title={t('Skills and languages')}>
             <TagInput label="Skills" values={form.skills} max={30} onChange={(v) => set('skills', v)} placeholder="e.g. Excel, driving, customer service" />
             <TagInput label="Languages" values={form.languages} max={10} onChange={(v) => set('languages', v)} placeholder="e.g. Wolaytta, English" />
           </Section>
 
-          <Section title="Work experience">
+          <Section title={t('Work experience')}>
             {form.experience.map((x, i) => (
               <ExperienceRow key={i} value={x} onChange={(v) => set('experience', form.experience.map((e, j) => (j === i ? v : e)))}
                 onRemove={() => set('experience', form.experience.filter((_, j) => j !== i))} />
             ))}
             {form.experience.length < 10 && (
               <Button type="button" variant="outline" onClick={() => set('experience', [...form.experience, { title: '', place: '', startMonth: '', endMonth: '', description: '' }])}>
-                <Plus /> Add a job or internship
+                <Plus /> {t('Add a job or internship')}
               </Button>
             )}
           </Section>
 
-          <Section title="The work I want">
-            <ChoiceRow label="Type" options={WORK_TYPES.map((t) => [t, WORK_TYPE_LABEL[t]])} values={form.workTypes} onToggle={(v) => toggle('workTypes', v)} />
-            <ChoiceRow label="Where" options={WORK_PLACES.map((t) => [t, WORK_PLACE_LABEL[t]])} values={form.workPlaces} onToggle={(v) => toggle('workPlaces', v)} />
+          <Section title={t('The work I want')}>
+            <ChoiceRow label={t('Type')} options={WORK_TYPES.map((w) => [w, t(WORK_TYPE_LABEL[w])])} values={form.workTypes} onToggle={(v) => toggle('workTypes', v)} />
+            <ChoiceRow label={t('Where')} options={WORK_PLACES.map((w) => [w, t(WORK_PLACE_LABEL[w])])} values={form.workPlaces} onToggle={(v) => toggle('workPlaces', v)} />
             <label className="flex items-start justify-between gap-4 rounded-xl border p-3">
               <span>
-                <span className="block font-medium">Let employers find me</span>
-                <span className="block text-sm text-muted-foreground">Employers who post jobs can see your profile (not your phone) in search. Off: only employers you apply to see it.</span>
+                <span className="block font-medium">{t('Let employers find me')}</span>
+                <span className="block text-sm text-muted-foreground">{t('Employers who post jobs can see your profile (not your phone) in search. Off: only employers you apply to see it.')}</span>
               </span>
               <Switch checked={form.publicProfile} onCheckedChange={(v) => set('publicProfile', v)} />
             </label>
           </Section>
 
           <div className="sticky bottom-16 z-10 flex flex-wrap gap-2 rounded-2xl border bg-background/95 p-3 backdrop-blur md:bottom-3">
-            <Button type="submit" size="lg" disabled={save.isPending} className="rounded-full px-8">{save.isPending && <Loader2 className="animate-spin" />}Save profile</Button>
-            {profile.data && f.on('auto_cv') && <Button asChild size="lg" variant="outline" className="rounded-full"><Link to="/work/my-cv">See my free CV</Link></Button>}
+            <Button type="submit" size="lg" disabled={save.isPending} className="rounded-full px-8">{save.isPending && <Loader2 className="animate-spin" />}{t('Save profile')}</Button>
+            {profile.data && f.on('auto_cv') && <Button asChild size="lg" variant="outline" className="rounded-full"><Link to="/work/my-cv">{t('See my free CV')}</Link></Button>}
           </div>
         </form>
 
         <aside className="space-y-4">
-          {profile.data ? <FilesCard profile={profile.data} /> : <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">Save your profile first, then add your CV and certificates here.</p>}
+          {profile.data ? <FilesCard profile={profile.data} /> : <p className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">{t('Save your profile first, then add your CV and certificates here.')}</p>}
           {profile.data && <DeleteCard />}
         </aside>
       </div>
@@ -203,6 +205,7 @@ function ChoiceRow({ label, options, values, onToggle }: { label: string; option
 }
 
 function TagInput({ label, values, max, onChange, placeholder }: { label: string; values: string[]; max: number; onChange: (v: string[]) => void; placeholder: string }) {
+  const t = useT()
   const [text, setText] = useState('')
   const add = () => {
     const parts = text.split(',').map((s) => s.trim()).filter(Boolean)
@@ -212,17 +215,17 @@ function TagInput({ label, values, max, onChange, placeholder }: { label: string
   const id = `tag-${label}`
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id}>{t(label)}</Label>
       <div className="flex flex-wrap gap-1.5">
         {values.map((v) => (
           <span key={v} className="inline-flex items-center gap-1 rounded-full bg-primary/10 py-1 pl-3 pr-1 text-sm text-primary">
             {v}
-            <button type="button" aria-label={`Remove ${v}`} className="rounded-full p-0.5 hover:bg-primary/20" onClick={() => onChange(values.filter((x) => x !== v))}><X className="size-3.5" /></button>
+            <button type="button" aria-label={t('Remove {name}', { name: v })} className="rounded-full p-0.5 hover:bg-primary/20" onClick={() => onChange(values.filter((x) => x !== v))}><X className="size-3.5" /></button>
           </span>
         ))}
       </div>
       <div className="flex gap-2">
-        <Input id={id} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} className="h-11"
+        <Input id={id} value={text} onChange={(e) => setText(e.target.value)} placeholder={t(placeholder)} className="h-11"
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault()
@@ -230,28 +233,29 @@ function TagInput({ label, values, max, onChange, placeholder }: { label: string
             }
           }}
           onBlur={add} />
-        <Button type="button" variant="outline" className="h-11" onClick={add}>Add</Button>
+        <Button type="button" variant="outline" className="h-11" onClick={add}>{t('Add')}</Button>
       </div>
     </div>
   )
 }
 
 function ExperienceRow({ value, onChange, onRemove }: { value: Experience; onChange: (v: Experience) => void; onRemove: () => void }) {
+  const t = useT()
   const set = (k: keyof Experience, v: string) => onChange({ ...value, [k]: v })
   return (
     <div className="space-y-3 rounded-xl border p-3">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input required aria-label="Job title" placeholder="Job title" maxLength={120} value={value.title} onChange={(e) => set('title', e.target.value)} className="h-11" />
-        <Input aria-label="Employer" placeholder="Employer or place" maxLength={120} value={value.place ?? ''} onChange={(e) => set('place', e.target.value)} className="h-11" />
-        <label className="space-y-1 text-xs text-muted-foreground">From
+        <Input required aria-label={t('Job title')} placeholder={t('Job title')} maxLength={120} value={value.title} onChange={(e) => set('title', e.target.value)} className="h-11" />
+        <Input aria-label={t('Employer')} placeholder={t('Employer or place')} maxLength={120} value={value.place ?? ''} onChange={(e) => set('place', e.target.value)} className="h-11" />
+        <label className="space-y-1 text-xs text-muted-foreground">{t('From')}
           <Input type="month" value={value.startMonth ?? ''} onChange={(e) => set('startMonth', e.target.value)} className="h-11" />
         </label>
-        <label className="space-y-1 text-xs text-muted-foreground">To (empty = now)
+        <label className="space-y-1 text-xs text-muted-foreground">{t('To (empty = now)')}
           <Input type="month" value={value.endMonth ?? ''} onChange={(e) => set('endMonth', e.target.value)} className="h-11" />
         </label>
       </div>
-      <Textarea rows={2} maxLength={600} aria-label="What you did" placeholder="What you did (optional)" value={value.description ?? ''} onChange={(e) => set('description', e.target.value)} />
-      <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={onRemove}><Trash2 /> Remove</Button>
+      <Textarea rows={2} maxLength={600} aria-label={t('What you did')} placeholder={t('What you did (optional)')} value={value.description ?? ''} onChange={(e) => set('description', e.target.value)} />
+      <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={onRemove}><Trash2 /> {t('Remove')}</Button>
     </div>
   )
 }
@@ -259,6 +263,7 @@ function ExperienceRow({ value, onChange, onRemove }: { value: Experience; onCha
 const KIND_LABEL: Record<FileKind, string> = { CV_UPLOAD: 'My CV (PDF)', CV_PRO: 'Professional CV', CERTIFICATE: 'Certificate', STUDENT_ID: 'Student ID' }
 
 function FilesCard({ profile }: { profile: Profile }) {
+  const t = useT()
   const f = useFeatures()
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
@@ -267,7 +272,7 @@ function FilesCard({ profile }: { profile: Profile }) {
     mutationFn: (file: File) => workApi.addFile(kind, file),
     onSuccess: (p) => {
       qc.setQueryData(['work-profile'], p)
-      toast.success(kind === 'STUDENT_ID' ? 'Student ID sent. We check it within a day.' : 'File added')
+      toast.success(kind === 'STUDENT_ID' ? t('Student ID sent. We check it within a day.') : t('File added'))
     },
     onError: (e) => toast.error(errorText(e)),
   })
@@ -285,23 +290,23 @@ function FilesCard({ profile }: { profile: Profile }) {
   return (
     <>
       <div className="space-y-3 rounded-2xl border bg-card p-4">
-        <h2 className="font-bold">CVs and certificates</h2>
-        <p className="text-xs text-muted-foreground">Private. Only employers you apply to can open them. PDF or photo, up to 5 MB.</p>
+        <h2 className="font-bold">{t('CVs and certificates')}</h2>
+        <p className="text-xs text-muted-foreground">{t('Private. Only employers you apply to can open them. PDF or photo, up to 5 MB.')}</p>
         <ul className="space-y-2">
           {docs.map((x) => (
             <li key={x.id} className="flex items-center gap-2 rounded-xl border p-2">
               <FileText className="size-4 shrink-0 text-primary" />
               <button type="button" className="min-w-0 flex-1 text-left" onClick={() => workApi.openMyFile(x.id).catch((e) => toast.error(errorText(e)))}>
                 <span className="block truncate text-sm font-medium hover:underline">{x.fileName}</span>
-                <span className="block text-xs text-muted-foreground">{KIND_LABEL[x.kind]} · {shortDate(x.createdAt)}</span>
+                <span className="block text-xs text-muted-foreground">{t(KIND_LABEL[x.kind])} · {shortDate(x.createdAt)}</span>
               </button>
-              <Button variant="ghost" size="icon-sm" aria-label={`Remove ${x.fileName}`} onClick={() => remove.mutate(x.id)}><Trash2 /></Button>
+              <Button variant="ghost" size="icon-sm" aria-label={t('Remove {name}', { name: x.fileName })} onClick={() => remove.mutate(x.id)}><Trash2 /></Button>
             </li>
           ))}
         </ul>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" disabled={add.isPending} onClick={() => pick('CV_UPLOAD')}><Upload /> Upload CV (PDF)</Button>
-          <Button variant="outline" size="sm" disabled={add.isPending} onClick={() => pick('CERTIFICATE')}><Upload /> Certificate</Button>
+          <Button variant="outline" size="sm" disabled={add.isPending} onClick={() => pick('CV_UPLOAD')}><Upload /> {t('Upload CV (PDF)')}</Button>
+          <Button variant="outline" size="sm" disabled={add.isPending} onClick={() => pick('CERTIFICATE')}><Upload /> {t('Certificate')}</Button>
         </div>
         <input ref={input} type="file" className="hidden" accept={kind === 'CV_UPLOAD' ? 'application/pdf' : 'application/pdf,image/jpeg,image/png,image/webp'}
           onChange={(e) => {
@@ -309,21 +314,21 @@ function FilesCard({ profile }: { profile: Profile }) {
             if (file) add.mutate(file)
             e.target.value = ''
           }} />
-        {add.isPending && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Uploading…</p>}
+        {add.isPending && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> {t('Uploading…')}</p>}
       </div>
 
       {f.on('student_badge') && profile.status === 'STUDENT' && (
         <div className="space-y-2 rounded-2xl border border-primary/30 bg-primary/5 p-4">
-          <h2 className="flex items-center gap-2 font-bold"><GraduationCap className="size-5 text-primary" /> Verified student</h2>
+          <h2 className="flex items-center gap-2 font-bold"><GraduationCap className="size-5 text-primary" /> {t('Verified student')}</h2>
           {profile.studentStatus === 'APPROVED' ? (
-            <p className="text-sm"><StudentBadge /> Employers see the badge, and you get {f.number('student_discount')}% off professional CVs.</p>
+            <p className="text-sm"><StudentBadge /> {t('Employers see the badge, and you get {n}% off professional CVs.', { n: f.number('student_discount') })}</p>
           ) : profile.studentStatus === 'SUBMITTED' ? (
-            <p className="text-sm text-muted-foreground">We're checking your student ID. Usually within a day.</p>
+            <p className="text-sm text-muted-foreground">{t("We're checking your student ID. Usually within a day.")}</p>
           ) : (
             <>
-              {profile.studentStatus === 'REJECTED' && <p className="text-sm text-destructive">Not approved: {profile.studentNote}</p>}
-              <p className="text-sm text-muted-foreground">Upload a photo of your student ID to get the badge and {f.number('student_discount')}% off professional CVs. Only our team sees it.</p>
-              <Button size="sm" disabled={add.isPending} onClick={() => pick('STUDENT_ID')}><Upload /> Upload student ID</Button>
+              {profile.studentStatus === 'REJECTED' && <p className="text-sm text-destructive">{t('Not approved: {note}', { note: profile.studentNote ?? '' })}</p>}
+              <p className="text-sm text-muted-foreground">{t('Upload a photo of your student ID to get the badge and {n}% off professional CVs. Only our team sees it.', { n: f.number('student_discount') })}</p>
+              <Button size="sm" disabled={add.isPending} onClick={() => pick('STUDENT_ID')}><Upload /> {t('Upload student ID')}</Button>
             </>
           )}
         </div>
@@ -333,6 +338,7 @@ function FilesCard({ profile }: { profile: Profile }) {
 }
 
 function DeleteCard() {
+  const t = useT()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [sure, setSure] = useState(false)
@@ -340,22 +346,22 @@ function DeleteCard() {
     mutationFn: workApi.deleteProfile,
     onSuccess: () => {
       qc.removeQueries({ queryKey: ['work-profile'] })
-      toast.success('Your profile and files are deleted')
+      toast.success(t('Your profile and files are deleted'))
       navigate('/work')
     },
     onError: (e) => toast.error(errorText(e)),
   })
   return (
     <div className="space-y-2 rounded-2xl border p-4 text-sm">
-      <p className="font-medium">Delete my profile</p>
-      <p className="text-muted-foreground">Removes your profile, CVs and certificates. Employers you applied to keep only the application status.</p>
+      <p className="font-medium">{t('Delete my profile')}</p>
+      <p className="text-muted-foreground">{t('Removes your profile, CVs and certificates. Employers you applied to keep only the application status.')}</p>
       {sure ? (
         <div className="flex gap-2">
-          <Button variant="destructive" size="sm" disabled={del.isPending} onClick={() => del.mutate()}>Yes, delete</Button>
-          <Button variant="outline" size="sm" onClick={() => setSure(false)}>Keep it</Button>
+          <Button variant="destructive" size="sm" disabled={del.isPending} onClick={() => del.mutate()}>{t('Yes, delete')}</Button>
+          <Button variant="outline" size="sm" onClick={() => setSure(false)}>{t('Keep it')}</Button>
         </div>
       ) : (
-        <Button variant="outline" size="sm" className="text-destructive" onClick={() => setSure(true)}><Trash2 /> Delete</Button>
+        <Button variant="outline" size="sm" className="text-destructive" onClick={() => setSure(true)}><Trash2 /> {t('Delete')}</Button>
       )}
     </div>
   )

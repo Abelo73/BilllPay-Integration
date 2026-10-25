@@ -8,13 +8,26 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { api, ApiError, type FulfilmentStatus, type OrderStatusView } from '@/lib/api'
+import { api, ApiError, type FulfilmentStatus, type OrderStatus, type OrderStatusView } from '@/lib/api'
 import { formatDate, formatETB, reasonMessage } from '@/lib/format'
+import { t as tr, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { OrderProblems } from './order-problems'
 import { useCart } from '@/store/cart'
 
 const POLL_MS = 3000
+
+/** What the status badge says for each order status. */
+const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
+  PENDING_PAYMENT: 'pending payment',
+  PAYMENT_FAILED: 'payment failed',
+  PAID: 'paid',
+  PARTIALLY_REFUNDED: 'partially refunded',
+  REFUNDED: 'refunded',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled',
+  REVIEW_REQUIRED: 'review required',
+}
 
 /** The payment hasn't settled yet, so keep asking the backend (which asks BillPay when needed). */
 function isSettling(o: OrderStatusView) {
@@ -30,6 +43,7 @@ export function OrderStatusPanel({
   phone: string
   cancelled?: boolean
 }) {
+  const t = useT()
   const query = useQuery({
     queryKey: ['order-status', orderNumber, phone],
     queryFn: () => api.orderStatus(orderNumber, phone),
@@ -53,7 +67,7 @@ export function OrderStatusPanel({
     onSuccess: (view) => {
       qc.setQueryData(['order-status', orderNumber, phone], view)
       setConfirmCancel(false)
-      toast.success('Order cancelled')
+      toast.success(tr('Order cancelled'))
     },
     onError: (err) => {
       toast.error(err.message)
@@ -65,7 +79,7 @@ export function OrderStatusPanel({
     return (
       <Card className="mx-auto max-w-xl">
         <CardContent className="flex items-center justify-center gap-3 py-16 text-muted-foreground">
-          <Loader2 className="animate-spin" /> Loading your order…
+          <Loader2 className="animate-spin" /> {t('Loading your order…')}
         </CardContent>
       </Card>
     )
@@ -76,9 +90,9 @@ export function OrderStatusPanel({
       <Card className="mx-auto max-w-xl">
         <CardContent className="space-y-4 py-12 text-center">
           <XCircle className="mx-auto size-10 text-destructive" />
-          <p className="font-medium">{notFound ? 'No order matches that number and phone.' : 'We couldn’t load your order.'}</p>
+          <p className="font-medium">{notFound ? t('No order matches that number and phone.') : t('We couldn’t load your order.')}</p>
           <Button asChild variant="outline">
-            <Link to="/orders/track">Try again</Link>
+            <Link to="/orders/track">{t('Try again')}</Link>
           </Button>
         </CardContent>
       </Card>
@@ -90,7 +104,7 @@ export function OrderStatusPanel({
   const retryButton = o.canRetry && (
     <Button size="lg" className="h-11" disabled={pay.isPending} onClick={() => pay.mutate()}>
       {pay.isPending ? <Loader2 className="animate-spin" /> : <RotateCcw />}
-      {o.payment?.status === 'PENDING' ? 'Continue payment' : o.payment ? 'Try paying again' : 'Pay now'}
+      {o.payment?.status === 'PENDING' ? t('Continue payment') : o.payment ? t('Try paying again') : t('Pay now')}
     </Button>
   )
   const canOrderAgain = (o.status === 'EXPIRED' || o.status === 'CANCELLED') && o.items.some((i) => i.productSlug)
@@ -99,27 +113,27 @@ export function OrderStatusPanel({
     <Card className="mx-auto max-w-xl overflow-hidden pt-0">
       <div className={`flex flex-col items-center gap-3 px-6 py-10 text-center ${view.tone}`}>
         <view.icon className={`size-12 ${view.iconClass}`} />
-        <h1 className="text-2xl font-semibold">{view.title}</h1>
+        <h1 className="text-2xl font-semibold">{t(view.title)}</h1>
         <p className="max-w-sm text-muted-foreground">{view.text}</p>
         {isSettling(o) && !cancelled && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" /> Checking with BillPay every few seconds
+            <Loader2 className="size-3 animate-spin" /> {t('Checking with BillPay every few seconds')}
           </p>
         )}
         {o.canRetry && o.payBy && <PayCountdown payBy={o.payBy} onElapsed={() => query.refetch()} />}
       </div>
       <CardContent className="space-y-4 pt-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Order</span>
+          <span className="text-muted-foreground">{t('Order')}</span>
           <span className="font-mono font-medium">{o.orderNumber}</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Status</span>
-          <Badge variant="outline">{o.status.replaceAll('_', ' ').toLowerCase()}</Badge>
+          <span className="text-muted-foreground">{t('Status')}</span>
+          <Badge variant="outline">{t(ORDER_STATUS_LABEL[o.status] ?? o.status.replaceAll('_', ' ').toLowerCase())}</Badge>
         </div>
         {o.payment?.paymentMethod && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Paid with</span>
+            <span className="text-muted-foreground">{t('Paid with')}</span>
             <span>{o.payment.paymentMethod.replaceAll('_', ' ')}</span>
           </div>
         )}
@@ -134,21 +148,21 @@ export function OrderStatusPanel({
         ))}
         <Separator />
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Subtotal</span>
+          <span className="text-muted-foreground">{t('Subtotal')}</span>
           <span className="tabular-nums">{formatETB(o.subtotal)}</span>
         </div>
         {o.discountAmount > 0 && (
           <div className="flex justify-between text-sm text-success">
-            <span>Discount ({o.discountCode})</span>
+            <span>{t('Discount ({code})', { code: o.discountCode ?? '' })}</span>
             <span className="tabular-nums">−{formatETB(o.discountAmount)}</span>
           </div>
         )}
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Delivery</span>
-          <span className="tabular-nums">{o.deliveryFee > 0 ? formatETB(o.deliveryFee) : 'Free'}</span>
+          <span className="text-muted-foreground">{t('Delivery')}</span>
+          <span className="tabular-nums">{o.deliveryFee > 0 ? formatETB(o.deliveryFee) : t('Free')}</span>
         </div>
         <div className="flex justify-between font-semibold">
-          <span>Total</span>
+          <span>{t('Total')}</span>
           <span className="tabular-nums">{formatETB(o.total)}</span>
         </div>
         {o.delivery?.address && <DeliveryBlock o={o} />}
@@ -156,24 +170,24 @@ export function OrderStatusPanel({
           {retryButton}
           {canOrderAgain && <OrderAgainButton items={o.items} />}
           <Button asChild size="lg" variant="outline" className="h-11">
-            <Link to="/shop">Continue shopping</Link>
+            <Link to="/shop">{t('Continue shopping')}</Link>
           </Button>
         </div>
         {o.canCancel && (
           <div className="text-center">
             {confirmCancel ? (
               <div className="flex flex-col items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                <span>Cancel this order? Your items go back on sale.</span>
+                <span>{t('Cancel this order? Your items go back on sale.')}</span>
                 <div className="flex gap-2">
                   <Button size="sm" variant="destructive" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
-                    {cancel.isPending && <Loader2 className="animate-spin" />} Yes, cancel order
+                    {cancel.isPending && <Loader2 className="animate-spin" />} {t('Yes, cancel order')}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>Keep it</Button>
+                  <Button size="sm" variant="outline" onClick={() => setConfirmCancel(false)}>{t('Keep it')}</Button>
                 </div>
               </div>
             ) : (
               <button type="button" className="text-sm text-muted-foreground underline-offset-4 hover:text-destructive hover:underline" onClick={() => setConfirmCancel(true)}>
-                Cancel this order
+                {t('Cancel this order')}
               </button>
             )}
           </div>
@@ -185,18 +199,19 @@ export function OrderStatusPanel({
 
 /** "Items held for 12:34": counts down to the moment the unpaid order is released. */
 function PayCountdown({ payBy, onElapsed }: { payBy: string; onElapsed: () => void }) {
+  const t = useT()
   const deadline = new Date(payBy).getTime()
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(t)
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
   }, [])
   const left = Math.max(0, deadline - now)
   useEffect(() => {
     // the server expires the order within a minute of the deadline; look again shortly after
     if (left === 0) {
-      const t = window.setTimeout(onElapsed, 5000)
-      return () => window.clearTimeout(t)
+      const timer = window.setTimeout(onElapsed, 5000)
+      return () => window.clearTimeout(timer)
     }
   }, [left === 0]) // eslint-disable-line react-hooks/exhaustive-deps
   const min = Math.floor(left / 60000)
@@ -212,13 +227,14 @@ function PayCountdown({ payBy, onElapsed }: { payBy: string; onElapsed: () => vo
       aria-live="off"
     >
       <Clock className="size-4" />
-      {left > 0 ? `Items held for you for ${min}:${String(sec).padStart(2, '0')}` : 'Payment window closing…'}
+      {left > 0 ? t('Items held for you for {time}', { time: `${min}:${String(sec).padStart(2, '0')}` }) : t('Payment window closing…')}
     </p>
   )
 }
 
 /** Puts the items of an expired or cancelled order back in the cart, at today's price and stock. */
 function OrderAgainButton({ items }: { items: OrderStatusView['items'] }) {
+  const t = useT()
   const add = useCart((s) => s.add)
   const [busy, setBusy] = useState(false)
   const run = async () => {
@@ -244,13 +260,13 @@ function OrderAgainButton({ items }: { items: OrderStatusView['items'] }) {
       }
     }
     setBusy(false)
-    if (added === 0) toast.error('These items aren’t available any more.')
-    else if (missing.length > 0) toast.warning(`Added to your cart. Not available now: ${missing.join(', ')}`)
-    else toast.success('Items added to your cart')
+    if (added === 0) toast.error(tr('These items aren’t available any more.'))
+    else if (missing.length > 0) toast.warning(tr('Added to your cart. Not available now: {items}', { items: missing.join(', ') }))
+    else toast.success(tr('Items added to your cart'))
   }
   return (
     <Button size="lg" className="h-11" disabled={busy} onClick={run}>
-      {busy ? <Loader2 className="animate-spin" /> : <ShoppingCart />} Order again
+      {busy ? <Loader2 className="animate-spin" /> : <ShoppingCart />} {t('Order again')}
     </Button>
   )
 }
@@ -264,13 +280,14 @@ const STEPS: { key: FulfilmentStatus; label: string; icon: typeof Package }[] = 
 
 /** "I received my items": marks the parcel delivered and lets Sodo Gebeya pay the seller. */
 function ConfirmReceipt({ o, parcelNo, label }: { o: OrderStatusView; parcelNo: number; label: string }) {
+  const t = useT()
   const qc = useQueryClient()
   const confirm = useMutation({
     mutationFn: () => api.confirmReceived(o.orderNumber, parcelNo),
     onSuccess: (next) => {
       qc.setQueriesData({ queryKey: ['order-status', o.orderNumber] }, next)
       qc.invalidateQueries({ queryKey: ['order-status', o.orderNumber] })
-      toast.success('Thanks! The seller gets paid now.')
+      toast.success(tr('Thanks! The seller gets paid now.'))
     },
     onError: (e) => toast.error(e.message),
   })
@@ -279,13 +296,14 @@ function ConfirmReceipt({ o, parcelNo, label }: { o: OrderStatusView; parcelNo: 
       <Button size="sm" className="w-full" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
         {confirm.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} {label}
       </Button>
-      <p className="text-[11px] text-muted-foreground">Only tap this once you have the items. Problem? Don't confirm; contact us.</p>
+      <p className="text-[11px] text-muted-foreground">{t("Only tap this once you have the items. Problem? Don't confirm; contact us.")}</p>
     </div>
   )
 }
 
 /** Orders from several sellers: one line per parcel, each with its own progress. */
 function ParcelList({ o }: { o: OrderStatusView }) {
+  const t = useT()
   return (
     <ul className="space-y-3">
       {o.parcels.map((p) => {
@@ -295,14 +313,14 @@ function ParcelList({ o }: { o: OrderStatusView }) {
           <li key={p.number} className="space-y-2 rounded-lg bg-background p-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
               <span className="font-semibold">
-                From {p.sellerSlug ? <Link to={`/shops/${p.sellerSlug}`} className="hover:underline">{p.seller}</Link> : 'Sodo Gebeya'}
+                {t('From')} {p.sellerSlug ? <Link to={`/shops/${p.sellerSlug}`} className="hover:underline">{p.seller}</Link> : 'Sodo Gebeya'}
               </span>
               <span className={cn('text-xs font-semibold', p.fulfilmentStatus === 'CANCELLED' ? 'text-destructive' : reached >= 3 ? 'text-success' : 'text-muted-foreground')}>
-                {p.fulfilmentStatus === 'CANCELLED' ? 'Cancelled' : reached >= 0 ? STEPS[reached].label : ''}
+                {p.fulfilmentStatus === 'CANCELLED' ? t('Cancelled') : reached >= 0 ? t(STEPS[reached].label) : ''}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              {items.map((i) => `${i.quantity} × ${i.productName}`).join(', ')} · delivery {p.deliveryFee === 0 ? 'free' : formatETB(p.deliveryFee)}
+              {items.map((i) => `${i.quantity} × ${i.productName}`).join(', ')} · {p.deliveryFee === 0 ? t('free delivery') : t('delivery {fee}', { fee: formatETB(p.deliveryFee) })}
             </p>
             {p.fulfilmentStatus !== 'CANCELLED' && (
               <div className="flex gap-1" aria-hidden>
@@ -312,7 +330,7 @@ function ParcelList({ o }: { o: OrderStatusView }) {
             {p.trackingNote && p.fulfilmentStatus === 'SHIPPED' && (
               <p className="text-xs"><Truck className="mr-1 inline size-3.5" />{p.trackingNote}</p>
             )}
-            {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={`I received the items from ${p.seller ?? 'Sodo Gebeya'}`} />}
+            {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={t('I received the items from {seller}', { seller: p.seller ?? 'Sodo Gebeya' })} />}
           </li>
         )
       })}
@@ -321,6 +339,7 @@ function ParcelList({ o }: { o: OrderStatusView }) {
 }
 
 function DeliveryBlock({ o }: { o: OrderStatusView }) {
+  const t = useT()
   const status = o.delivery.fulfilmentStatus
   const reached = status ? STEPS.findIndex((s) => s.key === status) : -1
   const multi = (o.parcels?.length ?? 0) > 1
@@ -329,21 +348,21 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       <div className="flex items-start gap-3 text-sm">
         <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div>
-          <p className="font-medium">Delivery to {o.delivery.address}, {o.delivery.city}</p>
-          {o.delivery.notes && <p className="text-muted-foreground">Note: {o.delivery.notes}</p>}
+          <p className="font-medium">{t('Delivery to {address}', { address: `${o.delivery.address}, ${o.delivery.city}` })}</p>
+          {o.delivery.notes && <p className="text-muted-foreground">{t('Note: {notes}', { notes: o.delivery.notes })}</p>}
         </div>
       </div>
       {multi && (
         <p className="text-xs text-muted-foreground">
-          Your order comes from {o.parcels.length} sellers. Each delivers their own items, so they may arrive separately.
+          {t('Your order comes from {n} sellers. Each delivers their own items, so they may arrive separately.', { n: o.parcels.length })}
         </p>
       )}
       {multi && status ? (
         <ParcelList o={o} />
       ) : status === 'CANCELLED' ? (
-        <p className="text-sm text-destructive">Delivery was cancelled. Our team will contact you about a refund.</p>
+        <p className="text-sm text-destructive">{t('Delivery was cancelled. Our team will contact you about a refund.')}</p>
       ) : status ? (
-        <ol className="grid grid-cols-4 gap-1" aria-label="Delivery progress">
+        <ol className="grid grid-cols-4 gap-1" aria-label={t('Delivery progress')}>
           {STEPS.map((s, i) => {
             const done = i <= reached
             const at = s.key === 'SHIPPED' ? o.delivery.shippedAt : s.key === 'DELIVERED' ? o.delivery.deliveredAt : s.key === 'UNFULFILLED' ? o.paidAt : stepTime(o, 'FULFILMENT_PROCESSING')
@@ -356,66 +375,67 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
                   </span>
                   <span className={cn('h-0.5 flex-1', i === STEPS.length - 1 ? 'invisible' : i < reached ? 'bg-success' : 'bg-border')} />
                 </div>
-                <span className={cn('text-xs', done ? 'font-medium' : 'text-muted-foreground')}>{s.label}</span>
+                <span className={cn('text-xs', done ? 'font-medium' : 'text-muted-foreground')}>{t(s.label)}</span>
                 {done && at && <span className="text-[11px] text-muted-foreground">{formatDate(at)}</span>}
               </li>
             )
           })}
         </ol>
       ) : o.status === 'PENDING_PAYMENT' || o.status === 'PAYMENT_FAILED' ? (
-        <p className="text-sm text-muted-foreground">Delivery starts once your payment is confirmed.</p>
+        <p className="text-sm text-muted-foreground">{t('Delivery starts once your payment is confirmed.')}</p>
       ) : null}
       {!multi && o.delivery.trackingNote && status === 'SHIPPED' && (
         <p className="rounded-lg bg-background px-3 py-2 text-sm"><Truck className="mr-1.5 inline size-4" />{o.delivery.trackingNote}</p>
       )}
-      {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label="I received my items" />}
+      {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label={t('I received my items')} />}
       <OrderProblems o={o} />
     </div>
   )
 }
 
 function stepTime(o: OrderStatusView, type: string) {
-  return o.timeline?.find((t) => t.type === type)?.at ?? null
+  return o.timeline?.find((e) => e.type === type)?.at ?? null
 }
 
 function describe(o: OrderStatusView, cancelled: boolean) {
-  const reason = reasonMessage(o.payment?.reasonCode)
+  const reason = tr(reasonMessage(o.payment?.reasonCode))
+  const first = o.customerName.split(' ')[0]
   switch (o.status) {
     case 'PAID':
       switch (o.delivery?.fulfilmentStatus) {
         case 'SHIPPED':
-          return { icon: Truck, iconClass: 'text-brand', tone: 'bg-accent', title: 'Your order is on the way', text: 'The rider will call you before arriving.' }
+          return { icon: Truck, iconClass: 'text-brand', tone: 'bg-accent', title: 'Your order is on the way', text: tr('The rider will call you before arriving.') }
         case 'DELIVERED':
-          return { icon: Home, iconClass: 'text-success', tone: 'bg-success/10', title: 'Delivered', text: `Enjoy your order, ${o.customerName.split(' ')[0]}! Thank you for shopping on Sodo Gebeya.` }
+          return { icon: Home, iconClass: 'text-success', tone: 'bg-success/10', title: 'Delivered', text: tr('Enjoy your order, {name}! Thank you for shopping on Sodo Gebeya.', { name: first }) }
         case 'CANCELLED':
-          return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Delivery cancelled', text: 'We couldn’t deliver this order. Our team will contact you about a refund.' }
+          return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Delivery cancelled', text: tr('We couldn’t deliver this order. Our team will contact you about a refund.') }
         case 'PROCESSING':
-          return { icon: Package, iconClass: 'text-brand', tone: 'bg-accent', title: 'We’re preparing your order', text: 'Your payment is confirmed and your items are being packed.' }
+          return { icon: Package, iconClass: 'text-brand', tone: 'bg-accent', title: 'We’re preparing your order', text: tr('Your payment is confirmed and your items are being packed.') }
         default:
-          return { icon: CheckCircle2, iconClass: 'text-success', tone: 'bg-success/10', title: 'Payment confirmed', text: `Thank you, ${o.customerName.split(' ')[0]}! BillPay confirmed your payment and your order is being prepared.` }
+          return { icon: CheckCircle2, iconClass: 'text-success', tone: 'bg-success/10', title: 'Payment confirmed', text: tr('Thank you, {name}! BillPay confirmed your payment and your order is being prepared.', { name: first }) }
       }
     case 'PAYMENT_FAILED':
-      return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Payment didn’t go through', text: `${reason} Your items are still reserved — you can try again.` }
+      return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Payment didn’t go through', text: `${reason} ${tr('Your items are still reserved — you can try again.')}` }
     case 'EXPIRED':
-      return { icon: Clock, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment window closed', text: 'We didn’t receive a payment in time, so the order was released. Still want these items? Order them again in one tap.' }
+      return { icon: Clock, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment window closed', text: tr('We didn’t receive a payment in time, so the order was released. Still want these items? Order them again in one tap.') }
     case 'REVIEW_REQUIRED':
-      return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'We’re checking your payment', text: 'Something about this payment needs a manual check. Our team will contact you shortly.' }
+      return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'We’re checking your payment', text: tr('Something about this payment needs a manual check. Our team will contact you shortly.') }
     case 'REFUNDED':
     case 'PARTIALLY_REFUNDED':
-      return { icon: RotateCcw, iconClass: 'text-brand', tone: 'bg-accent', title: 'Refund issued', text: 'A refund has been sent back through BillPay to your payment method.' }
+      return { icon: RotateCcw, iconClass: 'text-brand', tone: 'bg-accent', title: 'Refund issued', text: tr('A refund has been sent back through BillPay to your payment method.') }
     case 'CANCELLED':
-      return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Order cancelled', text: 'This order was cancelled and nothing was charged. Its items are back on sale.' }
+      return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Order cancelled', text: tr('This order was cancelled and nothing was charged. Its items are back on sale.') }
     default:
       if (cancelled) {
-        return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment cancelled', text: `You left BillPay before paying.${o.payment?.reasonCode ? ` Your last try: ${reason}` : ''} Your order is saved — continue whenever you’re ready.` }
+        return { icon: XCircle, iconClass: 'text-muted-foreground', tone: 'bg-muted', title: 'Payment cancelled', text: [tr('You left BillPay before paying.'), o.payment?.reasonCode ? tr('Your last try: {reason}', { reason }) : '', tr('Your order is saved — continue whenever you’re ready.')].filter(Boolean).join(' ') }
       }
       if (o.payment?.status === 'PENDING' && o.payment.reasonCode) {
         // BillPay keeps the payment open after a failed try, so the shopper can try again on the same link
-        return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'Your last try didn’t go through', text: `${reason} Continue the payment to try again with another number or method.` }
+        return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'Your last try didn’t go through', text: `${reason} ${tr('Continue the payment to try again with another number or method.')}` }
       }
       if (o.payment?.status === 'PENDING') {
-        return { icon: Loader2, iconClass: 'animate-spin text-brand', tone: 'bg-accent', title: 'Confirming your payment…', text: 'This usually takes a few seconds. You can keep this page open; it updates by itself.' }
+        return { icon: Loader2, iconClass: 'animate-spin text-brand', tone: 'bg-accent', title: 'Confirming your payment…', text: tr('This usually takes a few seconds. You can keep this page open; it updates by itself.') }
       }
-      return { icon: Clock, iconClass: 'text-brand', tone: 'bg-accent', title: 'Payment not started', text: 'We couldn’t open BillPay for this order yet. Please try again.' }
+      return { icon: Clock, iconClass: 'text-brand', tone: 'bg-accent', title: 'Payment not started', text: tr('We couldn’t open BillPay for this order yet. Please try again.') }
   }
 }

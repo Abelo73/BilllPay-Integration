@@ -9,12 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { publicTrustApi, REPORT_REASON_LABEL, type ReportReason } from '@/lib/trust-api'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
 /** "Report this listing": signed-in shoppers tell Sodo Gebeya about scams, fakes or banned items. */
 export function ReportListing({ productId, slug }: { productId: number; slug: string }) {
+  const t = useT()
   const session = useSession((s) => s.session)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -24,7 +26,7 @@ export function ReportListing({ productId, slug }: { productId: number; slug: st
     mutationFn: () => publicTrustApi.report(productId, reason!, details),
     onSuccess: () => {
       setOpen(false)
-      toast.success('Thanks. Our team will look at this listing.')
+      toast.success(t('Thanks. Our team will look at this listing.'))
     },
     onError: (e) => {
       if (e instanceof ApiError && e.code === 'ALREADY_REPORTED') setOpen(false)
@@ -38,15 +40,15 @@ export function ReportListing({ productId, slug }: { productId: number; slug: st
   return (
     <>
       <button type="button" onClick={start} className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-destructive">
-        <Flag className="size-3.5" /> Report this listing
+        <Flag className="size-3.5" /> {t('Report this listing')}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Report this listing</DialogTitle>
-            <DialogDescription>Only Sodo Gebeya sees your report, not the seller.</DialogDescription>
+            <DialogTitle>{t('Report this listing')}</DialogTitle>
+            <DialogDescription>{t('Only Sodo Gebeya sees your report, not the seller.')}</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2" role="radiogroup" aria-label="Reason">
+          <div className="grid gap-2" role="radiogroup" aria-label={t('Reason')}>
             {(Object.keys(REPORT_REASON_LABEL) as ReportReason[]).map((r) => (
               <button
                 key={r}
@@ -56,18 +58,18 @@ export function ReportListing({ productId, slug }: { productId: number; slug: st
                 onClick={() => setReason(r)}
                 className={cn('h-11 rounded-lg border px-3 text-left text-sm font-medium', reason === r ? 'border-2 border-primary bg-primary/5' : 'bg-card')}
               >
-                {REPORT_REASON_LABEL[r]}
+                {t(REPORT_REASON_LABEL[r])}
               </button>
             ))}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="report-details">What's wrong? <span className="font-normal text-muted-foreground">(optional)</span></Label>
+            <Label htmlFor="report-details">{t("What's wrong?")} <span className="font-normal text-muted-foreground">{t('(optional)')}</span></Label>
             <Textarea id="report-details" rows={3} maxLength={1000} value={details} onChange={(e) => setDetails(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{t('Cancel')}</Button>
             <Button disabled={!reason || send.isPending} onClick={() => send.mutate()}>
-              {send.isPending && <Loader2 className="animate-spin" />} Send report
+              {send.isPending && <Loader2 className="animate-spin" />} {t('Send report')}
             </Button>
           </DialogFooter>
         </DialogContent>

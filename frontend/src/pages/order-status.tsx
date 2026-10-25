@@ -8,17 +8,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { orderContact } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { useSession } from '@/store/session'
 
 /** Asks for order number and phone when they aren't known, then shows the order. */
 function OrderLookup({ initialOrder, onFound }: { initialOrder: string; onFound: (order: string, phone: string) => void }) {
+  const t = useT()
   const [order, setOrder] = useState(initialOrder)
   const [phone, setPhone] = useState('')
   return (
     <Card className="mx-auto max-w-md">
       <CardHeader>
-        <CardTitle>Track your order</CardTitle>
-        <CardDescription>Enter the order number from your confirmation and the phone you used at checkout.</CardDescription>
+        <CardTitle>{t('Track your order')}</CardTitle>
+        <CardDescription>{t('Enter the order number from your confirmation and the phone you used at checkout.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -29,15 +31,15 @@ function OrderLookup({ initialOrder, onFound }: { initialOrder: string; onFound:
           }}
         >
           <div className="space-y-2">
-            <Label htmlFor="order">Order number</Label>
+            <Label htmlFor="order">{t('Order number')}</Label>
             <Input id="order" className="h-10 font-mono" placeholder="TS-20261022-00001" value={order} onChange={(e) => setOrder(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone number</Label>
+            <Label htmlFor="phone">{t('Phone number')}</Label>
             <Input id="phone" className="h-10" inputMode="tel" placeholder="0911 234 567" value={phone} onChange={(e) => setPhone(e.target.value)} required />
           </div>
           <Button type="submit" size="lg" className="h-10 w-full">
-            <Search /> Find order
+            <Search /> {t('Find order')}
           </Button>
         </form>
       </CardContent>

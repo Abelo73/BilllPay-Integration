@@ -9,10 +9,12 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
 
 export function ShopPage() {
+  const t = useT()
   const [params, setParams] = useSearchParams()
   const category = params.get('category') ?? ''
   const q = params.get('q') ?? ''
@@ -31,10 +33,10 @@ export function ShopPage() {
   }
 
   useEffect(() => {
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (search !== q) update({ q: search || null })
     }, 300)
-    return () => clearTimeout(t)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
@@ -66,13 +68,13 @@ export function ShopPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Shop</h1>
-        <p className="text-muted-foreground">Everything in stock, priced in Ethiopian Birr.</p>
+        <h1 className="text-3xl font-semibold tracking-tight">{t('Shop')}</h1>
+        <p className="text-muted-foreground">{t('Everything in stock, priced in Ethiopian Birr.')}</p>
       </div>
 
       <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center">
         <div className="flex flex-wrap gap-2">
-          <Chip active={!category} onClick={() => pickCategory(null)}>All</Chip>
+          <Chip active={!category} onClick={() => pickCategory(null)}>{t('All')}</Chip>
           {all.filter((c) => !c.parentId).map((c) => (
             <Chip key={c.slug} active={main?.id === c.id} onClick={() => pickCategory(c.slug)}>
               {c.name}
@@ -82,25 +84,25 @@ export function ShopPage() {
         <div className="flex gap-2 lg:ml-auto">
           <div className="relative flex-1 lg:w-64">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products" className="pl-8" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Search products')} className="pl-8" />
           </div>
           <Select value={sort} onValueChange={(v) => update({ sort: v === 'newest' ? null : v })}>
-            <SelectTrigger className="w-40" aria-label="Sort">
+            <SelectTrigger className="w-40" aria-label={t('Sort')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="newest">Newest</SelectItem>
-              <SelectItem value="price_asc">Price: low to high</SelectItem>
-              <SelectItem value="price_desc">Price: high to low</SelectItem>
-              <SelectItem value="name">Name</SelectItem>
+              <SelectItem value="newest">{t('Newest')}</SelectItem>
+              <SelectItem value="price_asc">{t('Price: low to high')}</SelectItem>
+              <SelectItem value="price_desc">{t('Price: high to low')}</SelectItem>
+              <SelectItem value="name">{t('Name')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
       {subs.length > 0 && main && (
-        <div className="mt-4 flex flex-wrap gap-2" aria-label={`${main.name} types`}>
-          <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>All {main.name.toLowerCase()}</SubChip>
+        <div className="mt-4 flex flex-wrap gap-2" aria-label={t('{name} types', { name: main.name })}>
+          <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>{t('All {name}', { name: main.name.toLowerCase() })}</SubChip>
           {subs.map((s) => (
             <SubChip key={s.slug} active={current?.id === s.id} onClick={() => pickCategory(s.slug)}>{s.name}</SubChip>
           ))}
@@ -120,10 +122,10 @@ export function ShopPage() {
                   onChange={(e) => update({ [key]: e.target.value || null })}
                   className={cn('block h-9 min-w-32 rounded-lg border bg-background px-2 text-sm text-foreground', val && 'border-primary')}
                 >
-                  <option value="">Any</option>
+                  <option value="">{t('Any')}</option>
                   {f.values.map((v) => (
                     <option key={v.value} value={v.value}>
-                      {f.type === 'YES_NO' ? (v.value === 'true' ? 'Yes' : 'No') : v.value} ({v.count})
+                      {f.type === 'YES_NO' ? (v.value === 'true' ? t('Yes') : t('No')) : v.value} ({v.count})
                     </option>
                   ))}
                 </select>
@@ -131,7 +133,7 @@ export function ShopPage() {
             )
           })}
           {Object.keys(specFilters).length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => pickCategory(category)}><X /> Clear filters</Button>
+            <Button variant="ghost" size="sm" onClick={() => pickCategory(category)}><X /> {t('Clear filters')}</Button>
           )}
         </div>
       )}
@@ -142,29 +144,29 @@ export function ShopPage() {
       </div>
       {products.isError && (
         <p className="mt-8 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Products could not be loaded. Please try again.
+          {t('Products could not be loaded. Please try again.')}
         </p>
       )}
       {products.data && products.data.content.length === 0 && (
         <p className="mt-8 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          No products match your filters.
+          {t('No products match your filters.')}
         </p>
       )}
 
       {products.data && products.data.totalPages > 1 && (
         <div className="mt-10 flex items-center justify-center gap-3">
           <Button variant="outline" disabled={page === 0} onClick={() => update({ page: String(page - 1) })}>
-            Previous
+            {t('Previous')}
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {page + 1} of {products.data.totalPages}
+            {t('Page {page} of {pages}', { page: page + 1, pages: products.data.totalPages })}
           </span>
           <Button
             variant="outline"
             disabled={page + 1 >= products.data.totalPages}
             onClick={() => update({ page: String(page + 1) })}
           >
-            Next
+            {t('Next')}
           </Button>
         </div>
       )}

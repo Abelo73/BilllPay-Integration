@@ -7,6 +7,7 @@ import { LogoSymbol } from '@/components/logo'
 import { Button } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
 import { useFeatures } from '@/lib/features'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { JOB_TYPE_LABEL, TALENT_STATUS_LABEL, WORK_PLACE_LABEL, workApi, type Profile } from '@/lib/work-api'
 import { useSession } from '@/store/session'
@@ -25,6 +26,7 @@ const WORK_TYPE: Record<string, string> = { ...JOB_TYPE_LABEL, WEEKEND: 'Weekend
 /** /work/my-cv: the free CV made from the profile (J2). Saved as PDF with the browser's print. */
 export function MyCvPage() {
   const redirect = useRequireSession('/work/my-cv')
+  const t = useT()
   const f = useFeatures()
   const email = useSession((s) => s.session?.user.email ?? null)
   const profile = useQuery({ queryKey: ['work-profile'], queryFn: workApi.profile, retry: false, enabled: !redirect })
@@ -32,34 +34,38 @@ export function MyCvPage() {
   const [look, setLook] = useState<Look>('modern')
 
   if (redirect) return redirect
-  if (f.loaded && !f.on('auto_cv')) return <><WorkNav /><Notice title="The free CV is coming soon" /></>
+  if (f.loaded && !f.on('auto_cv')) return <><WorkNav /><Notice title={t('The free CV is coming soon')} /></>
   if (profile.isLoading) return <><WorkNav /><div className="grid min-h-[40vh] place-items-center"><Loader2 className="size-6 animate-spin text-muted-foreground" /></div></>
   if (profile.error instanceof ApiError && profile.error.code === 'NO_PROFILE') {
+    const [firstBefore, firstAfter] = t('{link} first. It takes 3 minutes.').split('{link}')
     return (
       <>
         <WorkNav />
-        <Notice title="Your CV is made from your profile">
-          <Link to="/work/profile?next=/work/my-cv" className="font-semibold text-primary underline">Make your free profile</Link> first. It takes 3 minutes.
+        <Notice title={t('Your CV is made from your profile')}>
+          {firstBefore}<Link to="/work/profile?next=/work/my-cv" className="font-semibold text-primary underline">{t('Make your free profile')}</Link>{firstAfter}
         </Notice>
       </>
     )
   }
   if (!profile.data) return null
   const p = profile.data
+  const [tapBefore, tapAfter] = t('Tap {button}, then choose “Save as PDF” as the printer.').split('{button}')
+  const [editBefore, editAfter] = t('To change anything, {link}.').split('{link}')
+  const [proBefore, proAfter] = t('Want it written by a professional? {link}.').split('{link}')
 
   return (
     <>
       <WorkNav />
       <div className="mx-auto max-w-4xl space-y-4 px-4 py-6 sm:px-6 print:max-w-none print:p-0">
         <div className="flex flex-wrap items-center gap-3 print:hidden">
-          <h1 className="mr-auto text-2xl font-extrabold tracking-tight">My free CV</h1>
-          <Toggle value={look} options={[['modern', 'Modern'], ['simple', 'Simple']]} onChange={(v) => setLook(v as Look)} label="Design" />
-          <Toggle value={lang} options={[['EN', 'English'], ['AM', 'አማርኛ']]} onChange={(v) => setLang(v as Lang)} label="Headings" />
-          <Button onClick={() => window.print()} className="rounded-full"><Printer /> Save as PDF</Button>
+          <h1 className="mr-auto text-2xl font-extrabold tracking-tight">{t('My free CV')}</h1>
+          <Toggle value={look} options={[['modern', t('Modern')], ['simple', t('Simple')]]} onChange={(v) => setLook(v as Look)} label={t('Design')} />
+          <Toggle value={lang} options={[['EN', 'English'], ['AM', 'አማርኛ']]} onChange={(v) => setLang(v as Lang)} label={t('Headings')} />
+          <Button onClick={() => window.print()} className="rounded-full"><Printer /> {t('Save as PDF')}</Button>
         </div>
         <p className="text-sm text-muted-foreground print:hidden">
-          Tap <strong>Save as PDF</strong>, then choose “Save as PDF” as the printer. To change anything, <Link to="/work/profile" className="text-primary underline">edit your profile</Link>.
-          {f.on('cv_service') && <> Want it written by a professional? <Link to="/work/cv" className="text-primary underline">See CV packages</Link>.</>}
+          {tapBefore}<strong>{t('Save as PDF')}</strong>{tapAfter} {editBefore}<Link to="/work/profile" className="text-primary underline">{t('edit your profile')}</Link>{editAfter}
+          {f.on('cv_service') && <> {proBefore}<Link to="/work/cv" className="text-primary underline">{t('See CV packages')}</Link>{proAfter}</>}
         </p>
         <div className="overflow-x-auto rounded-2xl border bg-muted/40 p-2 sm:p-6 print:overflow-visible print:border-0 print:bg-transparent print:p-0">
           <CvSheet p={p} email={email} lang={lang} look={look} />

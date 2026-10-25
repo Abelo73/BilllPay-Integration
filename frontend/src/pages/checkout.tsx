@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useFeatures } from '@/lib/features'
+import { t as tr, useT } from '@/lib/i18n'
 import { api, ApiError, deliveryFee, type Address, type PriceQuote } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -47,13 +48,14 @@ function fieldErrors(raw: Record<string, string>): Errors {
 
 /** Online payment is switched off (Admin → Features): buying works by contacting the seller. */
 function PaymentsOff() {
+  const t = useT()
   return (
     <div className="mx-auto max-w-lg space-y-4 px-4 py-16 text-center">
-      <h1 className="text-2xl font-bold">Contact the seller to buy</h1>
+      <h1 className="text-2xl font-bold">{t('Contact the seller to buy')}</h1>
       <p className="text-muted-foreground">
-        Open an item, then chat with the seller or tap "Show phone number" to call them. Agree on the price, meet in a safe place, check the item, then pay.
+        {t('Open an item, then chat with the seller or tap "Show phone number" to call them. Agree on the price, meet in a safe place, check the item, then pay.')}
       </p>
-      <Button asChild size="lg"><Link to="/shop">Browse items</Link></Button>
+      <Button asChild size="lg"><Link to="/shop">{t('Browse items')}</Link></Button>
     </div>
   )
 }
@@ -65,6 +67,7 @@ export function CheckoutPage() {
 }
 
 function CheckoutForm() {
+  const t = useT()
   const { lines, clear } = useCart()
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()
@@ -152,7 +155,7 @@ function CheckoutForm() {
       }
       if (err instanceof ApiError && err.status === 401) {
         // The session ended while filling in the form; the cart is kept.
-        toast.error('Please sign in again to finish your order.')
+        toast.error(tr('Please sign in again to finish your order.'))
         navigate('/login?next=/checkout')
         return
       }
@@ -176,11 +179,11 @@ function CheckoutForm() {
         <div className="grid size-16 place-items-center rounded-full bg-muted">
           <UserRound className="size-7 text-muted-foreground" />
         </div>
-        <h1 className="text-2xl font-semibold">Staff accounts can’t place orders</h1>
+        <h1 className="text-2xl font-semibold">{t('Staff accounts can’t place orders')}</h1>
         <p className="text-sm text-muted-foreground">
-          You’re signed in as {userContact(user)}. Sign out, then sign in with a customer account to buy.
+          {t('You’re signed in as {contact}. Sign out, then sign in with a customer account to buy.', { contact: userContact(user) })}
         </p>
-        <Button onClick={() => { clearSession(); navigate('/login?next=/checkout') }}>Sign out and continue</Button>
+        <Button onClick={() => { clearSession(); navigate('/login?next=/checkout') }}>{t('Sign out and continue')}</Button>
       </div>
     )
   }
@@ -191,9 +194,9 @@ function CheckoutForm() {
         <div className="grid size-16 place-items-center rounded-full bg-muted">
           <ShoppingBag className="size-7 text-muted-foreground" />
         </div>
-        <h1 className="text-2xl font-semibold">Your cart is empty</h1>
+        <h1 className="text-2xl font-semibold">{t('Your cart is empty')}</h1>
         <Button asChild>
-          <Link to="/shop">Browse products</Link>
+          <Link to="/shop">{t('Browse products')}</Link>
         </Button>
       </div>
     )
@@ -236,7 +239,7 @@ function CheckoutForm() {
         className="h-10"
         {...props}
       />
-      {errors[key] && <p className="text-sm text-destructive">{errors[key]}</p>}
+      {errors[key] && <p className="text-sm text-destructive">{t(errors[key])}</p>}
     </div>
   )
 
@@ -245,34 +248,34 @@ function CheckoutForm() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Checkout</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">{t('Checkout')}</h1>
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_400px]">
         <form id="checkout-form" onSubmit={submit} className="space-y-6" noValidate>
           <Card>
             <CardHeader>
-              <CardTitle>Contact details</CardTitle>
+              <CardTitle>{t('Contact details')}</CardTitle>
               <CardDescription>
-                Filled in from your account. BillPay uses these to send your payment request and receipt.
+                {t('Filled in from your account. BillPay uses these to send your payment request and receipt.')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {field('name', 'Full name', { autoComplete: 'name', placeholder: 'Abebe Kebede' })}
+              {field('name', t('Full name'), { autoComplete: 'name', placeholder: 'Abebe Kebede' })}
               <div className="grid gap-5 sm:grid-cols-2">
-                {field('phone', 'Phone number', { autoComplete: 'tel', inputMode: 'tel', placeholder: '0911 234 567' })}
-                {field('email', 'Email', { autoComplete: 'email', type: 'email', placeholder: 'abebe@example.et' })}
+                {field('phone', t('Phone number'), { autoComplete: 'tel', inputMode: 'tel', placeholder: '0911 234 567' })}
+                {field('email', t('Email'), { autoComplete: 'email', type: 'email', placeholder: 'abebe@example.et' })}
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Truck className="size-5" /> Delivery</CardTitle>
-              <CardDescription>Delivery in Wolaita Sodo. The seller or rider calls the phone above.</CardDescription>
+              <CardTitle className="flex items-center gap-2"><Truck className="size-5" /> {t('Delivery')}</CardTitle>
+              <CardDescription>{t('Delivery in Wolaita Sodo. The seller or rider calls the phone above.')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {saved.data && saved.data.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Saved addresses</Label>
+                  <Label>{t('Saved addresses')}</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {saved.data.map((a) => (
                       <button
@@ -284,24 +287,24 @@ function CheckoutForm() {
                           chosen === a.id && 'border-brand bg-brand/5 ring-1 ring-brand',
                         )}
                       >
-                        <span className="flex items-center gap-1.5 font-medium"><MapPin className="size-3.5" /> {a.label}{a.isDefault && <span className="text-xs font-normal text-muted-foreground">· default</span>}</span>
+                        <span className="flex items-center gap-1.5 font-medium"><MapPin className="size-3.5" /> {a.label}{a.isDefault && <span className="text-xs font-normal text-muted-foreground">· {t('default')}</span>}</span>
                         <span className="mt-1 block text-muted-foreground">{a.addressLine}, {a.city}</span>
                       </button>
                     ))}
                   </div>
                 </div>
               )}
-              {field('address', 'Street, area and house / building', { autoComplete: 'street-address', placeholder: 'Arada, near the church, house 12' })}
-              {field('city', 'City', { autoComplete: 'address-level2', placeholder: 'Wolaita Sodo' })}
+              {field('address', t('Street, area and house / building'), { autoComplete: 'street-address', placeholder: t('Arada, near the church, house 12') })}
+              {field('city', t('City'), { autoComplete: 'address-level2', placeholder: 'Wolaita Sodo' })}
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes for the rider <span className="font-normal text-muted-foreground">(optional)</span></Label>
-                <Textarea id="notes" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Gate colour, landmark, best time to call…" aria-invalid={!!errors.notes} />
-                {errors.notes && <p className="text-sm text-destructive">{errors.notes}</p>}
+                <Label htmlFor="notes">{t('Notes for the rider')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span></Label>
+                <Textarea id="notes" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t('Gate colour, landmark, best time to call…')} aria-invalid={!!errors.notes} />
+                {errors.notes && <p className="text-sm text-destructive">{t(errors.notes)}</p>}
               </div>
               {isCustomer && chosen === null && (
                 <label className="flex items-center justify-between gap-4 rounded-xl border p-3 text-sm">
-                  <span>Save this address to my account</span>
-                  <Switch checked={saveAddress} onCheckedChange={setSaveAddress} aria-label="Save this address" />
+                  <span>{t('Save this address to my account')}</span>
+                  <Switch checked={saveAddress} onCheckedChange={setSaveAddress} aria-label={t('Save this address')} />
                 </label>
               )}
             </CardContent>
@@ -310,7 +313,7 @@ function CheckoutForm() {
 
         <Card className="h-fit lg:sticky lg:top-24">
           <CardHeader>
-            <CardTitle>Order summary</CardTitle>
+            <CardTitle>{t('Order summary')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {lines.map((l) => (
@@ -318,7 +321,7 @@ function CheckoutForm() {
                 <ProductVisual categorySlug={l.categorySlug} imageUrl={l.imageUrl} name={l.name} className="size-12 shrink-0 rounded-lg" iconClassName="size-5" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{l.name}</p>
-                  <p className="text-xs text-muted-foreground">Qty {l.quantity}</p>
+                  <p className="text-xs text-muted-foreground">{t('Qty {n}', { n: l.quantity })}</p>
                 </div>
                 <span className="text-sm tabular-nums">{formatETB(l.price * l.quantity)}</span>
               </div>
@@ -333,8 +336,8 @@ function CheckoutForm() {
             >
               <div className="flex gap-2">
                 <Input
-                  aria-label="Discount code"
-                  placeholder="Discount code"
+                  aria-label={t('Discount code')}
+                  placeholder={t('Discount code')}
                   className="h-9 uppercase placeholder:normal-case"
                   value={codeInput}
                   onChange={(e) => {
@@ -346,11 +349,11 @@ function CheckoutForm() {
                 />
                 {applied ? (
                   <Button type="button" variant="outline" size="sm" className="h-9" onClick={() => { setApplied(null); setCodeInput('') }}>
-                    <X /> Remove
+                    <X /> {t('Remove')}
                   </Button>
                 ) : (
                   <Button type="submit" variant="outline" size="sm" className="h-9" disabled={!codeInput.trim() || applyCode.isPending}>
-                    {applyCode.isPending ? <Loader2 className="animate-spin" /> : <Tag />} Apply
+                    {applyCode.isPending ? <Loader2 className="animate-spin" /> : <Tag />} {t('Apply')}
                   </Button>
                 )}
               </div>
@@ -359,44 +362,44 @@ function CheckoutForm() {
             </form>
             <Separator />
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-muted-foreground">{t('Subtotal')}</span>
               <span className="tabular-nums">{formatETB(subtotal)}</span>
             </div>
             {applied && discount > 0 && (
               <div className="flex justify-between text-sm text-success">
-                <span>Discount ({applied.discountCode})</span>
+                <span>{t('Discount ({code})', { code: applied.discountCode })}</span>
                 <span className="tabular-nums">−{formatETB(discount)}</span>
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Delivery{parcels.length > 1 && ` (${parcels.length} sellers)`}</span>
-              <span className="tabular-nums">{quote.isLoading ? '…' : fee === 0 ? 'Free' : formatETB(fee)}</span>
+              <span className="text-muted-foreground">{parcels.length > 1 ? t('Delivery ({n} sellers)', { n: parcels.length }) : t('Delivery')}</span>
+              <span className="tabular-nums">{quote.isLoading ? '…' : fee === 0 ? t('Free') : formatETB(fee)}</span>
             </div>
             {parcels.length > 1 && (
               <ul className="space-y-1 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 {parcels.map((p, i) => (
                   <li key={i} className="flex justify-between gap-2">
-                    <span className="truncate">From {p.seller ?? 'Sodo Gebeya'} ({formatETB(p.itemsTotal)})</span>
-                    <span className="tabular-nums">{p.deliveryFee === 0 ? 'Free' : formatETB(p.deliveryFee)}</span>
+                    <span className="truncate">{t('From {seller} ({amount})', { seller: p.seller ?? 'Sodo Gebeya', amount: formatETB(p.itemsTotal) })}</span>
+                    <span className="tabular-nums">{p.deliveryFee === 0 ? t('Free') : formatETB(p.deliveryFee)}</span>
                   </li>
                 ))}
-                <li className="pt-1">Each seller delivers their own items, so they may arrive separately.</li>
+                <li className="pt-1">{t('Each seller delivers their own items, so they may arrive separately.')}</li>
               </ul>
             )}
             {toFree > 0 && (
               <p className="rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
-                Add {formatETB(toFree)} more for free delivery.
+                {t('Add {amount} more for free delivery.', { amount: formatETB(toFree) })}
               </p>
             )}
             <div className="flex justify-between text-lg font-semibold">
-              <span>Total</span>
+              <span>{t('Total')}</span>
               <span className="tabular-nums">{formatETB(total)}</span>
             </div>
             <Button type="submit" form="checkout-form" size="lg" className="h-11 w-full text-base" disabled={busy || quote.isLoading}>
-              {busy ? <><Loader2 className="animate-spin" /> Redirecting to BillPay…</> : <><Lock /> Pay {formatETB(total)} with BillPay</>}
+              {busy ? <><Loader2 className="animate-spin" /> {t('Redirecting to BillPay…')}</> : <><Lock /> {t('Pay {amount} with BillPay', { amount: formatETB(total) })}</>}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              You’ll finish paying on BillPay’s secure page with Wallet, Bank or Card.
+              {t('You’ll finish paying on BillPay’s secure page with Wallet, Bank or Card.')}
             </p>
           </CardContent>
         </Card>

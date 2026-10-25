@@ -81,7 +81,6 @@ export const account: Record<string, string> = {
   'Street, area and house / building': 'መንገድ፣ አካባቢና ቤት / ሕንፃ',
   'Notes for the rider': 'ለአድራሹ ማስታወሻ',
   'Save address': 'አድራሻ አስቀምጥ',
-  Cancel: 'ሰርዝ',
 
   // ---- account: profile ----
   'Profile saved': 'ፕሮፋይሉ ተቀምጧል',

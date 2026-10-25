@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { formatETB } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { cartTotals, useCart } from '@/store/cart'
 import { useSession } from '@/store/session'
 
 export function CartSheet() {
+  const t = useT()
   const { lines, open, setOpen, setQuantity, remove } = useCart()
   const { count, subtotal } = cartTotals(lines)
   const navigate = useNavigate()
@@ -27,8 +29,8 @@ export function CartSheet() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetContent className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Your cart</SheetTitle>
-          <SheetDescription>{count === 0 ? 'Nothing here yet.' : `${count} item${count > 1 ? 's' : ''}`}</SheetDescription>
+          <SheetTitle>{t('Your cart')}</SheetTitle>
+          <SheetDescription>{count === 0 ? t('Nothing here yet.') : count > 1 ? t('{n} items', { n: count }) : t('{n} item', { n: count })}</SheetDescription>
         </SheetHeader>
 
         {lines.length === 0 ? (
@@ -36,20 +38,20 @@ export function CartSheet() {
             <div className="grid size-16 place-items-center rounded-full bg-muted">
               <ShoppingBag className="size-7 text-muted-foreground" />
             </div>
-            <p className="text-sm text-muted-foreground">Browse the shop and add something you love.</p>
+            <p className="text-sm text-muted-foreground">{t('Browse the shop and add something you love.')}</p>
             <Button asChild onClick={() => setOpen(false)}>
-              <Link to="/shop">Start shopping</Link>
+              <Link to="/shop">{t('Start shopping')}</Link>
             </Button>
           </div>
         ) : (
           <div className="flex-1 space-y-5 overflow-y-auto px-4">
             {groups.length > 1 && (
               <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
-                From {groups.length} sellers: each delivers their own items, with its own delivery fee.
+                {t('From {n} sellers: each delivers their own items, with its own delivery fee.', { n: groups.length })}
               </p>
             )}
             {groups.map((g) => (
-              <section key={g.key} className="space-y-3" aria-label={`From ${g.name}`}>
+              <section key={g.key} className="space-y-3" aria-label={t('From {name}', { name: g.name })}>
                 {groups.length > 1 && (
                   <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <Store className="size-3.5" /> {g.name}
@@ -64,14 +66,14 @@ export function CartSheet() {
                   </Link>
                   <span className="text-sm text-muted-foreground">{formatETB(l.price)}</span>
                   <div className="mt-1 flex items-center gap-1">
-                    <Button size="icon-xs" variant="outline" aria-label="Decrease" onClick={() => setQuantity(l.productId, l.quantity - 1)}>
+                    <Button size="icon-xs" variant="outline" aria-label={t('Decrease')} onClick={() => setQuantity(l.productId, l.quantity - 1)}>
                       <Minus />
                     </Button>
                     <span className="w-7 text-center text-sm tabular-nums">{l.quantity}</span>
-                    <Button size="icon-xs" variant="outline" aria-label="Increase" onClick={() => setQuantity(l.productId, l.quantity + 1)}>
+                    <Button size="icon-xs" variant="outline" aria-label={t('Increase')} onClick={() => setQuantity(l.productId, l.quantity + 1)}>
                       <Plus />
                     </Button>
-                    <Button size="icon-xs" variant="ghost" className="ml-auto" aria-label="Remove" onClick={() => remove(l.productId)}>
+                    <Button size="icon-xs" variant="ghost" className="ml-auto" aria-label={t('Remove')} onClick={() => remove(l.productId)}>
                       <Trash2 />
                     </Button>
                   </div>
@@ -87,11 +89,11 @@ export function CartSheet() {
           <SheetFooter>
             <Separator className="mb-2" />
             <div className="flex items-center justify-between font-medium">
-              <span>Subtotal</span>
+              <span>{t('Subtotal')}</span>
               <span>{formatETB(subtotal)}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Final amount is confirmed at checkout.{!signedIn && ' You’ll sign in first; your cart is kept.'}
+              {t('Final amount is confirmed at checkout.')}{!signedIn && ` ${t('You’ll sign in first; your cart is kept.')}`}
             </p>
             <Button
               size="lg"
@@ -100,7 +102,7 @@ export function CartSheet() {
                 navigate(signedIn ? '/checkout' : '/login?next=/checkout')
               }}
             >
-              {signedIn ? 'Checkout' : 'Sign in to check out'}
+              {signedIn ? t('Checkout') : t('Sign in to check out')}
             </Button>
           </SheetFooter>
         )}

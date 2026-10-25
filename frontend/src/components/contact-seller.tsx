@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { request } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { useFeatures } from '@/lib/features'
 import { useSession } from '@/store/session'
 
@@ -25,6 +26,7 @@ function WhatsAppIcon() {
  * and agrees on payment and pickup themselves. Chat in the app is offered next to it.
  */
 export function ContactSeller({ productId, slug }: { productId: number; slug: string }) {
+  const t = useT()
   const session = useSession((s) => s.session)
   const navigate = useNavigate()
   const features = useFeatures()
@@ -43,7 +45,7 @@ export function ContactSeller({ productId, slug }: { productId: number; slug: st
         <p className="text-2xl font-bold tracking-wide tabular-nums">{contact.phone}</p>
         <div className="grid grid-cols-2 gap-2">
           <Button asChild size="lg" className="h-11">
-            <a href={`tel:${contact.phone}`}><Phone /> Call</a>
+            <a href={`tel:${contact.phone}`}><Phone /> {t('Call')}</a>
           </Button>
           {contact.whatsapp && (
             <Button asChild size="lg" variant="outline" className="h-11">
@@ -61,20 +63,21 @@ export function ContactSeller({ productId, slug }: { productId: number; slug: st
       disabled={reveal.isPending}
       onClick={() => (session ? reveal.mutate() : navigate(`/login?next=${encodeURIComponent(`/product/${slug}`)}`))}
     >
-      {reveal.isPending ? <Loader2 className="animate-spin" /> : <Phone />} {session ? 'Show phone number' : 'Sign in to see the phone number'}
+      {reveal.isPending ? <Loader2 className="animate-spin" /> : <Phone />} {session ? t('Show phone number') : t('Sign in to see the phone number')}
     </Button>
   )
 }
 
 /** Shown under the contact buttons while online payment is off. */
 export function SafetyTips() {
+  const t = useT()
   return (
     <div className="space-y-2 rounded-2xl border bg-muted/30 p-4 text-sm">
-      <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-primary" /> Buy safely</p>
+      <p className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4 text-primary" /> {t('Buy safely')}</p>
       <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-        <li>Meet in a public place in Sodo and check the item before you pay.</li>
-        <li>Never send money before you see the item.</li>
-        <li>Prefer sellers with the Verified badge. Report anything suspicious.</li>
+        <li>{t('Meet in a public place in Sodo and check the item before you pay.')}</li>
+        <li>{t('Never send money before you see the item.')}</li>
+        <li>{t('Prefer sellers with the Verified badge. Report anything suspicious.')}</li>
       </ul>
     </div>
   )
