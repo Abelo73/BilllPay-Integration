@@ -210,6 +210,8 @@ All of these must be true:
 
 ### M18. Amharic and Wolaytta (1 week)
 - Full Amharic translation; Wolaytta with a native speaker; language remembered per user; SMS in the user's language
+
+🟡 Part done 2026-10-25 (V29). **English / አማርኛ switch** in the header (starts in Amharic when the phone is set to Amharic; remembered on the device and on the account). Translated: menus, footer, home page, sign-in and register, account, chats, notifications, product cards, reviews, Telegram card, Hire a pro (list, profile, jobs, quotes, pro dashboard): about 450 lines in `frontend/src/locales/am/` (one file per area; the English text is the key, missing lines show in English). **SMS in Amharic** for people who chose it: sign-in code, order updates, chat and job alerts (`sms/SmsLanguage` helper for other features). Still to do: shop, product, checkout, seller and jobs/CV pages; dispute, payout and verification SMS; admin stays English. **Needs you:** a native speaker to review the Amharic (first draft by us), and someone to write Wolaytta.
 ### M19. Installable app (PWA) (1 week)
 - Add to home screen, works on slow connections, offline pages, push notifications on Android
 

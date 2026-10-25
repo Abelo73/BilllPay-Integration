@@ -12,10 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useT } from '@/lib/i18n'
 import { userContact, useSession } from '@/store/session'
 
 /** "Sign in" for guests; an account menu for signed-in customers. */
 export function UserMenu() {
+  const t = useT()
   const { session, clear } = useSession()
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -23,7 +25,7 @@ export function UserMenu() {
   if (!session) {
     return (
       <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-        <Link to="/login">Sign in</Link>
+        <Link to="/login">{t('Sign in')}</Link>
       </Button>
     )
   }
@@ -31,14 +33,14 @@ export function UserMenu() {
   const signOut = () => {
     clear()
     qc.removeQueries({ queryKey: ['my-orders'] })
-    toast.success('Signed out')
+    toast.success(t('Signed out'))
     navigate('/')
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Account menu">
+        <Button variant="ghost" size="icon" aria-label={t('Account menu')}>
           <span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
             {session.user.fullName[0]?.toUpperCase()}
           </span>
@@ -51,14 +53,14 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/account"><Package /> My orders</Link>
+          <Link to="/account"><Package /> {t('My orders')}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link to="/account?tab=profile"><UserRound /> Account settings</Link>
+          <Link to="/account?tab=profile"><UserRound /> {t('Account settings')}</Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={signOut}>
-          <LogOut /> Sign out
+          <LogOut /> {t('Sign out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

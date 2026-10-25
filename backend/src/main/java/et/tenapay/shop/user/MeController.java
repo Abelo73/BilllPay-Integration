@@ -74,6 +74,18 @@ public class MeController {
 		return UserView.of(u);
 	}
 
+	public record LanguageUpdate(@NotBlank @Pattern(regexp = "en|am", message = "must be en or am") String language) {
+	}
+
+	/** Remembers the site language, so SMS and alerts come in it. */
+	@org.springframework.web.bind.annotation.PutMapping("/language")
+	@Transactional
+	public Map<String, String> language(@Valid @RequestBody LanguageUpdate req) {
+		User u = load();
+		u.setLanguage(et.tenapay.shop.sms.SmsLanguage.normalize(req.language()));
+		return Map.of("language", u.getLanguage());
+	}
+
 	@PostMapping("/password")
 	public Session changePassword(@Valid @RequestBody PasswordChange req) {
 		return auth.changePassword(CurrentUser.require().id(), req.currentPassword(), req.newPassword());

@@ -8,6 +8,7 @@ import { TelegramConnect } from '@/components/telegram-connect'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { formatDate } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { inboxApi, type InboxItem, type InboxKind, type NotificationPrefs } from '@/lib/inbox-api'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
@@ -24,6 +25,7 @@ const ICON: Record<InboxKind, typeof Bell> = {
 }
 
 function Row({ item }: { item: InboxItem }) {
+  const t = useT()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const Icon = ICON[item.kind] ?? Bell
@@ -46,30 +48,31 @@ function Row({ item }: { item: InboxItem }) {
           {item.body && <span className="line-clamp-2 block text-sm text-muted-foreground">{item.body}</span>}
           <span className="block text-xs text-muted-foreground">{formatDate(item.createdAt)}</span>
         </span>
-        {!item.read && <span className="mt-1 size-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+        {!item.read && <span className="mt-1 size-2.5 shrink-0 rounded-full bg-primary" aria-label={t('Unread')} />}
       </button>
     </li>
   )
 }
 
 function SmsChoices() {
+  const t = useT()
   const qc = useQueryClient()
   const { data } = useQuery({ queryKey: ['notification-prefs'], queryFn: inboxApi.prefs })
   const save = useMutation({
     mutationFn: (p: NotificationPrefs) => inboxApi.savePrefs(p),
-    onSuccess: (p) => { qc.setQueryData(['notification-prefs'], p); toast.success('Saved') },
+    onSuccess: (p) => { qc.setQueryData(['notification-prefs'], p); toast.success(t('Saved')) },
     onError: (e) => toast.error(e.message),
   })
   if (!data) return null
   const rows: [keyof NotificationPrefs, string, string][] = [
-    ['smsOrders', 'Orders', 'Payment received, on the way, delivered, finish-paying reminder'],
-    ['smsChat', 'Chats', 'When someone sends you a message (at most every few hours)'],
-    ['smsJobs', 'Jobs', 'New prices for your jobs, accepted prices, job requests'],
+    ['smsOrders', t('Orders'), t('Payment received, on the way, delivered, finish-paying reminder')],
+    ['smsChat', t('Chats'), t('When someone sends you a message (at most every few hours)')],
+    ['smsJobs', t('Jobs'), t('New prices for your jobs, accepted prices, job requests')],
   ]
   return (
     <section aria-labelledby="sms-choices" className="space-y-3 rounded-2xl border bg-card p-4">
-      <h2 id="sms-choices" className="font-bold">Text messages (SMS)</h2>
-      <p className="text-sm text-muted-foreground">You always see everything here in the app. Choose what we also send by SMS.</p>
+      <h2 id="sms-choices" className="font-bold">{t('Text messages (SMS)')}</h2>
+      <p className="text-sm text-muted-foreground">{t('You always see everything here in the app. Choose what we also send by SMS.')}</p>
       {rows.map(([key, title, hint]) => (
         <label key={key} className="flex items-center gap-3">
           <span className="flex-1"><span className="block text-sm font-semibold">{title}</span><span className="block text-xs text-muted-foreground">{hint}</span></span>
@@ -82,6 +85,7 @@ function SmsChoices() {
 
 /** Notifications (design S15). */
 export function NotificationsPage() {
+  const t = useT()
   const session = useSession((s) => s.session)
   const qc = useQueryClient()
   const [page, setPage] = useState(0)
@@ -94,21 +98,21 @@ export function NotificationsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-extrabold tracking-tight">Notifications</h1>
-        {!!data?.unread && <Button variant="ghost" onClick={() => readAll.mutate()}>Mark all read</Button>}
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('Notifications')}</h1>
+        {!!data?.unread && <Button variant="ghost" onClick={() => readAll.mutate()}>{t('Mark all read')}</Button>}
       </div>
       {data?.items.content.length === 0 && (
         <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed py-12 text-center">
           <Bell className="size-8 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Nothing yet. Order updates, messages and job prices show up here.</p>
-          <Button asChild variant="outline"><Link to="/shop">Browse products</Link></Button>
+          <p className="text-sm text-muted-foreground">{t('Nothing yet. Order updates, messages and job prices show up here.')}</p>
+          <Button asChild variant="outline"><Link to="/shop">{t('Browse products')}</Link></Button>
         </div>
       )}
       <ul className="space-y-2">{data?.items.content.map((i) => <Row key={i.id} item={i} />)}</ul>
       {data && data.items.totalPages > 1 && (
         <div className="flex justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Newer</Button>
-          <Button variant="outline" size="sm" disabled={page + 1 >= data.items.totalPages} onClick={() => setPage(page + 1)}>Older</Button>
+          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('Newer')}</Button>
+          <Button variant="outline" size="sm" disabled={page + 1 >= data.items.totalPages} onClick={() => setPage(page + 1)}>{t('Older')}</Button>
         </div>
       )}
       <TelegramConnect />

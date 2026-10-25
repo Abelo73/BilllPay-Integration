@@ -3,18 +3,20 @@ import { Bell } from 'lucide-react'
 import { Link } from 'react-router'
 
 import { Button } from '@/components/ui/button'
+import { useT } from '@/lib/i18n'
 import { inboxApi } from '@/lib/inbox-api'
 import { useSession } from '@/store/session'
 
 /** Header bell with the unread count (customers only). */
 export function InboxBell() {
+  const t = useT()
   const session = useSession((s) => s.session)
   const enabled = !!session && session.user.role === 'CUSTOMER'
   const { data } = useQuery({ queryKey: ['inbox-unread', session?.user.id], queryFn: inboxApi.unread, enabled, refetchInterval: 30_000 })
   if (!enabled) return null
   const n = data?.unread ?? 0
   return (
-    <Button asChild variant="ghost" size="icon" className="relative size-11" aria-label={n ? `Notifications, ${n} new` : 'Notifications'}>
+    <Button asChild variant="ghost" size="icon" className="relative size-11" aria-label={n ? t('Notifications, {n} new', { n }) : t('Notifications')}>
       <Link to="/notifications">
         <Bell className="size-5" />
         {n > 0 && (

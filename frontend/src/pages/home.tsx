@@ -37,6 +37,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, type Product } from '@/lib/api'
 import { useFeatures } from '@/lib/features'
+import { useT } from '@/lib/i18n'
 import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
@@ -92,6 +93,7 @@ function Eyebrow({ children, light = false }: { children: ReactNode; light?: boo
 }
 
 function SearchBox() {
+  const t = useT()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   return (
@@ -104,75 +106,156 @@ function SearchBox() {
       }}
     >
       <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-      <label htmlFor="home-search" className="sr-only">Search Sodo Gebeya</label>
+      <label htmlFor="home-search" className="sr-only">{t('Search Sodo Gebeya')}</label>
       <input
         id="home-search"
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Search phones, sofas, tailors, jobs…"
+        placeholder={t('Search phones, sofas, tailors, jobs…')}
         className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
       />
-      <Button type="submit" size="lg" className="h-11 rounded-xl px-5">Search</Button>
+      <Button type="submit" size="lg" className="h-11 rounded-xl px-5">{t('Search')}</Button>
     </form>
   )
 }
 
-/** The phone in the hero: real listings from the store, a chat bubble and a contact card, gently floating. */
-function HeroPhone({ products, payments }: { products: Product[]; payments: boolean }) {
-  const shown = products.slice(0, 4)
+/** Sample listings for the hero phone while the store is empty or still loading. */
+const SAMPLE_LISTINGS: { name: string; price: string; icon: LucideIcon; tint: string }[] = [
+  { name: 'Samsung A15, like new', price: '14,500 ETB', icon: Smartphone, tint: 'from-emerald-100 to-emerald-200 text-emerald-800' },
+  { name: 'Habesha kemis', price: '3,800 ETB', icon: Shirt, tint: 'from-amber-100 to-amber-200 text-amber-800' },
+  { name: '3-seat sofa', price: '22,000 ETB', icon: Armchair, tint: 'from-sky-100 to-sky-200 text-sky-800' },
+  { name: 'Electrician, Arada', price: 'From 300 ETB', icon: Wrench, tint: 'from-rose-100 to-rose-200 text-rose-800' },
+]
+
+/** Phone status bar: time on the left, signal, Wi-Fi and battery on the right, the camera island in the middle. */
+function StatusBar() {
   return (
-    <div className="relative mx-auto w-full max-w-[340px]" aria-hidden>
-      <div className="absolute -inset-6 -z-10 rounded-[3rem] bg-primary/10 blur-2xl" />
-      <div className="drift-slow rounded-[2.5rem] border-[10px] border-[#13201A] bg-background shadow-2xl">
-        <div className="space-y-3 p-4">
-          <div className="flex items-center gap-2">
-            <LogoSymbol className="h-6 w-auto" />
-            <span className="text-sm font-extrabold">Sodo <span className="text-market-deep dark:text-market">Gebeya</span></span>
-          </div>
-          <div className="flex h-9 items-center gap-2 rounded-xl border bg-card px-3 text-xs text-muted-foreground">
-            <Search className="size-3.5" /> Search in Sodo…
-          </div>
-          <div className="flex gap-1.5 text-[10px] font-semibold">
-            {['All', 'Phones', 'Jobs', 'Workers'].map((c, i) => (
-              <span key={c} className={cn('rounded-full px-2.5 py-1', i === 0 ? 'bg-primary text-primary-foreground' : 'bg-muted')}>{c}</span>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {(shown.length ? shown : Array.from({ length: 4 })).map((p, i) => {
-              const product = p as Product | undefined
-              return (
-                <div key={product?.id ?? i} className="overflow-hidden rounded-xl border bg-card">
-                  {product?.imageUrl ? (
-                    <img src={product.imageUrl} alt="" className="aspect-square w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="grid aspect-square place-items-center bg-accent text-primary"><ShoppingBag className="size-6" /></div>
-                  )}
-                  <div className="space-y-0.5 p-2">
-                    <p className="truncate text-[10px] font-semibold">{product?.name ?? 'Item near you'}</p>
-                    <p className="text-[11px] font-extrabold text-market-deep dark:text-market">{product ? formatETB(product.price) : '—'}</p>
-                  </div>
+    <div className="relative flex h-11 items-center justify-between px-7 pt-1 text-[11px] font-semibold text-foreground">
+      <span className="tabular-nums">9:41</span>
+      <span className="absolute left-1/2 top-2.5 h-[22px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
+      <span className="flex items-center gap-1">
+        {/* signal bars */}
+        <span className="flex items-end gap-[1.5px]">
+          {[4, 6, 8, 10].map((h) => <span key={h} className="w-[3px] rounded-[1px] bg-current" style={{ height: h }} />)}
+        </span>
+        <svg viewBox="0 0 16 12" className="h-[10px] w-[14px] fill-current"><path d="M8 11.5 10.6 8.4a3.6 3.6 0 0 0-5.2 0zM3.6 6.6l1.3 1.5a4.7 4.7 0 0 1 6.2 0l1.3-1.5a6.7 6.7 0 0 0-8.8 0zM.8 3.4l1.3 1.5a8.9 8.9 0 0 1 11.8 0l1.3-1.5a10.9 10.9 0 0 0-14.4 0z" /></svg>
+        {/* battery */}
+        <span className="relative ml-0.5 flex h-[11px] w-[22px] items-center rounded-[3px] border border-current/50 p-[1.5px]">
+          <span className="h-full w-[80%] rounded-[1.5px] bg-current" />
+          <span className="absolute -right-[3px] h-[4px] w-[1.5px] rounded-r bg-current/50" />
+        </span>
+      </span>
+    </div>
+  )
+}
+
+/** The phone in the hero: a realistic handset showing the real app with live listings, plus two floating cards. */
+function HeroPhone({ products, payments }: { products: Product[]; payments: boolean }) {
+  const t = useT()
+  const shown = products.filter((p) => p.imageUrl).slice(0, 4)
+  const tabs: [LucideIcon, string][] = [[Store, 'Home'], [Wrench, 'Services'], [Tag, 'Sell'], [MessageCircle, 'Chats'], [GraduationCap, 'Jobs']]
+  return (
+    <div className="relative mx-auto w-[min(290px,78vw)] sm:w-[310px]" aria-hidden>
+      {/* soft green glow behind the phone */}
+      <div className="absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(closest-side,rgba(19,120,90,0.28),transparent)] blur-2xl" />
+
+      <div className="drift-slow relative">
+        {/* side buttons */}
+        <span className="absolute -left-[3px] top-[18%] h-6 w-[3px] rounded-l bg-[#2a3a33]" />
+        <span className="absolute -left-[3px] top-[27%] h-11 w-[3px] rounded-l bg-[#2a3a33]" />
+        <span className="absolute -left-[3px] top-[37%] h-11 w-[3px] rounded-l bg-[#2a3a33]" />
+        <span className="absolute -right-[3px] top-[30%] h-16 w-[3px] rounded-r bg-[#2a3a33]" />
+
+        {/* frame: a metal edge around a black bezel */}
+        <div className="rounded-[3rem] bg-gradient-to-b from-[#4a5a52] via-[#1e2a24] to-[#3a4a42] p-[3px] shadow-[0_40px_80px_-20px_rgba(14,90,67,0.45),0_20px_40px_-20px_rgba(0,0,0,0.5)]">
+          <div className="rounded-[2.85rem] bg-black p-[9px]">
+            <div className="relative aspect-[9/19.5] overflow-hidden rounded-[2.35rem] bg-background">
+              <StatusBar />
+
+              {/* the app */}
+              <div className="space-y-2.5 px-3.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <LogoSymbol className="h-5 w-auto" />
+                    <span className="text-[13px] font-extrabold">Sodo <span className="text-market-deep dark:text-market">Gebeya</span></span>
+                  </span>
+                  <span className="relative grid size-7 place-items-center rounded-full bg-muted">
+                    <MessageCircle className="size-3.5" />
+                    <span className="absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-destructive text-[8px] font-bold text-white">2</span>
+                  </span>
                 </div>
-              )
-            })}
+                <div className="flex h-8 items-center gap-1.5 rounded-xl border bg-card px-2.5 text-[11px] text-muted-foreground shadow-sm">
+                  <Search className="size-3.5" /> {t('Search in Sodo…')}
+                </div>
+                <div className="flex gap-1.5 text-[10px] font-semibold">
+                  {['All', 'Phones', 'Clothes', 'Workers'].map((c, i) => (
+                    <span key={c} className={cn('rounded-full px-2.5 py-1', i === 0 ? 'bg-primary text-primary-foreground' : 'border bg-card')}>{t(c)}</span>
+                  ))}
+                </div>
+                <p className="pt-0.5 text-[11px] font-bold">{t('New near you')}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {shown.length >= 4
+                    ? shown.map((p) => (
+                        <div key={p.id} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                          <img src={p.imageUrl!} alt="" className="aspect-[4/3.4] w-full object-cover" loading="lazy" />
+                          <div className="p-1.5">
+                            <p className="truncate text-[10px] font-semibold">{p.name}</p>
+                            <p className="text-[10.5px] font-extrabold text-market-deep dark:text-market">{formatETB(p.price)}</p>
+                          </div>
+                        </div>
+                      ))
+                    : SAMPLE_LISTINGS.map((s) => (
+                        <div key={s.name} className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                          <div className={cn('grid aspect-[4/3.4] place-items-center bg-gradient-to-br', s.tint)}>
+                            <s.icon className="size-8" strokeWidth={1.6} />
+                          </div>
+                          <div className="p-1.5">
+                            <p className="truncate text-[10px] font-semibold">{t(s.name)}</p>
+                            <p className="text-[10.5px] font-extrabold text-market-deep dark:text-market">{s.price.replace('From', t('From')).replace('ETB', t('ETB'))}</p>
+                          </div>
+                        </div>
+                      ))}
+                </div>
+              </div>
+
+              {/* bottom tabs, like the real app */}
+              <div className="absolute inset-x-0 bottom-0 border-t bg-card/95 pb-4 pt-1.5 backdrop-blur">
+                <div className="grid grid-cols-5 text-[8.5px] font-medium text-muted-foreground">
+                  {tabs.map(([Icon, label], i) => (
+                    <span key={label} className={cn('flex flex-col items-center gap-0.5', i === 0 && 'font-bold text-primary')}>
+                      <Icon className="size-4" />
+                      {t(label)}
+                    </span>
+                  ))}
+                </div>
+                {/* home indicator */}
+                <span className="absolute bottom-1.5 left-1/2 h-1 w-24 -translate-x-1/2 rounded-full bg-foreground/80" />
+              </div>
+
+              {/* glass reflection */}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0)_35%)]" />
+            </div>
           </div>
         </div>
       </div>
-      <div className="drift absolute -left-10 top-24 w-48 rounded-2xl border bg-card p-3 text-xs shadow-xl sm:-left-16">
-        <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><MessageCircle className="size-3.5 text-primary" /> Chat with the seller</p>
-        <p className="w-fit rounded-xl rounded-bl-sm bg-muted px-2.5 py-1.5">Is it still available?</p>
-        <p className="ml-auto mt-1 w-fit rounded-xl rounded-br-sm bg-primary px-2.5 py-1.5 text-primary-foreground">Yes! Like new.</p>
+
+      {/* floating cards: kept inside the screen width on phones */}
+      <div className="drift absolute -left-6 top-[30%] w-44 rounded-2xl border bg-card/95 p-3 text-xs shadow-xl backdrop-blur sm:-left-20 sm:w-48">
+        <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><MessageCircle className="size-3.5 text-primary" /> {t('Chat with the seller')}</p>
+        <p className="w-fit rounded-xl rounded-bl-sm bg-muted px-2.5 py-1.5">{t('Is it still available?')}</p>
+        <p className="ml-auto mt-1 w-fit rounded-xl rounded-br-sm bg-primary px-2.5 py-1.5 text-primary-foreground">{t('Yes! Like new.')}</p>
       </div>
-      <div className="drift absolute -right-6 bottom-14 w-44 rounded-2xl border bg-card p-3 text-xs shadow-xl [animation-delay:1.5s] sm:-right-12">
+      <div className="drift absolute -right-5 bottom-[16%] w-40 rounded-2xl border bg-card/95 p-3 text-xs shadow-xl backdrop-blur [animation-delay:1.5s] sm:-right-16 sm:w-44">
         {payments ? (
           <>
-            <p className="flex items-center gap-1.5 font-semibold"><ShieldCheck className="size-3.5 text-primary" /> Money held safely</p>
-            <p className="mt-1 text-muted-foreground">Paid to the seller only when you confirm.</p>
+            <p className="flex items-center gap-1.5 font-semibold"><ShieldCheck className="size-3.5 text-primary" /> {t('Money held safely')}</p>
+            <p className="mt-1 text-muted-foreground">{t('Paid to the seller only when you confirm.')}</p>
           </>
         ) : (
           <>
-            <p className="flex items-center gap-1.5 font-semibold"><Phone className="size-3.5 text-primary" /> Call the seller</p>
-            <p className="mt-1 text-muted-foreground">Agree, meet in town, check it, then pay.</p>
+            <p className="flex items-center gap-1.5 font-semibold"><Phone className="size-3.5 text-primary" /> {t('Call the seller')}</p>
+            <p className="mt-1 text-muted-foreground">{t('Agree, meet in town, check it, then pay.')}</p>
           </>
         )}
       </div>
@@ -181,13 +264,14 @@ function HeroPhone({ products, payments }: { products: Product[]; payments: bool
 }
 
 function Hero({ payments }: { payments: boolean }) {
+  const t = useT()
   const featured = useQuery({ queryKey: ['featured'], queryFn: api.featured })
   const chips = [
-    { label: 'Phones', to: '/shop?q=phone' },
-    { label: 'Clothes', to: '/shop?q=cloth' },
-    { label: 'Furniture', to: '/shop?q=sofa' },
-    { label: 'Electricians', to: '/services' },
-    { label: 'Jobs', to: '/work' },
+    { label: 'Phones', to: '/shop?q=phone', icon: Smartphone },
+    { label: 'Clothes', to: '/shop?q=cloth', icon: Shirt },
+    { label: 'Furniture', to: '/shop?q=sofa', icon: Armchair },
+    { label: 'Electricians', to: '/services', icon: Wrench },
+    { label: 'Jobs', to: '/work', icon: BriefcaseBusiness },
   ]
   const trust = payments
     ? [{ icon: ShieldCheck, text: 'Money held safely' }, { icon: BadgeCheck, text: 'Verified sellers' }, { icon: Truck, text: 'Pick up or delivery' }]
@@ -199,36 +283,40 @@ function Hero({ payments }: { payments: boolean }) {
         <div className="space-y-7">
           <Reveal>
             <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-semibold shadow-sm">
-              <span className="rounded-full bg-market px-1.5 py-0.5 text-[10px] font-extrabold text-[#13201A]">NEW</span>
-              Wolaita Sodo's own online market
+              <span className="rounded-full bg-market px-1.5 py-0.5 text-[10px] font-extrabold text-[#13201A]">{t('NEW')}</span>
+              {t("Wolaita Sodo's own online market")}
             </span>
           </Reveal>
           <Reveal delay={80}>
             <h1 className="text-4xl leading-[1.05] tracking-tight text-balance sm:text-6xl">
-              Buy, sell, hire and <span className="text-market-deep dark:text-market">get hired</span>, all in Sodo.
+              {t('Buy, sell, hire and')} <span className="text-market-deep dark:text-market">{t('get hired')}</span>{t(', all in Sodo.')}
             </h1>
           </Reveal>
           <Reveal delay={160}>
-            <p className="max-w-xl text-lg text-muted-foreground text-pretty">
-              Find shops, used items and skilled workers near you.{' '}
-              {payments ? 'Chat before you buy, pay safely, and pick up for free.' : 'Chat or call the seller, meet in town, and pay when you see it.'}{' '}
-              Students and graduates can build a free profile and send their CV in one tap.
+            <p className="max-w-xl text-base text-muted-foreground text-pretty sm:text-lg">
+              {t('Find shops, used items and skilled workers near you.')}{' '}
+              {payments ? t('Chat before you buy, pay safely, and pick up for free.') : t('Chat or call the seller, meet in town, and pay when you see it.')}
+              <span className="hidden sm:inline"> {t('Students and graduates can build a free profile and send their CV in one tap.')}</span>
             </p>
           </Reveal>
           <Reveal delay={240} className="max-w-xl space-y-3">
             <SearchBox />
-            <div className="flex flex-wrap gap-2">
+            {/* one swipeable row on phones, wrapping on wider screens */}
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
               {chips.map((c) => (
-                <Link key={c.label} to={c.to} className="rounded-full border bg-card px-3.5 py-1.5 text-sm font-medium transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
-                  {c.label}
-                </Link>
+                  <Link key={c.label} to={c.to} className="flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3.5 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
+                    <c.icon className="size-4 text-primary" /> {t(c.label)}
+                  </Link>
               ))}
             </div>
           </Reveal>
           <Reveal delay={320}>
-            <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium">
-              {trust.map((t) => (
-                <li key={t.text} className="flex items-center gap-2"><t.icon className="size-4 text-primary" /> {t.text}</li>
+            <ul className="grid grid-cols-3 gap-2 text-xs font-medium sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2 sm:text-sm">
+              {trust.map((x) => (
+                <li key={x.text} className="flex flex-col items-center gap-1.5 rounded-xl border bg-card/70 px-2 py-2.5 text-center sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:text-left">
+                  <span className="grid size-8 place-items-center rounded-full bg-accent sm:size-auto sm:bg-transparent"><x.icon className="size-4 text-primary" /></span>
+                  {t(x.text)}
+                </li>
               ))}
             </ul>
           </Reveal>
@@ -243,12 +331,13 @@ function Hero({ payments }: { payments: boolean }) {
 
 /** A slow, endless strip of what people trade in Sodo. */
 function Marquee() {
+  const t = useT()
   const words = ['Phones', 'Habesha kemis', 'Sofas', 'Electricians', 'Tailors', 'Bajaj parts', 'Coffee', 'Tutors', 'Jobs', 'Used items', 'Shoes', 'Plumbers']
   return (
     <div className="overflow-hidden border-y bg-primary py-3 text-primary-foreground" aria-hidden>
       <div className="marquee flex w-max gap-10 whitespace-nowrap text-sm font-semibold">
         {[...words, ...words].map((w, i) => (
-          <span key={i} className="flex items-center gap-10">{w}<span className="size-1.5 rounded-full bg-market" /></span>
+          <span key={i} className="flex items-center gap-10">{t(w)}<span className="size-1.5 rounded-full bg-market" /></span>
         ))}
       </div>
     </div>
@@ -256,6 +345,7 @@ function Marquee() {
 }
 
 function Categories({ jobsOn }: { jobsOn: boolean }) {
+  const t = useT()
   const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: api.categories, staleTime: 5 * 60_000 })
   const extra = [
     { name: 'Skilled workers', note: 'Electricians, tailors, tutors', to: '/services', icon: Wrench },
@@ -265,11 +355,11 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
     <section className="mx-auto max-w-7xl space-y-8 px-4 py-20 sm:px-6">
       <Reveal className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <Eyebrow>Everything in Sodo</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">One market, every need.</h2>
-          <p className="max-w-xl text-muted-foreground">New goods from local shops, used items from people near you, and skilled workers ready for the job.</p>
+          <Eyebrow>{t('Everything in Sodo')}</Eyebrow>
+          <h2 className="text-3xl sm:text-4xl">{t('One market, every need.')}</h2>
+          <p className="max-w-xl text-muted-foreground">{t('New goods from local shops, used items from people near you, and skilled workers ready for the job.')}</p>
         </div>
-        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">Browse all <ArrowRight /></Link></Button>
+        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">{t('Browse all')} <ArrowRight /></Link></Button>
       </Reveal>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
@@ -288,7 +378,7 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
           <Reveal key={c.name} delay={(i + 6) * 50}>
             <Link to={c.to} className="group flex h-full items-center gap-3 rounded-2xl border bg-card p-4 transition hover:-translate-y-1 hover:border-market hover:shadow-lg">
               <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-soft text-market-deep transition group-hover:bg-market group-hover:text-[#13201A] dark:text-market"><c.icon className="size-5" /></span>
-              <span><span className="block text-sm font-semibold">{c.name}</span><span className="block text-xs text-muted-foreground">{c.note}</span></span>
+              <span><span className="block text-sm font-semibold">{t(c.name)}</span><span className="block text-xs text-muted-foreground">{t(c.note)}</span></span>
             </Link>
           </Reveal>
         ))}
@@ -298,6 +388,7 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
 }
 
 function HowItWorks({ payments }: { payments: boolean }) {
+  const t = useT()
   const steps = [
     { title: 'Find it', text: 'Search by price, compare items and read real reviews.' },
     { title: 'Chat & agree', text: payments ? 'Ask questions and make your offer in the app.' : 'Chat in the app or call the seller, and agree on the price.' },
@@ -312,16 +403,16 @@ function HowItWorks({ payments }: { payments: boolean }) {
     <section className="bg-[#0E5A43] text-white">
       <div className="mx-auto max-w-7xl space-y-10 px-4 py-20 sm:px-6">
         <Reveal className="space-y-2">
-          <Eyebrow light>How it works</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">From "I need this" to "I got it" in four steps.</h2>
+          <Eyebrow light>{t('How it works')}</Eyebrow>
+          <h2 className="text-3xl sm:text-4xl">{t('From "I need this" to "I got it" in four steps.')}</h2>
         </Reveal>
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((s, i) => (
             <Reveal key={s.title} delay={i * 100}>
               <li className="h-full rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10">
                 <span className="text-3xl font-extrabold text-[#F2C77E]">0{i + 1}</span>
-                <p className="mt-3 text-lg font-bold">{s.title}</p>
-                <p className="mt-1 text-sm text-white/75">{s.text}</p>
+                <p className="mt-3 text-lg font-bold">{t(s.title)}</p>
+                <p className="mt-1 text-sm text-white/75">{t(s.text)}</p>
               </li>
             </Reveal>
           ))}
@@ -330,9 +421,9 @@ function HowItWorks({ payments }: { payments: boolean }) {
           <p className="flex items-start gap-3 rounded-2xl bg-white p-4 text-sm text-[#13201A]">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[#0E5A43]" />
             {payments ? (
-              <span><strong>Your money waits until you say "I got it".</strong> When you pay online, the seller is paid only after you confirm. No more lost deposits.</span>
+              <span><strong>{t('Your money waits until you say "I got it".')}</strong> {t('When you pay online, the seller is paid only after you confirm. No more lost deposits.')}</span>
             ) : (
-              <span><strong>Never pay before you see the item.</strong> Prefer sellers with the Verified badge, and report anything suspicious; our team checks every report.</span>
+              <span><strong>{t('Never pay before you see the item.')}</strong> {t('Prefer sellers with the Verified badge, and report anything suspicious; our team checks every report.')}</span>
             )}
           </p>
         </Reveal>
@@ -342,16 +433,17 @@ function HowItWorks({ payments }: { payments: boolean }) {
 }
 
 function Fresh() {
+  const t = useT()
   const { data, isLoading } = useQuery({ queryKey: ['featured'], queryFn: api.featured })
   if (!isLoading && (!data || data.length === 0)) return null
   return (
     <section className="mx-auto max-w-7xl space-y-8 px-4 py-20 sm:px-6">
       <Reveal className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <Eyebrow>Fresh in Sodo</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">Popular right now</h2>
+          <Eyebrow>{t('Fresh in Sodo')}</Eyebrow>
+          <h2 className="text-3xl sm:text-4xl">{t('Popular right now')}</h2>
         </div>
-        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">See everything <ArrowRight /></Link></Button>
+        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">{t('See everything')} <ArrowRight /></Link></Button>
       </Reveal>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4] rounded-2xl" />)}
@@ -364,38 +456,39 @@ function Fresh() {
 }
 
 function Workers() {
+  const t = useT()
   const quotes = [
-    { initial: 'D', name: 'Dawit Electric', meta: '4.9 rating · 86 jobs · Verified', price: 400, best: true },
-    { initial: 'A', name: 'Abebe & Sons', meta: '4.7 rating · 52 jobs', price: 450 },
-    { initial: 'S', name: 'Samuel Fix', meta: '4.6 rating · 23 jobs', price: 380 },
+    { initial: 'D', name: 'Dawit Electric', meta: t('{r} rating · {n} jobs', { r: '4.9', n: 86 }) + ' · ' + t('Verified'), price: 400, best: true },
+    { initial: 'A', name: 'Abebe & Sons', meta: t('{r} rating · {n} jobs', { r: '4.7', n: 52 }), price: 450 },
+    { initial: 'S', name: 'Samuel Fix', meta: t('{r} rating · {n} jobs', { r: '4.6', n: 23 }), price: 380 },
   ]
   return (
     <section className="bg-card">
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2">
         <Reveal className="space-y-5">
-          <Eyebrow>Skilled workers</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">Need a hand? Post the job, compare prices.</h2>
-          <p className="text-muted-foreground">Electricians, plumbers, tailors, carpenters, tutors and phone repair, with real reviews and photos of past work.</p>
+          <Eyebrow>{t('Skilled workers')}</Eyebrow>
+          <h2 className="text-3xl sm:text-4xl">{t('Need a hand? Post the job, compare prices.')}</h2>
+          <p className="text-muted-foreground">{t('Electricians, plumbers, tailors, carpenters, tutors and phone repair, with real reviews and photos of past work.')}</p>
           <ul className="space-y-2 text-sm">
-            {['Describe the job, and workers send you their price.', 'Pick the best one, then agree on how to pay.', 'Verified workers carry a badge after an ID check.'].map((t) => (
-              <li key={t} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t}</li>
+            {['Describe the job, and workers send you their price.', 'Pick the best one, then agree on how to pay.', 'Verified workers carry a badge after an ID check.'].map((x) => (
+              <li key={x} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t(x)}</li>
             ))}
           </ul>
-          <Button asChild size="lg" className="rounded-full"><Link to="/services">Find a worker <ArrowRight /></Link></Button>
+          <Button asChild size="lg" className="rounded-full"><Link to="/services">{t('Find a worker')} <ArrowRight /></Link></Button>
         </Reveal>
         <Reveal delay={150}>
           <div className="mx-auto max-w-md space-y-3 rounded-3xl border bg-background p-5 shadow-xl">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your job</p>
-            <p className="text-lg font-bold">Fix my kitchen lights</p>
-            <p className="text-sm text-muted-foreground">3 electricians sent a price</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Your job')}</p>
+            <p className="text-lg font-bold">{t('Fix my kitchen lights')}</p>
+            <p className="text-sm text-muted-foreground">{t('3 electricians sent a price')}</p>
             {quotes.map((q, i) => (
               <div key={q.name} className={cn('drift flex items-center gap-3 rounded-2xl border bg-card p-3', q.best && 'border-primary ring-2 ring-primary/15')} style={{ animationDelay: `${i * 0.8}s` }}>
                 <span className="grid size-10 place-items-center rounded-full bg-primary font-bold text-primary-foreground">{q.initial}</span>
                 <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{q.name}</span><span className="block text-xs text-muted-foreground">{q.meta}</span></span>
-                <span className="text-sm font-extrabold">{q.price} birr</span>
+                <span className="text-sm font-extrabold">{q.price} {t('birr')}</span>
               </div>
             ))}
-            <p className="text-[11px] text-muted-foreground">Example names and prices.</p>
+            <p className="text-[11px] text-muted-foreground">{t('Example names and prices.')}</p>
           </div>
         </Reveal>
       </div>
@@ -404,6 +497,7 @@ function Workers() {
 }
 
 function JobsAndCvs() {
+  const t = useT()
   const f = useFeatures()
   if (!f.on('talent_profiles') && !f.on('job_posts') && !f.on('cv_service')) return null
   const packages = [
@@ -419,17 +513,17 @@ function JobsAndCvs() {
   return (
     <section className="mx-auto max-w-7xl space-y-10 px-4 py-20 sm:px-6">
       <Reveal className="mx-auto max-w-2xl space-y-3 text-center">
-        <Eyebrow>Jobs & CVs</Eyebrow>
-        <h2 className="text-3xl sm:text-4xl">Students and graduates: get seen, get hired.</h2>
-        <p className="text-muted-foreground">Build a free profile in five minutes, download your CV, and apply to jobs in Sodo with one tap. Or let our team write a professional CV for you.</p>
+        <Eyebrow>{t('Jobs & CVs')}</Eyebrow>
+        <h2 className="text-3xl sm:text-4xl">{t('Students and graduates: get seen, get hired.')}</h2>
+        <p className="text-muted-foreground">{t('Build a free profile in five minutes, download your CV, and apply to jobs in Sodo with one tap. Or let our team write a professional CV for you.')}</p>
       </Reveal>
       <div className="grid gap-4 md:grid-cols-3">
         {free.map((x, i) => (
           <Reveal key={x.title} delay={i * 100}>
             <div className="h-full rounded-2xl border bg-card p-5 transition hover:-translate-y-1 hover:shadow-lg">
               <span className="grid size-11 place-items-center rounded-xl bg-accent text-primary"><x.icon className="size-5" /></span>
-              <p className="mt-4 font-bold">{x.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{x.text}</p>
+              <p className="mt-4 font-bold">{t(x.title)}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t(x.text)}</p>
             </div>
           </Reveal>
         ))}
@@ -439,49 +533,50 @@ function JobsAndCvs() {
           <div className="space-y-6 rounded-3xl border bg-card p-5 sm:p-8">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div className="space-y-1">
-                <Eyebrow>Professional CV service</Eyebrow>
-                <p className="text-2xl font-extrabold">Send us your details. We write your CV.</p>
-                <p className="text-sm text-muted-foreground">Written and designed by our team, in English or Amharic. PDF and Word. {f.number('student_discount')}% off for verified students.</p>
+                <Eyebrow>{t('Professional CV service')}</Eyebrow>
+                <p className="text-2xl font-extrabold">{t('Send us your details. We write your CV.')}</p>
+                <p className="text-sm text-muted-foreground">{t('Written and designed by our team, in English or Amharic. PDF and Word.')} {t('{n}% off for verified students.', { n: f.number('student_discount') })}</p>
               </div>
-              <Button asChild className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/work/cv">Order my CV</Link></Button>
+              <Button asChild className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/work/cv">{t('Order my CV')}</Link></Button>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {packages.map((p) => (
                 <div key={p.name} className={cn('relative rounded-2xl border p-5', p.popular && 'border-primary ring-2 ring-primary/15')}>
-                  {p.popular && <span className="absolute -top-3 left-5 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold text-primary-foreground">MOST CHOSEN</span>}
-                  <p className="font-bold">{p.name}</p>
-                  <p className="mt-1"><span className="text-3xl font-extrabold">{p.price}</span> <span className="text-sm text-muted-foreground">birr · ready in {p.days}</span></p>
+                  {p.popular && <span className="absolute -top-3 left-5 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold text-primary-foreground">{t('MOST CHOSEN')}</span>}
+                  <p className="font-bold">{t(p.name)}</p>
+                  <p className="mt-1"><span className="text-3xl font-extrabold">{p.price}</span> <span className="text-sm text-muted-foreground">{t('birr · ready in {days}', { days: t(p.days) })}</span></p>
                   <ul className="mt-3 space-y-1.5 text-sm">
-                    {p.points.map((t) => <li key={t} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t}</li>)}
+                    {p.points.map((x) => <li key={x} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t(x)}</li>)}
                   </ul>
                 </div>
               ))}
             </div>
             <p className="text-sm text-muted-foreground">
-              Need it fast? Add 24-hour express for {f.number('cv_express_fee')} birr.{f.on('job_posts') && <> Hiring? <Link to="/work/post" className="font-semibold text-primary hover:underline">Post your first job free</Link>.</>}
+              {t('Need it fast? Add 24-hour express for {fee} birr.', { fee: f.number('cv_express_fee') })}{f.on('job_posts') && <> {t('Hiring?')} <Link to="/work/post" className="font-semibold text-primary hover:underline">{t('Post your first job free')}</Link>.</>}
             </p>
           </div>
         </Reveal>
       )}
       <Reveal className="flex flex-wrap justify-center gap-3">
-        <Button asChild size="lg" className="rounded-full"><Link to="/work/profile">Make my free profile</Link></Button>
-        <Button asChild size="lg" variant="outline" className="rounded-full"><Link to="/work">See jobs in Sodo</Link></Button>
+        <Button asChild size="lg" className="rounded-full"><Link to="/work/profile">{t('Make my free profile')}</Link></Button>
+        <Button asChild size="lg" variant="outline" className="rounded-full"><Link to="/work">{t('See jobs in Sodo')}</Link></Button>
       </Reveal>
     </section>
   )
 }
 
 function ForSellers() {
+  const t = useT()
   return (
     <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
       <Reveal>
         <div className="grid items-center gap-8 overflow-hidden rounded-3xl bg-amber-soft p-6 sm:p-10 lg:grid-cols-[1.2fr_1fr]">
           <div className="space-y-4">
-            <Eyebrow>For sellers</Eyebrow>
-            <h2 className="text-3xl sm:text-4xl">Start free. Sell to all of Sodo.</h2>
-            <p className="text-muted-foreground">Open your shop in a minute, or sell a few things of your own. Buyers find you, chat with you and call you.</p>
+            <Eyebrow>{t('For sellers')}</Eyebrow>
+            <h2 className="text-3xl sm:text-4xl">{t('Start free. Sell to all of Sodo.')}</h2>
+            <p className="text-muted-foreground">{t('Open your shop in a minute, or sell a few things of your own. Buyers find you, chat with you and call you.')}</p>
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-full"><Link to="/sell"><Store /> Start selling</Link></Button>
+              <Button asChild size="lg" className="rounded-full"><Link to="/sell"><Store /> {t('Start selling')}</Link></Button>
             </div>
           </div>
           <ul className="grid gap-3 text-sm">
@@ -489,8 +584,8 @@ function ForSellers() {
               ['Free to post', 'Add photos, a price and the area. Show your products to buyers across Sodo.'],
               ['Verified badge', 'Send your ID once; buyers trust the badge.'],
               ['Chats and calls', 'Buyers message you in the app or call you directly.'],
-            ].map(([t, d]) => (
-              <li key={t} className="rounded-2xl bg-card p-4"><p className="font-semibold">{t}</p><p className="text-muted-foreground">{d}</p></li>
+            ].map(([x, d]) => (
+              <li key={x} className="rounded-2xl bg-card p-4"><p className="font-semibold">{t(x)}</p><p className="text-muted-foreground">{t(d)}</p></li>
             ))}
           </ul>
         </div>
@@ -500,6 +595,7 @@ function ForSellers() {
 }
 
 function Faq({ payments }: { payments: boolean }) {
+  const t = useT()
   const items = [
     { q: 'Is it free for buyers?', a: 'Yes. Browsing, chatting and contacting sellers are always free.' },
     payments
@@ -511,15 +607,15 @@ function Faq({ payments }: { payments: boolean }) {
   return (
     <section id="faq" className="mx-auto max-w-3xl space-y-6 px-4 pb-20 sm:px-6">
       <Reveal className="space-y-2 text-center">
-        <Eyebrow>Questions</Eyebrow>
-        <h2 className="text-3xl sm:text-4xl">Good to know</h2>
+        <Eyebrow>{t('Questions')}</Eyebrow>
+        <h2 className="text-3xl sm:text-4xl">{t('Good to know')}</h2>
       </Reveal>
       <Reveal>
         <Accordion type="single" collapsible className="rounded-2xl border bg-card px-5">
           {items.map((f) => (
             <AccordionItem key={f.q} value={f.q}>
-              <AccordionTrigger className="text-left font-semibold">{f.q}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">{f.a}</AccordionContent>
+              <AccordionTrigger className="text-left font-semibold">{t(f.q)}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">{t(f.a)}</AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
@@ -529,6 +625,7 @@ function Faq({ payments }: { payments: boolean }) {
 }
 
 function FinalCall() {
+  const t = useT()
   const signedIn = useSession((s) => !!s.session)
   return (
     <section className="px-4 pb-24 sm:px-6">
@@ -536,14 +633,14 @@ function FinalCall() {
         <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl bg-[#0E5A43] px-6 py-14 text-center text-white sm:py-20">
           <LogoSymbol onDark className="pointer-events-none absolute -right-10 -top-10 h-64 w-auto opacity-10" />
           <p className="font-ethiopic text-sm text-white/70">ሶዶ ገበያ · ይግዙ · ይሽጡ · ይቅጠሩ</p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-3xl sm:text-5xl">Join Sodo's own market today. It's free.</h2>
-          <p className="mt-3 text-white/75">Sign up with your phone number. One SMS code, and you're in.</p>
+          <h2 className="mx-auto mt-3 max-w-2xl text-3xl sm:text-5xl">{t("Join Sodo's own market today. It's free.")}</h2>
+          <p className="mt-3 text-white/75">{t("Sign up with your phone number. One SMS code, and you're in.")}</p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {!signedIn && (
-              <Button asChild size="lg" className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/register">Create free account</Link></Button>
+              <Button asChild size="lg" className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/register">{t('Create free account')}</Link></Button>
             )}
             <Button asChild size="lg" variant="outline" className="rounded-full border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
-              <Link to="/sell">Start selling</Link>
+              <Link to="/sell">{t('Start selling')}</Link>
             </Button>
           </div>
         </div>

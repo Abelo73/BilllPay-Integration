@@ -43,6 +43,14 @@ public class ChatService {
 	public static final Duration OFFER_TTL = Duration.ofHours(48);
 	public static final Duration SMS_NUDGE_EVERY = Duration.ofHours(6);
 
+	private et.tenapay.shop.sms.SmsLanguage smsLanguage;
+
+	/** SMS in Amharic for people who use the site in Amharic. */
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	void setSmsLanguage(et.tenapay.shop.sms.SmsLanguage smsLanguage) {
+		this.smsLanguage = smsLanguage;
+	}
+
 	/** Phone numbers and "pay me outside" phrases (English and Amharic). */
 	private static final Pattern OFF_PLATFORM = Pattern.compile(
 			"(\\+?251|\\b0)[\\s-]?[79](?:[\\s-]?\\d){8}"
@@ -540,6 +548,13 @@ public class ChatService {
 			}
 			long bucket = Instant.now().getEpochSecond() / SMS_NUDGE_EVERY.toSeconds();
 			String key = "CHAT:" + p.c().getId() + ":" + (toSeller ? "S" : "B") + ":" + bucket;
+			if (smsLanguage != null && smsLanguage.amharic(recipient)) {
+				String who = from.trim().isEmpty() ? (toSeller ? "ገዢ" : "ሱቅ") : (from.trim().length() > 30 ? from.trim().substring(0, 30) : from.trim());
+				String am = "ሶዶ ገበያ፦ ከ" + who + " አዲስ መልዕክት። ይመልሱ፦ " + app.publicBaseUrl().replaceAll("/+$", "") + "/chats/" + p.c().getId();
+				String amTo = phone;
+				java.util.concurrent.CompletableFuture.runAsync(() -> sms.sendOnce(SmsService.Kind.CHAT, amTo, am, null, key));
+				return;
+			}
 			String name = from.replaceAll("[^\\x20-\\x7E]", "").trim();
 			String text = "Sodo Gebeya: new message from " + (name.isEmpty() ? (toSeller ? "a buyer" : "a shop")
 					: (name.length() > 30 ? name.substring(0, 30) : name)) + ". Reply: "

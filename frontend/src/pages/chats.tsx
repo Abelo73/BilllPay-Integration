@@ -5,6 +5,7 @@ import { Link, Navigate } from 'react-router'
 
 import { Button } from '@/components/ui/button'
 import { chatApi, type Conversation } from '@/lib/chat-api'
+import { t as tNow, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
@@ -20,7 +21,7 @@ export function chatTime(iso: string) {
   const now = new Date()
   const days = Math.floor((new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000)
   if (days <= 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  if (days === 1) return 'Yesterday'
+  if (days === 1) return tNow('Yesterday')
   if (days < 7) return d.toLocaleDateString([], { weekday: 'short' })
   return d.toLocaleDateString([], { day: 'numeric', month: 'short' })
 }
@@ -35,6 +36,7 @@ export function initials(name: string) {
 }
 
 function Row({ c }: { c: Conversation }) {
+  const t = useT()
   return (
     <Link
       to={`/chats/${c.id}`}
@@ -54,14 +56,14 @@ function Row({ c }: { c: Conversation }) {
           <span className={cn('shrink-0 text-xs', c.unread ? 'font-bold text-brand' : 'text-muted-foreground')}>{chatTime(c.lastMessageAt)}</span>
         </span>
         <span className="block truncate text-xs text-muted-foreground">
-          {c.side === 'SELLER' ? 'Selling' : 'Buying'}
+          {c.side === 'SELLER' ? t('Selling') : t('Buying')}
           {c.product ? ` · ${c.product.name}` : ''}
         </span>
         <span className="flex items-center justify-between gap-2">
           <span className={cn('truncate text-sm', c.unread ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
-            {c.blockedBy ? 'Blocked' : (c.lastMessagePreview ?? 'Say hello')}
+            {c.blockedBy ? t('Blocked') : (c.lastMessagePreview ?? t('Say hello'))}
           </span>
-          {c.unread && <span className="size-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+          {c.unread && <span className="size-2.5 shrink-0 rounded-full bg-primary" aria-label={t('Unread')} />}
         </span>
       </span>
     </Link>
@@ -70,6 +72,7 @@ function Row({ c }: { c: Conversation }) {
 
 /** Chat list (design S11). */
 export function ChatsPage() {
+  const t = useT()
   const session = useSession((s) => s.session)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all')
   const { data, isLoading } = useQuery({
@@ -83,8 +86,8 @@ export function ChatsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6">
-      <h1 className="text-2xl font-extrabold tracking-tight">Chats</h1>
-      <div className="flex gap-2" role="group" aria-label="Show">
+      <h1 className="text-2xl font-extrabold tracking-tight">{t('Chats')}</h1>
+      <div className="flex gap-2" role="group" aria-label={t('Show')}>
         {FILTERS.map((f) => (
           <Button
             key={f.key}
@@ -94,20 +97,20 @@ export function ChatsPage() {
             className="h-9 rounded-full px-4"
             onClick={() => setFilter(f.key)}
           >
-            {f.label}
+            {t(f.label)}
           </Button>
         ))}
       </div>
       <div className="rounded-2xl border bg-card px-2">
-        {isLoading && <p className="py-10 text-center text-sm text-muted-foreground">Loading…</p>}
+        {isLoading && <p className="py-10 text-center text-sm text-muted-foreground">{t('Loading…')}</p>}
         {data?.content.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-14 text-center">
             <MessageCircle className="size-8 text-muted-foreground" />
             <p className="max-w-xs text-sm text-muted-foreground">
-              No chats yet. Open a product and tap “Chat with seller” to ask a question or make an offer.
+              {t('No chats yet. Open a product and tap “Chat with seller” to ask a question or make an offer.')}
             </p>
             <Button asChild>
-              <Link to="/shop">Browse products</Link>
+              <Link to="/shop">{t('Browse products')}</Link>
             </Button>
           </div>
         )}

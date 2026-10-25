@@ -38,6 +38,13 @@ public class SmsOrderNotifier {
 	private final AppProperties app;
 	private final boolean enabled;
 	private final et.tenapay.shop.inbox.InboxService inbox;
+	private SmsLanguage language;
+
+	/** Amharic texts for people who use the site in Amharic. Optional so plain unit setups still work. */
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	void setLanguage(SmsLanguage language) {
+		this.language = language;
+	}
 
 	public SmsOrderNotifier(SmsService sms, OrderRepository orders, TransactionTemplate tx, AppProperties app,
 			@Value("${sms.order-updates:true}") boolean enabled, et.tenapay.shop.inbox.InboxService inbox) {
@@ -110,6 +117,9 @@ public class SmsOrderNotifier {
 	}
 
 	String text(String type, OrderInfo o, String seller) {
+		if (language != null && language.amharic(o.userId())) {
+			return amharic(type, o, seller);
+		}
 		String part = seller == null ? null : "part of " + o.number() + from(seller);
 		String link = app.publicBaseUrl().replaceAll("/+$", "") + "/orders/track?order=" + o.number();
 		return switch (type) {
@@ -120,6 +130,22 @@ public class SmsOrderNotifier {
 			case "order.fulfilment.delivered" -> "Sodo Gebeya: " + (part != null ? part : o.number()) + " was delivered. Thank you! Problem? " + link;
 			default -> "Sodo Gebeya: payment of " + etb(o.total()) + " received for " + o.number()
 					+ ". We'll text when it ships. " + link;
+		};
+	}
+
+	/** The same texts in Amharic. Unicode SMS parts hold 70 characters, so these stay short. */
+	String amharic(String type, OrderInfo o, String seller) {
+		String link = app.publicBaseUrl().replaceAll("/+$", "") + "/orders/track?order=" + o.number();
+		String name = seller == null ? null : seller.trim();
+		String what = seller == null ? o.number() : "የ" + o.number() + " ከፊል" + (name == null || name.isEmpty() ? "" : " (" + (name.length() > 20 ? name.substring(0, 20).trim() : name) + ")");
+		String note = o.trackingNote() == null || o.trackingNote().isBlank() ? ""
+				: " " + (o.trackingNote().length() > 40 ? o.trackingNote().substring(0, 40) : o.trackingNote().trim()) + "።";
+		return switch (type) {
+			case "order.payment.reminder" -> "ሶዶ ገበያ፦ " + o.number() + " ገና አልተከፈለም። እስከ "
+					+ (o.payBy() == null ? "በቅርቡ" : TIME.format(o.payBy())) + " ይክፈሉ፣ ያለበለዚያ እቃዎቹ ይለቀቃሉ፦ " + link;
+			case "order.fulfilment.shipped" -> "ሶዶ ገበያ፦ " + what + " በመንገድ ላይ ነው።" + note + " ይከታተሉ፦ " + link;
+			case "order.fulfilment.delivered" -> "ሶዶ ገበያ፦ " + what + " ደርሷል። እናመሰግናለን! ችግር ካለ፦ " + link;
+			default -> "ሶዶ ገበያ፦ ለ" + o.number() + " የ" + etb(o.total()).replace("ETB", "ብር") + " ክፍያ ደርሷል። ሲላክ እናሳውቅዎታለን። " + link;
 		};
 	}
 

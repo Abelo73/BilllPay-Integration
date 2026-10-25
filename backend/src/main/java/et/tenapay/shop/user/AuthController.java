@@ -43,7 +43,8 @@ public class AuthController {
 		return auth.login(req.email(), req.password(), Portal.SHOP, client(http));
 	}
 
-	public record PhoneStartRequest(@NotBlank @Size(max = 30) String phone) {
+	/** {@code language}: the site language right now ("en" or "am"); the code SMS is written in it. */
+	public record PhoneStartRequest(@NotBlank @Size(max = 30) String phone, @Size(max = 5) String language) {
 	}
 
 	public record PhoneVerifyRequest(@NotBlank @Size(max = 30) String phone, @NotBlank @Size(max = 12) String code,
@@ -53,7 +54,7 @@ public class AuthController {
 	/** Step 1 of phone sign-in: text a 6-digit code to the number. */
 	@PostMapping("/api/auth/phone/start")
 	public PhoneAuthService.CodeSent phoneStart(@Valid @RequestBody PhoneStartRequest req, HttpServletRequest http) {
-		return phoneAuth.sendCode(req.phone(), client(http));
+		return phoneAuth.sendCode(req.phone(), client(http), req.language());
 	}
 
 	/** Step 2: check the code and sign in (creating the account on a first sign-in, which needs fullName). */

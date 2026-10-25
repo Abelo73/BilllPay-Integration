@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { reviewApi, type Review, type Reviewable, type ReviewPage } from '@/lib/review-api'
 import { cn } from '@/lib/utils'
 
 /** Read-only stars, e.g. 4.3 → four full, one partly filled. */
 export function Stars({ value, className }: { value: number; className?: string }) {
+  const t = useT()
   return (
-    <span className={cn('inline-flex text-warning', className)} role="img" aria-label={`${value} out of 5 stars`}>
+    <span className={cn('inline-flex text-warning', className)} role="img" aria-label={t('{n} out of 5 stars', { n: value })}>
       {[1, 2, 3, 4, 5].map((i) => (
         <span key={i} className="relative size-4">
           <Star className="absolute size-4 text-border" fill="currentColor" strokeWidth={0} />
@@ -27,14 +29,15 @@ export function Stars({ value, className }: { value: number; className?: string 
 }
 
 function Summary({ data }: { data: ReviewPage }) {
+  const t = useT()
   const { average, count, stars } = data.summary
-  if (count === 0) return <p className="text-sm text-muted-foreground">No reviews yet. Reviews come only from buyers who received the item.</p>
+  if (count === 0) return <p className="text-sm text-muted-foreground">{t('No reviews yet. Reviews come only from buyers who received the item.')}</p>
   return (
     <div className="flex flex-wrap items-center gap-6 rounded-2xl border bg-card p-4">
       <div className="text-center">
         <p className="text-4xl font-extrabold tabular-nums">{average?.toFixed(1)}</p>
         <Stars value={average ?? 0} />
-        <p className="mt-1 text-xs text-muted-foreground">{count} review{count === 1 ? '' : 's'}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{count === 1 ? t('1 review') : t('{n} reviews', { n: count })}</p>
       </div>
       <div className="min-w-48 flex-1 space-y-1">
         {[5, 4, 3, 2, 1].map((s) => {
@@ -55,22 +58,23 @@ function Summary({ data }: { data: ReviewPage }) {
 }
 
 export function ReviewItem({ r, showProduct = false, children }: { r: Review; showProduct?: boolean; children?: React.ReactNode }) {
+  const t = useT()
   return (
     <li className="space-y-2 rounded-2xl border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-sm font-semibold">
           {r.authorName}
-          <span className="flex items-center gap-1 text-xs font-medium text-success"><BadgeCheck className="size-3.5" /> Verified purchase</span>
+          <span className="flex items-center gap-1 text-xs font-medium text-success"><BadgeCheck className="size-3.5" /> {t('Verified purchase')}</span>
         </span>
         <Stars value={r.rating} />
       </div>
       {showProduct && r.productName && <p className="text-xs text-muted-foreground">{r.productName}</p>}
       {r.body && <p className="whitespace-pre-wrap text-sm leading-relaxed">{r.body}</p>}
       <p className="text-xs text-muted-foreground">{formatDate(r.createdAt)}</p>
-      {r.hidden && <p className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">Hidden by staff{r.hiddenReason ? `: ${r.hiddenReason}` : ''}</p>}
+      {r.hidden && <p className="rounded-lg bg-destructive/10 p-2 text-xs text-destructive">{t('Hidden by staff')}{r.hiddenReason ? `: ${r.hiddenReason}` : ''}</p>}
       {r.sellerReply && (
         <div className="rounded-xl bg-muted/60 p-3 text-sm">
-          <p className="mb-1 flex items-center gap-1 text-xs font-semibold"><MessageSquareReply className="size-3.5" /> Reply from the shop</p>
+          <p className="mb-1 flex items-center gap-1 text-xs font-semibold"><MessageSquareReply className="size-3.5" /> {t('Reply from the shop')}</p>
           <p className="whitespace-pre-wrap">{r.sellerReply}</p>
         </div>
       )}
@@ -81,6 +85,7 @@ export function ReviewItem({ r, showProduct = false, children }: { r: Review; sh
 
 /** Reviews of a product or of a whole shop: summary, then the newest reviews. */
 export function ReviewsSection({ productId, shopSlug, title = 'Reviews' }: { productId?: number; shopSlug?: string; title?: string }) {
+  const t = useT()
   const [page, setPage] = useState(0)
   const { data } = useQuery({
     queryKey: ['reviews', productId ?? shopSlug, page],
@@ -90,7 +95,7 @@ export function ReviewsSection({ productId, shopSlug, title = 'Reviews' }: { pro
   if (!data) return null
   return (
     <section aria-labelledby="reviews-title" className="space-y-4">
-      <h2 id="reviews-title" className="text-xl font-bold">{title}</h2>
+      <h2 id="reviews-title" className="text-xl font-bold">{t(title)}</h2>
       <Summary data={data} />
       {data.reviews.content.length > 0 && (
         <ul className="space-y-3">
@@ -99,8 +104,8 @@ export function ReviewsSection({ productId, shopSlug, title = 'Reviews' }: { pro
       )}
       {data.reviews.totalPages > 1 && (
         <div className="flex justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>Newer</Button>
-          <Button variant="outline" size="sm" disabled={page + 1 >= data.reviews.totalPages} onClick={() => setPage(page + 1)}>Older</Button>
+          <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('Newer')}</Button>
+          <Button variant="outline" size="sm" disabled={page + 1 >= data.reviews.totalPages} onClick={() => setPage(page + 1)}>{t('Older')}</Button>
         </div>
       )}
     </section>
@@ -108,15 +113,16 @@ export function ReviewsSection({ productId, shopSlug, title = 'Reviews' }: { pro
 }
 
 function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const t = useT()
   return (
-    <div role="radiogroup" aria-label="Rating" className="flex gap-1">
+    <div role="radiogroup" aria-label={t('Rating')} className="flex gap-1">
       {[1, 2, 3, 4, 5].map((i) => (
         <button
           key={i}
           type="button"
           role="radio"
           aria-checked={value === i}
-          aria-label={`${i} star${i === 1 ? '' : 's'}`}
+          aria-label={i === 1 ? t('1 star') : t('{n} stars', { n: i })}
           className="grid size-11 place-items-center rounded-lg hover:bg-muted"
           onClick={() => onChange(i)}
         >
@@ -128,13 +134,14 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 function WriteReview({ item, onClose }: { item: Reviewable; onClose: () => void }) {
+  const t = useT()
   const qc = useQueryClient()
   const [rating, setRating] = useState(0)
   const [body, setBody] = useState('')
   const save = useMutation({
     mutationFn: () => reviewApi.create(item.orderItemId, rating, body),
     onSuccess: () => {
-      toast.success('Thanks for your review!')
+      toast.success(t('Thanks for your review!'))
       qc.invalidateQueries({ queryKey: ['reviewable'] })
       qc.invalidateQueries({ queryKey: ['reviews'] })
       onClose()
@@ -145,15 +152,15 @@ function WriteReview({ item, onClose }: { item: Reviewable; onClose: () => void 
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rate {item.productName}</DialogTitle>
-          <DialogDescription>Order {item.orderNumber}. Your first name and last initial are shown with the review.</DialogDescription>
+          <DialogTitle>{t('Rate {name}', { name: item.productName })}</DialogTitle>
+          <DialogDescription>{t('Order {number}. Your first name and last initial are shown with the review.', { number: item.orderNumber })}</DialogDescription>
         </DialogHeader>
         <StarPicker value={rating} onChange={setRating} />
-        <Textarea rows={4} maxLength={1000} placeholder="What did you like? Anything to improve? (optional)" value={body} onChange={(e) => setBody(e.target.value)} aria-label="Your review" />
+        <Textarea rows={4} maxLength={1000} placeholder={t('What did you like? Anything to improve? (optional)')} value={body} onChange={(e) => setBody(e.target.value)} aria-label={t('Your review')} />
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Later</Button>
+          <Button variant="outline" onClick={onClose}>{t('Later')}</Button>
           <Button disabled={rating === 0 || save.isPending} onClick={() => save.mutate()}>
-            {save.isPending && <Loader2 className="animate-spin" />} Post review
+            {save.isPending && <Loader2 className="animate-spin" />} {t('Post review')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -163,22 +170,23 @@ function WriteReview({ item, onClose }: { item: Reviewable; onClose: () => void 
 
 /** "Rate what you received": items from delivered orders that don't have a review yet. */
 export function ToReview() {
+  const t = useT()
   const { data } = useQuery({ queryKey: ['reviewable'], queryFn: reviewApi.reviewable })
   const [open, setOpen] = useState<Reviewable | null>(null)
   if (!data || data.length === 0) return null
   return (
     <section aria-labelledby="to-review" className="space-y-3 rounded-2xl border border-warning/50 bg-amber-soft/40 p-4">
-      <h2 id="to-review" className="font-bold">Rate what you received</h2>
+      <h2 id="to-review" className="font-bold">{t('Rate what you received')}</h2>
       <ul className="space-y-2">
         {data.map((i) => (
           <li key={i.orderItemId} className="flex items-center gap-3 rounded-xl bg-card p-2">
             {i.imageUrl ? <img src={i.imageUrl} alt="" className="size-12 rounded-lg object-cover" /> : <span className="size-12 rounded-lg bg-muted" />}
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{i.productName}</span>
-              <span className="text-xs text-muted-foreground">Delivered {formatDate(i.deliveredAt)}</span>
+              <span className="text-xs text-muted-foreground">{t('Delivered {date}', { date: formatDate(i.deliveredAt) })}</span>
             </span>
             <Button size="sm" className="h-10" onClick={() => setOpen(i)}>
-              <Star /> Rate
+              <Star /> {t('Rate')}
             </Button>
           </li>
         ))}

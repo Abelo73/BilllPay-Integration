@@ -5,11 +5,13 @@ import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { chatApi } from '@/lib/chat-api'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
 /** Opens (or reopens) the chat with this product's shop. Signed-out shoppers go through sign-in first. */
 export function ChatWithSeller({ productId, slug, className }: { productId: number; slug: string; className?: string }) {
+  const t = useT()
   const session = useSession((s) => s.session)
   const navigate = useNavigate()
   const start = useMutation({
@@ -25,7 +27,7 @@ export function ChatWithSeller({ productId, slug, className }: { productId: numb
       disabled={start.isPending}
       onClick={() => (session ? start.mutate() : navigate(`/login?next=${encodeURIComponent(`/product/${slug}`)}`))}
     >
-      {start.isPending ? <Loader2 className="animate-spin" /> : <MessageCircle />} Chat with seller
+      {start.isPending ? <Loader2 className="animate-spin" /> : <MessageCircle />} {t('Chat with seller')}
     </Button>
   )
 }

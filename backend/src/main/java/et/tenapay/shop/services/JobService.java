@@ -52,6 +52,13 @@ public class JobService {
 	private final AppProperties app;
 	private final TransactionTemplate tx;
 	private final et.tenapay.shop.inbox.InboxService inbox;
+	private et.tenapay.shop.sms.SmsLanguage smsLanguage;
+
+	/** SMS in Amharic for people who use the site in Amharic. */
+	@org.springframework.beans.factory.annotation.Autowired(required = false)
+	void setSmsLanguage(et.tenapay.shop.sms.SmsLanguage smsLanguage) {
+		this.smsLanguage = smsLanguage;
+	}
 
 	public JobService(JobRequestRepository jobs, JobQuoteRepository quotes, JobPhotoRepository photos, ProProfileRepository pros,
 			ProService proService, UserRepository users, ImageProcessor images, MediaStorage storage, MediaProperties media,
@@ -138,6 +145,7 @@ public class JobService {
 		if (directPro != null) {
 			tell(directPro.getOwnerId(), directPro.getPhone(),
 					"Sodo Gebeya: new job request for you: " + snippet(description) + " Reply with a price: " + link("/pro/jobs/" + j.getId()),
+					"ሶዶ ገበያ፦ አዲስ የሥራ ጥያቄ ቀርቦልዎታል። ዋጋ ይላኩ፦ " + link("/pro/jobs/" + j.getId()),
 					"JOB:DIRECT:" + j.getId(), "New job request for you", description, "/pro/jobs/" + j.getId());
 		}
 		return tx.execute(s -> view(jobs.findById(j.getId()).orElseThrow(), customerId, null));
@@ -206,6 +214,7 @@ public class JobService {
 			return new Accepted(view(j, customerId, null), pro.getPhone(), customer, pro.getOwnerId());
 		});
 		tell(a.proOwner(), a.proPhone(), "Sodo Gebeya: your quote was accepted. Contact " + a.customer() + ". Details: " + link("/pro/jobs/" + jobId),
+				"ሶዶ ገበያ፦ ዋጋዎ ተቀባይነት አግኝቷል። " + a.customer() + "ን ያነጋግሩ፦ " + link("/pro/jobs/" + jobId),
 				"JOB:ACCEPTED:" + jobId, "Your price was accepted", "Contact " + a.customer() + " to plan the work.", "/pro/jobs/" + jobId);
 		return a.view();
 	}
@@ -227,7 +236,8 @@ public class JobService {
 					assigned == null ? null : assigned.getOwnerId());
 		});
 		if (c.proOwner() != null) {
-			tell(c.proOwner(), c.proPhone(), "Sodo Gebeya: the customer cancelled job #" + jobId + ". No need to go.", "JOB:CANCELLED:" + jobId,
+			tell(c.proOwner(), c.proPhone(), "Sodo Gebeya: the customer cancelled job #" + jobId + ". No need to go.",
+					"ሶዶ ገበያ፦ ደንበኛው ሥራ #" + jobId + "ን ሰርዘዋል። መሄድ አያስፈልግም።", "JOB:CANCELLED:" + jobId,
 					"Job cancelled", "The customer cancelled job #" + jobId + ". No need to go.", "/pro/jobs/" + jobId);
 		}
 		return c.view();
@@ -297,6 +307,7 @@ public class JobService {
 		String priceText = q.price().stripTrailingZeros().toPlainString() + " ETB";
 		tell(q.customerId(), q.customerPhone(), "Sodo Gebeya: new quote for your job: " + priceText + " from "
 				+ ascii(q.proName(), 30) + ". Compare: " + link("/jobs/" + jobId),
+				"ሶዶ ገበያ፦ ለሥራዎ አዲስ ዋጋ፦ " + priceText.replace("ETB", "ብር") + " ከ" + q.proName() + "። ያወዳድሩ፦ " + link("/jobs/" + jobId),
 				"JOB:QUOTE:" + jobId + ":" + Instant.now().getEpochSecond() / 3600,
 				"New price for your job", priceText + " from " + q.proName(), "/jobs/" + jobId);
 		return q.view();
@@ -371,18 +382,26 @@ public class JobService {
 	 * off. In-app keys get their own prefix; the SMS key throttles texts (e.g. one "new quote" per hour).
 	 */
 	private void tell(UUID userId, String phone, String smsBody, String key, String title, String body, String link) {
+		tell(userId, phone, smsBody, null, key, title, body, link);
+	}
+
+	/** {@code smsAmharic} goes to people who use the site in Amharic (null = always English). */
+	private void tell(UUID userId, String phone, String smsBody, String smsAmharic, String key, String title, String body,
+			String link) {
 		inbox.notify(userId, et.tenapay.shop.inbox.InboxItem.Kind.JOB, title, body, link,
 				"INBOX:" + key + (key.startsWith("JOB:QUOTE:") ? ":" + UUID.randomUUID() : ""));
 		if (inbox.wantsSms(userId, et.tenapay.shop.inbox.InboxService.SmsTopic.JOBS)) {
-			text(phone, smsBody, key);
+			boolean amharic = smsAmharic != null && smsLanguage != null && smsLanguage.amharic(userId);
+			text(phone, amharic ? smsAmharic : smsBody, key, amharic);
 		}
 	}
 
-	private void text(String phone, String body, String key) {
+	/** {@code unicode}: keep non-Latin letters (Amharic); English texts are cut to plain ASCII so they stay one part. */
+	private void text(String phone, String body, String key, boolean unicode) {
 		if (phone == null || !phone.matches("^\\+251[79]\\d{8}$")) {
 			return;
 		}
-		String plain = body.replaceAll("[^\\x20-\\x7E]", "");
+		String plain = unicode ? body : body.replaceAll("[^\\x20-\\x7E]", "");
 		java.util.concurrent.CompletableFuture.runAsync(() -> sms.sendOnce(SmsService.Kind.JOB, phone, plain, null, key));
 	}
 

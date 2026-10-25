@@ -1,4 +1,5 @@
 import { sessionToken, useSession, type Session, type SessionUser } from '@/store/session'
+import { useLang } from '@/lib/i18n'
 import type { SpecLine } from '@/lib/specs-api'
 
 export type Product = {
@@ -274,7 +275,7 @@ export const api = {
   login: (email: string, password: string) =>
     request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   phoneStart: (phone: string) =>
-    request<PhoneCodeSent>('/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone }) }),
+    request<PhoneCodeSent>('/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone, language: useLang.getState().lang }) }),
   phoneVerify: (phone: string, code: string, fullName?: string) =>
     request<Session>('/auth/phone/verify', { method: 'POST', body: JSON.stringify({ phone, code, fullName }) }),
   me: () => request<SessionUser>('/me'),
