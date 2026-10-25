@@ -34,6 +34,7 @@ import {
   Wrench,
   Star,
   BriefcaseBusiness,
+  AlertTriangle,
   FileText,
   GraduationCap,
 } from 'lucide-react'
@@ -47,9 +48,10 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { adminApi, adminToken, payoutAdminApi, shopAdminApi } from '@/lib/admin-api'
 import { trustAdminApi } from '@/lib/trust-api'
 import { workAdminApi } from '@/lib/work-admin-api'
+import { problemAdminApi } from '@/lib/dispute-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' | 'jobs' | 'cv' | 'students' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' | 'jobs' | 'cv' | 'students' | 'problems' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -66,6 +68,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/orders', label: 'Orders', icon: Package, badge: 'review' },
       { to: '/admin/payments', label: 'Payments', icon: ArrowLeftRight },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw },
+      { to: '/admin/problems', label: 'Problems', icon: AlertTriangle, badge: 'problems' },
       { to: '/admin/discounts', label: 'Discounts', icon: TicketPercent },
       { to: '/admin/payouts', label: 'Payouts', icon: Wallet, badge: 'payouts' },
       { to: '/admin/fees', label: 'Fees', icon: Percent },
@@ -243,6 +246,7 @@ export function AdminLayout() {
   })
 
   const workQueue = useQuery({ queryKey: ['admin-work-counts'], queryFn: workAdminApi.counts, enabled: signedIn, refetchInterval: 60_000 })
+  const problemQueue = useQuery({ queryKey: ['admin-problem-count'], queryFn: problemAdminApi.count, enabled: signedIn, refetchInterval: 60_000 })
 
   const staff = adminToken.session()
   if (!signedIn) {
@@ -259,6 +263,7 @@ export function AdminLayout() {
     jobs: workQueue.data?.jobsPending ?? 0,
     cv: workQueue.data?.cvOrdersOpen ?? 0,
     students: workQueue.data?.studentsWaiting ?? 0,
+    problems: problemQueue.data?.open ?? 0,
   }
 
   const toggle = () => {

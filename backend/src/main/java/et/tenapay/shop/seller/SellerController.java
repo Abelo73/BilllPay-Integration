@@ -109,7 +109,8 @@ public class SellerController {
 			Boolean active,
 			et.tenapay.shop.catalog.ItemCondition condition,
 			Boolean negotiable,
-			@Size(max = 120) String area) {
+			@Size(max = 120) String area,
+			@Size(max = 40) java.util.Map<String, Object> specs) {
 	}
 
 	public record StockRequest(@NotNull @Min(-100000) @Max(100000) Integer delta, @Size(max = 200) String reason) {
@@ -124,7 +125,7 @@ public class SellerController {
 	public record FulfilmentRequest(@NotNull FulfilmentStatus status, @Size(max = 300) String note) {
 	}
 
-	public record CategoryDto(Long id, String name, String slug) {
+	public record CategoryDto(Long id, String name, String slug, Long parentId) {
 	}
 
 	public record BestSeller(String productName, long units) {
@@ -216,7 +217,7 @@ public class SellerController {
 	@Transactional(readOnly = true)
 	public List<CategoryDto> categories() {
 		return categories.findByActiveTrueOrderBySortOrderAscIdAsc().stream()
-				.map(c -> new CategoryDto(c.getId(), c.getName(), c.getSlug())).toList();
+				.map(c -> new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId())).toList();
 	}
 
 	@GetMapping("/products")
@@ -242,7 +243,7 @@ public class SellerController {
 		Shop shop = shopService.requireMine();
 		activeCategory(req.categoryId());
 		Product p = catalog.create(new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(),
-				req.stock(), req.lowStockThreshold(), false, req.active(), req.condition(), req.negotiable(), req.area()), shop);
+				req.stock(), req.lowStockThreshold(), false, req.active(), req.condition(), req.negotiable(), req.area(), req.specs()), shop);
 		return detailOf(p.getId());
 	}
 
@@ -254,7 +255,8 @@ public class SellerController {
 		}
 		// sellers can't feature their own products on the home page or change the address of a listing
 		catalog.update(id, new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(), null,
-				req.lowStockThreshold(), null, req.active(), req.condition(), req.negotiable(), req.area() == null ? "" : req.area()));
+				req.lowStockThreshold(), null, req.active(), req.condition(), req.negotiable(), req.area() == null ? "" : req.area(),
+				req.specs()));
 		return detailOf(id);
 	}
 

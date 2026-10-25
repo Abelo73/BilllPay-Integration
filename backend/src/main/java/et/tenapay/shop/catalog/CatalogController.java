@@ -1,7 +1,9 @@
 package et.tenapay.shop.catalog;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -28,6 +30,7 @@ public class CatalogController {
 	private final ProductImageRepository images;
 	private final MediaProperties media;
 	private final et.tenapay.shop.seller.ShopRepository shops;
+	private final SpecsService specs;
 
 	public record ImageDto(String url, String thumbUrl) {
 	}
@@ -45,13 +48,19 @@ public class CatalogController {
 	public record ProductDto(Long id, String name, String slug, String description, BigDecimal price,
 			String currency, int available, boolean lowStock, String imageUrl, boolean featured, String categorySlug,
 			String categoryName, List<ImageDto> images, SellerDto seller, String condition, boolean negotiable,
-			String area) {
+			String area, List<SpecsService.SpecLine> specs) {
 
 		public static ProductDto from(Product p, List<ImageDto> images) {
 			return new ProductDto(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
 					p.getCurrency(), Math.max(0, p.available()), p.lowStock(), p.getImageUrl(), p.isFeatured(),
 					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()),
-					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea());
+					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea(), List.of());
+		}
+
+		/** The product page also shows the details table (brand, RAM, storage, ...). */
+		public ProductDto withSpecs(List<SpecsService.SpecLine> lines) {
+			return new ProductDto(id, name, slug, description, price, currency, available, lowStock, imageUrl, featured,
+					categorySlug, categoryName, images, seller, condition, negotiable, area, lines);
 		}
 
 		public static ProductDto from(Product p) {
@@ -59,16 +68,23 @@ public class CatalogController {
 		}
 	}
 
-	public record CategoryDto(Long id, String name, String slug) {
+	/** {@code parentId}: the main category this one sits under; null = a main category. */
+	public record CategoryDto(Long id, String name, String slug, Long parentId) {
 	}
 
+	/** A category's detail fields (for the listing form) and filters with counts (for the shop page). */
+	public record CategoryFields(CategoryDto category, List<SpecsService.FieldView> fields, List<SpecsService.Facet> facets) {
+	}
+
+	/** Shop filters come as {@code spec.<key>=<value>}, e.g. spec.brand=Samsung&spec.ram=8 GB. */
 	@GetMapping("/products")
 	public PageDto<ProductDto> list(@RequestParam(required = false) String category,
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) String shop,
 			@RequestParam(defaultValue = "newest") String sort,
 			@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "12") int size) {
+			@RequestParam(defaultValue = "12") int size,
+			@RequestParam Map<String, String> params) {
 		Sort order = switch (sort) {
 			case "price_asc" -> Sort.by("price").ascending();
 			case "price_desc" -> Sort.by("price").descending();
@@ -83,8 +99,32 @@ public class CatalogController {
 			shopId = shops.findBySlug(shop).filter(s -> s.getStatus().selling()).map(et.tenapay.shop.seller.Shop::getId)
 					.orElse(-1L);
 		}
-		return PageDto.of(products.search(cat, query, shopId, PageRequest.of(page, Math.min(size, 48), order))
+		Map<String, String> wanted = new HashMap<>();
+		params.forEach((k, v) -> {
+			if (k.startsWith("spec.") && v != null && !v.isBlank()) {
+				wanted.put(k.substring(5), v.trim());
+			}
+		});
+		String specFilter = cat == null || wanted.isEmpty() ? null
+				: categories.findBySlug(cat).map(c -> specs.filterJson(c.getId(), wanted)).orElse(null);
+		return PageDto.of(products.search(cat, query, shopId, specFilter, PageRequest.of(page, Math.min(size, 48), order))
 				.map(ProductDto::from));
+	}
+
+	@GetMapping("/categories/{slug}/fields")
+	public CategoryFields fields(@PathVariable String slug, @RequestParam(defaultValue = "false") boolean facets) {
+		Category c = categories.findBySlug(slug).filter(Category::isActive).orElseThrow(() -> ApiException.notFound("Category"));
+		return new CategoryFields(dto(c), specs.views(c.getId(), false), facets ? specs.facets(c) : List.of());
+	}
+
+	@GetMapping("/categories/id/{id}/fields")
+	public CategoryFields fieldsById(@PathVariable Long id) {
+		Category c = categories.findById(id).orElseThrow(() -> ApiException.notFound("Category"));
+		return new CategoryFields(dto(c), specs.views(c.getId(), false), List.of());
+	}
+
+	static CategoryDto dto(Category c) {
+		return new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId());
 	}
 
 	@GetMapping("/products/featured")
@@ -101,12 +141,12 @@ public class CatalogController {
 		if (gallery.isEmpty() && p.getImageUrl() != null) {
 			gallery = List.of(new ImageDto(p.getImageUrl(), p.getImageUrl())); // seeded photo from /products
 		}
-		return ProductDto.from(p, gallery);
+		return ProductDto.from(p, gallery).withSpecs(specs.lines(p.getCategory().getId(), p.getSpecs()));
 	}
 
 	@GetMapping("/categories")
 	public List<CategoryDto> categories() {
 		return categories.findByActiveTrueOrderBySortOrderAscIdAsc().stream()
-				.map(c -> new CategoryDto(c.getId(), c.getName(), c.getSlug())).toList();
+				.map(CatalogController::dto).toList();
 	}
 }

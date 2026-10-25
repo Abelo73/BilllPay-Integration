@@ -88,6 +88,18 @@ public final class BillPayFake {
 						""".formatted(paymentId, reference, status, amount.toPlainString(), attempts))));
 	}
 
+	/** POST /payments/{id}/refunds → 201, accepted and still processing (any payment, any amount). */
+	public static void acceptsRefunds(WireMockServer billPay) {
+		billPay.stubFor(post(com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds")).willReturn(aResponse()
+				.withStatus(201).withHeader("Content-Type", "application/json").withTransformers("response-template")
+				.withBody("""
+						{"statusCode":201,"message":"Refund created","body":{
+						 "refundId":"rf-{{randomValue length=8 type='ALPHANUMERIC'}}","status":"PENDING",
+						 "merchantReference":"{{jsonPath request.body '$.merchantReference'}}",
+						 "amount":{"amount":{{jsonPath request.body '$.amount'}},"currency":"ETB"}}}
+						""")));
+	}
+
 	/** POST /payments/{id}/refunds → 422, BillPay's answer while the merchant is at its refund limit. */
 	public static void refundsBlocked(WireMockServer billPay, String paymentId) {
 		billPay.stubFor(post(urlEqualTo(CREATE_PATH + "/" + paymentId + "/refunds")).willReturn(aResponse()

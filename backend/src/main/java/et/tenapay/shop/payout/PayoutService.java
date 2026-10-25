@@ -51,6 +51,7 @@ public class PayoutService {
 	private final ShopRepository shops;
 	private final SmsService sms;
 	private final ShopMetrics metrics;
+	private final et.tenapay.shop.dispute.DisputeRepository disputes;
 	private final TransactionTemplate tx;
 
 	@Value("${app.payouts.release-after:48h}")
@@ -103,6 +104,10 @@ public class PayoutService {
 	public void release(OrderParcel p, String why) {
 		if (p.getPayoutStatus() != EarningStatus.HELD) {
 			return;
+		}
+		if (disputes.existsByParcelIdAndStatus(p.getId(), et.tenapay.shop.dispute.Dispute.Status.OPEN)) {
+			log.info("Parcel #{} stays held: a problem report is open", p.getId());
+			return; // staff settle it first (M8)
 		}
 		p.setPayoutStatus(EarningStatus.RELEASED);
 		p.setReleasedAt(Instant.now());

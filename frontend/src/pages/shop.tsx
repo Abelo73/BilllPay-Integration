@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
 
 export function ShopPage() {
@@ -38,11 +39,29 @@ export function ShopPage() {
   }, [search])
 
   const categories = useQuery({ queryKey: ['categories'], queryFn: api.categories })
+  const all = categories.data ?? []
+  const current = all.find((c) => c.slug === category)
+  const main = current?.parentId ? all.find((c) => c.id === current.parentId) : current
+  const subs = main ? all.filter((c) => c.parentId === main.id) : []
+  const specFilters = Object.fromEntries([...params.entries()].filter(([k]) => k.startsWith('spec.'))) as Record<`spec.${string}`, string>
+  const filterKey = JSON.stringify(specFilters)
+  const facets = useQuery({
+    queryKey: ['facets', category],
+    queryFn: () => specsApi.bySlug(category, true),
+    enabled: !!category,
+    staleTime: 60_000,
+  })
   const products = useQuery({
-    queryKey: ['products', category, q, sort, page],
-    queryFn: () => api.products({ category, q, sort, page, size: 12 }),
+    queryKey: ['products', category, q, sort, page, filterKey],
+    queryFn: () => api.products({ category, q, sort, page, size: 12, ...specFilters }),
     placeholderData: keepPreviousData,
   })
+  /** Picking another category clears the detail filters (they belong to the old one). */
+  const pickCategory = (slug: string | null) => {
+    const changes: Record<string, string | null> = { category: slug }
+    for (const k of Object.keys(specFilters)) changes[k] = null
+    update(changes)
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
@@ -53,9 +72,9 @@ export function ShopPage() {
 
       <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center">
         <div className="flex flex-wrap gap-2">
-          <Chip active={!category} onClick={() => update({ category: null })}>All</Chip>
-          {categories.data?.map((c) => (
-            <Chip key={c.slug} active={category === c.slug} onClick={() => update({ category: c.slug })}>
+          <Chip active={!category} onClick={() => pickCategory(null)}>All</Chip>
+          {all.filter((c) => !c.parentId).map((c) => (
+            <Chip key={c.slug} active={main?.id === c.id} onClick={() => pickCategory(c.slug)}>
               {c.name}
             </Chip>
           ))}
@@ -78,6 +97,44 @@ export function ShopPage() {
           </Select>
         </div>
       </div>
+
+      {subs.length > 0 && main && (
+        <div className="mt-4 flex flex-wrap gap-2" aria-label={`${main.name} types`}>
+          <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>All {main.name.toLowerCase()}</SubChip>
+          {subs.map((s) => (
+            <SubChip key={s.slug} active={current?.id === s.id} onClick={() => pickCategory(s.slug)}>{s.name}</SubChip>
+          ))}
+        </div>
+      )}
+
+      {!!facets.data?.facets.length && (
+        <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border bg-card p-3">
+          {facets.data.facets.map((f) => {
+            const key = `spec.${f.key}` as const
+            const val = specFilters[key] ?? ''
+            return (
+              <label key={f.key} className="space-y-1 text-xs font-medium text-muted-foreground">
+                {f.label}
+                <select
+                  value={val}
+                  onChange={(e) => update({ [key]: e.target.value || null })}
+                  className={cn('block h-9 min-w-32 rounded-lg border bg-background px-2 text-sm text-foreground', val && 'border-primary')}
+                >
+                  <option value="">Any</option>
+                  {f.values.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {f.type === 'YES_NO' ? (v.value === 'true' ? 'Yes' : 'No') : v.value} ({v.count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          })}
+          {Object.keys(specFilters).length > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => pickCategory(category)}><X /> Clear filters</Button>
+          )}
+        </div>
+      )}
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {products.isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="aspect-square rounded-2xl" />)}
@@ -123,6 +180,22 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       className={cn(
         'rounded-full border px-3.5 py-1.5 text-sm font-medium transition',
         active ? 'border-primary bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function SubChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'rounded-lg border px-3 py-1 text-sm transition',
+        active ? 'border-primary bg-primary/10 font-semibold text-primary' : 'bg-background text-muted-foreground hover:bg-muted',
       )}
     >
       {children}

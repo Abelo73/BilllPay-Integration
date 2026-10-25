@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator'
 import { api, ApiError, type FulfilmentStatus, type OrderStatusView } from '@/lib/api'
 import { formatDate, formatETB, reasonMessage } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { OrderProblems } from './order-problems'
 import { useCart } from '@/store/cart'
 
 const POLL_MS = 3000
@@ -368,6 +369,7 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
         <p className="rounded-lg bg-background px-3 py-2 text-sm"><Truck className="mr-1.5 inline size-4" />{o.delivery.trackingNote}</p>
       )}
       {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label="I received my items" />}
+      <OrderProblems o={o} />
     </div>
   )
 }

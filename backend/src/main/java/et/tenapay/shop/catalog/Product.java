@@ -75,6 +75,11 @@ public class Product {
 	/** Where the item is; null = the shop's area. */
 	private String area;
 
+	/** Answers to the category's detail fields as JSON, e.g. {"brand":"Samsung","ram":"8 GB"} (see SpecsService). */
+	@Column(columnDefinition = "jsonb", nullable = false)
+	@org.hibernate.annotations.ColumnTransformer(write = "?::jsonb")
+	private String specs = "{}";
+
 	/** Set when staff took the listing down after reports; it stays off the store until staff lift it. */
 	private String blockedReason;
 

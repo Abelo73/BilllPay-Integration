@@ -96,6 +96,19 @@ export function ProductPage() {
                 </p>
               )}
             </div>
+            {!!p.specs?.length && (
+              <section aria-labelledby="details-title" className="overflow-hidden rounded-2xl border">
+                <h2 id="details-title" className="border-b bg-muted/50 px-4 py-2.5 text-sm font-bold">Details</h2>
+                <dl className="divide-y text-sm">
+                  {p.specs.map((s) => (
+                    <div key={s.key} className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-4 py-2.5">
+                      <dt className="text-muted-foreground">{s.label}</dt>
+                      <dd className="font-medium">{s.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
             <p className="text-muted-foreground text-pretty">{p.description}</p>
 
             {p.seller ? (

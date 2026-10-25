@@ -2,6 +2,7 @@ import { useRoutes, type RouteObject } from 'react-router'
 
 import { AdminAreasPage } from './areas'
 import { AdminCategoriesPage } from './categories'
+import { AdminCategoryFieldsPage } from './category-fields'
 import { AdminChatReportsPage } from './chat-reports'
 import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
@@ -19,6 +20,7 @@ import { AdminOrderDetailPage } from './order-detail'
 import { AdminOrdersPage } from './orders'
 import { AdminPaymentsPage } from './payments'
 import { AdminPayoutsPage } from './payouts'
+import { AdminProblemPage, AdminProblemsPage } from './problems'
 import { AdminProductEditPage } from './product-edit'
 import { AdminProductsPage } from './products'
 import { AdminProsPage } from './pros'
@@ -44,6 +46,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'products', element: <AdminProductsPage /> },
       { path: 'products/:productId', element: <AdminProductEditPage /> },
       { path: 'categories', element: <AdminCategoriesPage /> },
+      { path: 'categories/:categoryId/fields', element: <AdminCategoryFieldsPage /> },
       { path: 'shops', element: <AdminShopsPage /> },
       { path: 'pros', element: <AdminProsPage /> },
       { path: 'reviews', element: <AdminReviewsPage /> },
@@ -52,6 +55,8 @@ const adminRoutes: RouteObject[] = [
       { path: 'listing-reports', element: <AdminListingReportsPage /> },
       { path: 'areas', element: <AdminAreasPage /> },
       { path: 'payouts', element: <AdminPayoutsPage /> },
+      { path: 'problems', element: <AdminProblemsPage /> },
+      { path: 'problems/:id', element: <AdminProblemPage /> },
       { path: 'fees', element: <AdminFeesPage /> },
       { path: 'features', element: <AdminFeaturesPage /> },
       { path: 'jobs', element: <AdminJobsPage /> },

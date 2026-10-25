@@ -29,7 +29,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { SpecFields } from '@/components/spec-fields'
 import { catalogApi, isAdmin, type ChangeRow, type ProductDetail, type ProductInput } from '@/lib/admin-api'
+import { categoryTree, type Specs } from '@/lib/specs-api'
 import type { ItemCondition, Page } from '@/lib/api'
 import { publicTrustApi } from '@/lib/trust-api'
 import { formatDate, formatETB } from '@/lib/format'
@@ -65,7 +67,7 @@ export type CatalogClient = {
   removeImage: (id: number, imageId: number) => Promise<ProductDetail>
   reorderImages: (id: number, ids: number[]) => Promise<ProductDetail>
   uploadImage: (id: number, file: File) => Promise<ProductDetail>
-  categories: () => Promise<{ id: number; name: string; active?: boolean }[]>
+  categories: () => Promise<{ id: number; name: string; active?: boolean; parentId?: number | null }[]>
 }
 
 export type EditorConfig = {
@@ -101,6 +103,8 @@ type FormState = {
   condition: '' | ItemCondition
   negotiable: boolean
   area: string
+  /** answers to the category's detail fields (brand, RAM, ...) */
+  specs: Specs
 }
 
 function initialForm(d?: ProductDetail): FormState {
@@ -117,6 +121,7 @@ function initialForm(d?: ProductDetail): FormState {
     condition: d?.product.condition ?? '',
     negotiable: d?.product.negotiable ?? false,
     area: d?.product.area ?? '',
+    specs: d?.specs ?? {},
   }
 }
 
@@ -143,6 +148,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
         condition: form.condition || null,
         negotiable: form.negotiable,
         area: form.area,
+        specs: form.specs,
         ...(isNew ? { stock: Number(form.stock || 0) } : {}),
       }
       return isNew ? client.create(body) : client.update(detail.product.id, body)
@@ -186,11 +192,11 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
             </div>}
             <div className="space-y-2">
               <Label>Category</Label>
-              <Select value={form.categoryId} onValueChange={(v) => set('categoryId', v)} disabled={!editable}>
+              <Select value={form.categoryId} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v, specs: v === f.categoryId ? f.specs : {} }))} disabled={!editable}>
                 <SelectTrigger className="w-full" aria-invalid={!!errors.categoryId}><SelectValue placeholder="Choose…" /></SelectTrigger>
                 <SelectContent>
-                  {categories.data?.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name}{c.active === false && ' (hidden)'}</SelectItem>
+                  {categoryTree(categories.data ?? []).map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.label}{c.active === false && ' (hidden)'}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -212,6 +218,10 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
                 <Input id="stock" type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} />
               </div>
             )}
+            <div className="rounded-lg border bg-muted/30 p-3 sm:col-span-2 empty:hidden">
+              <SpecFields categoryId={form.categoryId ? Number(form.categoryId) : null} value={form.specs}
+                onChange={(specs) => set('specs', specs)} errors={errors} disabled={!editable} />
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <span className="text-sm font-medium">Condition</span>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Condition">

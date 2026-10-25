@@ -33,6 +33,7 @@ public class CatalogAdminService {
 	private final ProductImageRepository images;
 	private final CatalogChangeRepository changes;
 	private final ImageProcessor imageProcessor;
+	private final SpecsService specs;
 	private final MediaStorage storage;
 	private final MediaProperties media;
 	private final TransactionTemplate tx;
@@ -40,11 +41,17 @@ public class CatalogAdminService {
 	/** {@code condition}, {@code negotiable}, {@code area}: listing details (M4); null leaves them as they are. */
 	public record ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
 			Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active, ItemCondition condition,
-			Boolean negotiable, String area) {
+			Boolean negotiable, String area, java.util.Map<String, Object> specs) {
 
 		public ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
 				Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active) {
-			this(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active, null, null, null);
+			this(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active, null, null, null, null);
+		}
+
+		public ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
+				Integer stock, Integer lowStockThreshold, Boolean featured, Boolean active, ItemCondition condition,
+				Boolean negotiable, String area) {
+			this(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active, condition, negotiable, area, null);
 		}
 	}
 
@@ -72,6 +79,8 @@ public class CatalogAdminService {
 			p.setCondition(f.condition());
 			p.setNegotiable(Boolean.TRUE.equals(f.negotiable()));
 			p.setArea(blankToNull(f.area()));
+			// null = not sent (older clients): no details yet
+			p.setSpecs(f.specs() == null ? "{}" : specs.clean(p.getCategory().getId(), f.specs()));
 			products.save(p);
 			record(CatalogChange.EntityType.PRODUCT, p.getId(), "CREATED",
 					p.getName() + " · " + p.getPrice() + " ETB · stock " + p.getStock());
@@ -132,6 +141,13 @@ public class CatalogAdminService {
 			if (f.area() != null && !Objects.equals(blankToNull(f.area()), p.getArea())) {
 				diff.add("area " + (p.getArea() == null ? "-" : p.getArea()) + " → " + (blankToNull(f.area()) == null ? "-" : f.area().trim()));
 				p.setArea(blankToNull(f.area()));
+			}
+			if (f.specs() != null) {
+				String cleaned = specs.clean(p.getCategory().getId(), f.specs());
+				if (!specs.read(cleaned).equals(specs.read(p.getSpecs()))) {
+					diff.add("details edited");
+					p.setSpecs(cleaned);
+				}
 			}
 			if (!diff.isEmpty()) {
 				record(CatalogChange.EntityType.PRODUCT, p.getId(), "UPDATED", String.join("; ", diff));
@@ -214,6 +230,7 @@ public class CatalogAdminService {
 			p.setCondition(source.getCondition());
 			p.setNegotiable(source.isNegotiable());
 			p.setArea(source.getArea());
+			p.setSpecs(source.getSpecs());
 			p.setImageUrl(sourceImages.isEmpty() ? source.getImageUrl() : null);
 			products.save(p);
 			record(CatalogChange.EntityType.PRODUCT, p.getId(), "DUPLICATED", "from #" + source.getId() + " " + source.getName());
@@ -323,9 +340,15 @@ public class CatalogAdminService {
 	// ---------- categories ----------
 
 	public Category createCategory(String name) {
+		return createCategory(name, null);
+	}
+
+	/** {@code parentId}: a subcategory under that main category (Electronics → Mobile phones). */
+	public Category createCategory(String name, Long parentId) {
 		return tx.execute(s -> {
 			Category c = new Category();
 			c.setName(name.trim());
+			c.setParentId(parentId == null ? null : mainCategory(parentId, null).getId());
 			c.setSlug(Slugs.unique(Slugs.slugify(name), "category", categories::existsBySlug));
 			c.setSortOrder(categories.maxSortOrder() + 1);
 			categories.save(c);
@@ -335,9 +358,26 @@ public class CatalogAdminService {
 	}
 
 	public Category updateCategory(Long id, String name, Boolean active) {
+		return updateCategory(id, name, active, null, null);
+	}
+
+	/** Also moves it under a main category ({@code parentId}) or back to the top ({@code mainCategory}). */
+	public Category updateCategory(Long id, String name, Boolean active, Long parentId, Boolean mainCategory) {
 		return tx.execute(s -> {
 			Category c = category(id);
 			List<String> diff = new ArrayList<>();
+			if (Boolean.TRUE.equals(mainCategory) && c.getParentId() != null) {
+				diff.add("now a main category");
+				c.setParentId(null);
+			} else if (parentId != null && !parentId.equals(c.getParentId())) {
+				Category parent = mainCategory(parentId, c.getId());
+				if (!categories.findByParentIdOrderBySortOrderAscIdAsc(c.getId()).isEmpty()) {
+					throw new ApiException(HttpStatus.BAD_REQUEST, "HAS_SUBCATEGORIES",
+							"This category has its own subcategories. Move them first.");
+				}
+				diff.add("moved under " + parent.getName());
+				c.setParentId(parent.getId());
+			}
 			if (name != null && !name.isBlank() && !name.trim().equals(c.getName())) {
 				diff.add("name \"" + c.getName() + "\" → \"" + name.trim() + "\"");
 				c.setName(name.trim());
@@ -371,6 +411,15 @@ public class CatalogAdminService {
 	}
 
 	// ---------- helpers ----------
+
+	/** Subcategories go one level deep: the parent must be a main category (and not the category itself). */
+	private Category mainCategory(Long parentId, Long selfId) {
+		Category parent = category(parentId);
+		if (parent.getParentId() != null || parent.getId().equals(selfId)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "PARENT_INVALID", "Choose a main category as the parent.");
+		}
+		return parent;
+	}
 
 	private Category category(Long id) {
 		if (id == null) {

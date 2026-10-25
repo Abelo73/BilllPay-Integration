@@ -140,7 +140,7 @@ export const sellerCatalog = {
   reorderImages: (id: number, ids: number[]) =>
     request<ProductDetail>(`/seller/products/${id}/images/order`, json('PUT', { ids })),
   uploadImage: (id: number, file: File) => upload<ProductDetail>(`/seller/products/${id}/images`, file),
-  categories: () => request<{ id: number; name: string; slug: string }[]>('/seller/categories'),
+  categories: () => request<{ id: number; name: string; slug: string; parentId: number | null }[]>('/seller/categories'),
 }
 
 export const SHOP_STATUS_LABEL: Record<ShopStatus, string> = {

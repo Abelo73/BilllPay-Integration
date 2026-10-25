@@ -1,5 +1,6 @@
 import { ApiError, type Page } from '@/lib/api'
 import type { MyShop } from '@/lib/seller-api'
+import type { SpecField, SpecType, Specs } from '@/lib/specs-api'
 import type { Session } from '@/store/session'
 
 const STAFF_KEY = 'tenashop-staff-session'
@@ -419,7 +420,8 @@ export type ProductImageView = {
   sizeBytes: number | null
 }
 
-export type ProductDetail = { product: ProductRow; description: string | null; images: ProductImageView[]; maxImages: number }
+/** `specs`: answers to the category's detail fields (brand, RAM, ...) */
+export type ProductDetail = { product: ProductRow; description: string | null; images: ProductImageView[]; maxImages: number; specs: Specs }
 
 export type CategoryRow = {
   id: number
@@ -429,6 +431,9 @@ export type CategoryRow = {
   active: boolean
   productCount: number
   activeProductCount: number
+  /** the main category it sits under; null = a main category */
+  parentId: number | null
+  fieldCount: number
 }
 
 export type ChangeRow = { id: number; action: string; detail: string | null; userEmail: string | null; createdAt: string }
@@ -446,6 +451,7 @@ export type ProductInput = {
   condition?: 'NEW' | 'LIKE_NEW' | 'USED' | null
   negotiable?: boolean
   area?: string
+  specs?: Specs
 }
 
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) })
@@ -480,10 +486,18 @@ export const catalogApi = {
     return res.json() as Promise<ProductDetail>
   },
   categories: () => request<CategoryRow[]>('/categories'),
-  createCategory: (name: string) => request<CategoryRow[]>('/categories', json('POST', { name })),
-  updateCategory: (id: number, body: { name?: string; active?: boolean }) =>
+  createCategory: (name: string, parentId?: number | null) => request<CategoryRow[]>('/categories', json('POST', { name, parentId })),
+  updateCategory: (id: number, body: { name?: string; active?: boolean; parentId?: number; mainCategory?: boolean }) =>
     request<CategoryRow[]>(`/categories/${id}`, json('PATCH', body)),
   reorderCategories: (ids: number[]) => request<CategoryRow[]>('/categories/order', json('PUT', { ids })),
+  fields: (categoryId: number) => request<SpecField[]>(`/categories/${categoryId}/fields`),
+  addField: (categoryId: number, body: FieldInput) => request<SpecField[]>(`/categories/${categoryId}/fields`, json('POST', body)),
+  updateField: (categoryId: number, fieldId: number, body: Partial<FieldInput>) =>
+    request<SpecField[]>(`/categories/${categoryId}/fields/${fieldId}`, json('PUT', body)),
+  deleteField: (categoryId: number, fieldId: number) =>
+    request<SpecField[]>(`/categories/${categoryId}/fields/${fieldId}`, { method: 'DELETE' }),
+  reorderFields: (categoryId: number, ids: number[]) =>
+    request<SpecField[]>(`/categories/${categoryId}/fields/order`, json('PUT', { ids })),
 }
 
 /** Labels for customer email kinds (notifications log). */
@@ -723,4 +737,18 @@ export type FeatureSetting = {
 export const featureAdminApi = {
   list: () => request<FeatureSetting[]>('/features'),
   set: (key: string, value: string) => request<FeatureSetting[]>(`/features/${key}`, json('PUT', { value })),
+}
+
+/** Admin → Categories → Fields: options is a list, or with dependsOn a list per answer of that field. */
+export type FieldInput = {
+  label: string
+  type: SpecType
+  unit?: string | null
+  options?: string[] | Record<string, string[]> | null
+  dependsOn?: string | null
+  allowOther?: boolean
+  required?: boolean
+  filterable?: boolean
+  active?: boolean
+  help?: string | null
 }

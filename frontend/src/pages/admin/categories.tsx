@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Check, Loader2, Pencil, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, ListChecks, Loader2, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -9,27 +9,34 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { catalogApi, isAdmin, type CategoryRow } from '@/lib/admin-api'
+import { categoryTree } from '@/lib/specs-api'
+import { cn } from '@/lib/utils'
 import { PageHeader } from './shared'
 
-function Row({ c, index, total, onMove }: { c: CategoryRow; index: number; total: number; onMove: (from: number, to: number) => void }) {
+const selectClass = 'h-8 rounded-lg border bg-background px-2 text-sm'
+
+type TreeRow = CategoryRow & { label: string; depth: number }
+
+function Row({ c, mains, canUp, canDown, onMove }: { c: TreeRow; mains: CategoryRow[]; canUp: boolean; canDown: boolean; onMove: (dir: -1 | 1) => void }) {
   const qc = useQueryClient()
   const editable = isAdmin()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(c.name)
   const update = useMutation({
-    mutationFn: (body: { name?: string; active?: boolean }) => catalogApi.updateCategory(c.id, body),
+    mutationFn: (body: { name?: string; active?: boolean; parentId?: number; mainCategory?: boolean }) => catalogApi.updateCategory(c.id, body),
     onSuccess: (rows) => {
       qc.setQueryData(['admin-categories'], rows)
       setEditing(false)
     },
     onError: (e) => toast.error(e.message),
   })
+  const isMain = c.depth === 0
   return (
-    <div className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0">
+    <div className={cn('flex flex-wrap items-center gap-3 border-b px-4 py-3 last:border-b-0', !isMain && 'bg-muted/30 pl-10')}>
       {editable && (
         <div className="flex flex-col">
-          <Button size="icon-xs" variant="ghost" aria-label="Move up" disabled={index === 0} onClick={() => onMove(index, index - 1)}><ArrowUp /></Button>
-          <Button size="icon-xs" variant="ghost" aria-label="Move down" disabled={index === total - 1} onClick={() => onMove(index, index + 1)}><ArrowDown /></Button>
+          <Button size="icon-xs" variant="ghost" aria-label="Move up" disabled={!canUp} onClick={() => onMove(-1)}><ArrowUp /></Button>
+          <Button size="icon-xs" variant="ghost" aria-label="Move down" disabled={!canDown} onClick={() => onMove(1)}><ArrowDown /></Button>
         </div>
       )}
       <div className="min-w-0 flex-1">
@@ -40,7 +47,8 @@ function Row({ c, index, total, onMove }: { c: CategoryRow; index: number; total
             <Button size="sm" variant="ghost" type="button" onClick={() => { setEditing(false); setName(c.name) }}>Cancel</Button>
           </form>
         ) : (
-          <p className="flex items-center gap-2 font-medium">
+          <p className={cn('flex items-center gap-2', isMain ? 'font-semibold' : 'font-medium')}>
+            {!isMain && <span className="text-muted-foreground">↳</span>}
             {c.name}
             {editable && <Button size="icon-xs" variant="ghost" aria-label="Rename" onClick={() => setEditing(true)}><Pencil /></Button>}
           </p>
@@ -52,6 +60,21 @@ function Row({ c, index, total, onMove }: { c: CategoryRow; index: number; total
           </Link>
         </p>
       </div>
+      <Button asChild size="sm" variant="outline">
+        <Link to={`/admin/categories/${c.id}/fields`}><ListChecks /> Fields{c.fieldCount > 0 && ` (${c.fieldCount})`}</Link>
+      </Button>
+      {editable && (
+        <select
+          aria-label={`Where ${c.name} sits`}
+          className={selectClass}
+          value={c.parentId ?? ''}
+          disabled={update.isPending}
+          onChange={(e) => update.mutate(e.target.value ? { parentId: Number(e.target.value) } : { mainCategory: true })}
+        >
+          <option value="">Main category</option>
+          {mains.filter((m) => m.id !== c.id).map((m) => <option key={m.id} value={m.id}>Under {m.name}</option>)}
+        </select>
+      )}
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
         {c.active ? 'Visible' : 'Hidden'}
         <Switch checked={c.active} disabled={!editable || update.isPending} onCheckedChange={(v) => update.mutate({ active: v })} />
@@ -63,30 +86,47 @@ function Row({ c, index, total, onMove }: { c: CategoryRow; index: number; total
 export function AdminCategoriesPage() {
   const qc = useQueryClient()
   const [name, setName] = useState('')
+  const [parent, setParent] = useState('')
   const { data } = useQuery({ queryKey: ['admin-categories'], queryFn: catalogApi.categories })
+  const rows = categoryTree(data ?? [])
+  const mains = (data ?? []).filter((c) => !c.parentId)
   const create = useMutation({
-    mutationFn: () => catalogApi.createCategory(name),
-    onSuccess: (rows) => { qc.setQueryData(['admin-categories'], rows); setName(''); toast.success('Category added') },
+    mutationFn: () => catalogApi.createCategory(name, parent ? Number(parent) : null),
+    onSuccess: (r) => { qc.setQueryData(['admin-categories'], r); setName(''); toast.success('Category added') },
     onError: (e) => toast.error(e.message),
   })
   const reorder = useMutation({
     mutationFn: catalogApi.reorderCategories,
-    onSuccess: (rows) => qc.setQueryData(['admin-categories'], rows),
+    onSuccess: (r) => qc.setQueryData(['admin-categories'], r),
     onError: (e) => toast.error(e.message),
   })
-  const move = (from: number, to: number) => {
-    const ids = data!.map((c) => c.id)
-    const [x] = ids.splice(from, 1)
-    ids.splice(to, 0, x)
+  /** Moves a category up or down among its siblings (main categories, or the subcategories of one main category). */
+  const move = (c: TreeRow, dir: -1 | 1) => {
+    const siblings = rows.filter((x) => (x.parentId ?? null) === (c.parentId ?? null))
+    const i = siblings.findIndex((x) => x.id === c.id)
+    const other = siblings[i + dir]
+    if (!other) return
+    const ids = data!.map((x) => x.id)
+    const a = ids.indexOf(c.id)
+    const b = ids.indexOf(other.id)
+    ;[ids[a], ids[b]] = [ids[b], ids[a]]
     reorder.mutate(ids)
   }
+  const siblingsOf = (c: TreeRow) => rows.filter((x) => (x.parentId ?? null) === (c.parentId ?? null))
 
   return (
     <>
-      <PageHeader title="Categories" description="Order here is the order in the store. Hiding a category hides its products from the store too." />
+      <PageHeader
+        title="Categories"
+        description="Order here is the order in the store. Subcategories (Electronics → Mobile phones) have their own fields: brand, model, RAM, size… Hiding a category hides its products too."
+      />
       {isAdmin() && (
-        <form className="flex max-w-md gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) create.mutate() }}>
-          <Input placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} />
+        <form className="flex max-w-2xl flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (name.trim()) create.mutate() }}>
+          <Input placeholder="New category name" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} className="min-w-48 flex-1" />
+          <select aria-label="Where it goes" value={parent} onChange={(e) => setParent(e.target.value)} className="h-9 rounded-lg border bg-background px-2 text-sm">
+            <option value="">As a main category</option>
+            {mains.map((m) => <option key={m.id} value={m.id}>Under {m.name}</option>)}
+          </select>
           <Button type="submit" disabled={!name.trim() || create.isPending}>
             {create.isPending ? <Loader2 className="animate-spin" /> : <Plus />} Add
           </Button>
@@ -94,7 +134,11 @@ export function AdminCategoriesPage() {
       )}
       <Card>
         <CardContent className="p-0">
-          {data?.map((c, i) => <Row key={c.id} c={c} index={i} total={data.length} onMove={move} />)}
+          {rows.map((c) => {
+            const sib = siblingsOf(c)
+            const i = sib.findIndex((x) => x.id === c.id)
+            return <Row key={c.id} c={c} mains={mains} canUp={i > 0} canDown={i < sib.length - 1} onMove={(d) => move(c, d)} />
+          })}
         </CardContent>
       </Card>
     </>

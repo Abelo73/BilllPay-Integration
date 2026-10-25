@@ -27,12 +27,20 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			select p from Product p left join p.shop s
 			where p.active = true and p.category.active = true
 			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
-			  and (:category is null or p.category.slug = :category)
+			  and (:category is null or p.category.slug = :category
+			       or p.category.parentId in (select c.id from Category c where c.slug = :category))
 			  and (:shopId is null or s.id = :shopId)
-			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%')))
+			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%'))
+			       or function('specs_has_text', p.specs, cast(:q as string)) = true)
+			  and function('specs_match', p.specs, coalesce(cast(:specs as string), '{}')) = true
 			""")
 	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
-			Pageable pageable);
+			@Param("specs") String specs, Pageable pageable);
+
+	/** Store listing without spec filters. A main category's slug also lists its subcategories' products. */
+	default Page<Product> search(String category, String q, Long shopId, Pageable pageable) {
+		return search(category, q, shopId, null, pageable);
+	}
 
 	/** Store product page: hidden products, hidden categories and unapproved sellers are not found. */
 	@EntityGraph(attributePaths = { "category", "shop" })

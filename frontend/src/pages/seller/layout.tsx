@@ -13,6 +13,7 @@ import { useSession } from '@/store/session'
 const TABS = [
   { to: '/seller', label: 'Home', end: true },
   { to: '/seller/orders', label: 'Orders' },
+  { to: '/seller/problems', label: 'Problems' },
   { to: '/seller/products', label: 'Products' },
   { to: '/seller/money', label: 'Money' },
   { to: '/seller/shop', label: 'Shop details' },
@@ -94,7 +95,7 @@ export function SellerLayout() {
       <StatusBanner shop={s} />
 
       <nav aria-label="Seller" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {TABS.filter((t) => payments || (t.to !== '/seller/orders' && t.to !== '/seller/money')).map((t) => (
+        {TABS.filter((t) => payments || !['/seller/orders', '/seller/money', '/seller/problems'].includes(t.to)).map((t) => (
           <NavLink
             key={t.to}
             to={t.to}

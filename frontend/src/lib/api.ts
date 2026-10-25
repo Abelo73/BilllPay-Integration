@@ -1,4 +1,5 @@
 import { sessionToken, useSession, type Session, type SessionUser } from '@/store/session'
+import type { SpecLine } from '@/lib/specs-api'
 
 export type Product = {
   id: number
@@ -22,6 +23,8 @@ export type Product = {
   negotiable: boolean
   /** Where the item is (its own area, else the shop's) */
   area: string | null
+  /** product page only: the details table (brand, RAM, storage, ...) */
+  specs?: SpecLine[]
 }
 
 export type ItemCondition = 'NEW' | 'LIKE_NEW' | 'USED'
@@ -46,7 +49,7 @@ export type PublicShop = {
   verified: boolean
 }
 
-export type Category = { id: number; name: string; slug: string }
+export type Category = { id: number; name: string; slug: string; parentId?: number | null }
 
 export type Page<T> = {
   content: T[]
@@ -222,7 +225,8 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
 }
 
 export const api = {
-  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string }) => {
+  /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
+  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; [spec: `spec.${string}`]: string }) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     return request<Page<Product>>(`/products?${qs}`)

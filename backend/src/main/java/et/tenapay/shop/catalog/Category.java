@@ -26,6 +26,10 @@ public class Category {
 
 	private int sortOrder;
 
+	/** The main category this one sits under (Electronics for "Mobile phones"); null = a main category. */
+	@jakarta.persistence.Column(name = "parent_id")
+	private Long parentId;
+
 	/** Hidden categories (and their products) are not shown in the store. */
 	private boolean active = true;
 }

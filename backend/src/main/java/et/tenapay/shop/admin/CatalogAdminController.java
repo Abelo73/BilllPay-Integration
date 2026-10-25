@@ -59,6 +59,7 @@ public class CatalogAdminController {
 	private final CategoryRepository categories;
 	private final ProductImageRepository images;
 	private final CatalogChangeRepository changes;
+	private final et.tenapay.shop.catalog.CategoryFieldRepository fields;
 	private final MediaProperties media;
 
 	public record ProductRequest(
@@ -73,11 +74,12 @@ public class CatalogAdminController {
 			Boolean active,
 			et.tenapay.shop.catalog.ItemCondition condition,
 			Boolean negotiable,
-			@Size(max = 120) String area) {
+			@Size(max = 120) String area,
+			@Size(max = 40) java.util.Map<String, Object> specs) {
 
 		ProductForm form() {
 			return new ProductForm(name, slug, description, categoryId, price, stock, lowStockThreshold, featured, active,
-					condition, negotiable, area);
+					condition, negotiable, area, specs);
 		}
 	}
 
@@ -90,7 +92,8 @@ public class CatalogAdminController {
 	public record OrderRequest(@NotNull List<Long> ids) {
 	}
 
-	public record CategoryRequest(@Size(max = 100) String name, Boolean active) {
+	/** {@code parentId}: put it under a main category; {@code mainCategory=true}: make it a main category again. */
+	public record CategoryRequest(@Size(max = 100) String name, Boolean active, Long parentId, Boolean mainCategory) {
 	}
 
 	public record ImageView(Long id, int position, String url, String thumbUrl, Integer width, Integer height,
@@ -120,17 +123,22 @@ public class CatalogAdminController {
 		}
 	}
 
+	/** {@code specs}: the answers to the category's detail fields (brand, RAM, ...), for the edit form. */
 	public record ProductDetail(ProductRow product, String description, List<ImageView> images,
-			int maxImages) {
+			int maxImages, Map<String, Object> specs) {
+
+		private static final tools.jackson.databind.ObjectMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
 
 		public static ProductDetail of(Product p, List<ProductImage> gallery, MediaProperties media) {
 			return new ProductDetail(ProductRow.of(p), p.getDescription(),
-					gallery.stream().map(i -> ImageView.of(i, media)).toList(), CatalogAdminService.MAX_IMAGES);
+					gallery.stream().map(i -> ImageView.of(i, media)).toList(), CatalogAdminService.MAX_IMAGES,
+					JSON.readValue(p.getSpecs() == null ? "{}" : p.getSpecs(), new tools.jackson.core.type.TypeReference<java.util.LinkedHashMap<String, Object>>() {
+					}));
 		}
 	}
 
 	public record CategoryRow(Long id, String name, String slug, int sortOrder, boolean active, long productCount,
-			long activeProductCount) {
+			long activeProductCount, Long parentId, long fieldCount) {
 	}
 
 	public record ChangeRow(Long id, String action, String detail, String userEmail, Instant createdAt) {
@@ -227,9 +235,14 @@ public class CatalogAdminController {
 		for (Object[] row : categories.productCounts()) {
 			counts.put((Long) row[0], new long[] { ((Number) row[1]).longValue(), ((Number) row[2]).longValue() });
 		}
+		Map<Long, Long> fieldCounts = new HashMap<>();
+		for (et.tenapay.shop.catalog.CategoryField f : fields.findAll()) {
+			fieldCounts.merge(f.getCategoryId(), 1L, Long::sum);
+		}
 		return categories.findAllByOrderBySortOrderAscIdAsc().stream().map(c -> {
 			long[] n = counts.getOrDefault(c.getId(), new long[] { 0, 0 });
-			return new CategoryRow(c.getId(), c.getName(), c.getSlug(), c.getSortOrder(), c.isActive(), n[0], n[1]);
+			return new CategoryRow(c.getId(), c.getName(), c.getSlug(), c.getSortOrder(), c.isActive(), n[0], n[1], c.getParentId(),
+					fieldCounts.getOrDefault(c.getId(), 0L));
 		}).toList();
 	}
 
@@ -238,13 +251,13 @@ public class CatalogAdminController {
 		if (req.name() == null || req.name().isBlank()) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "NAME_REQUIRED", "Enter a category name.");
 		}
-		catalog.createCategory(req.name());
+		catalog.createCategory(req.name(), req.parentId());
 		return categories();
 	}
 
 	@PatchMapping("/categories/{id}")
 	public List<CategoryRow> updateCategory(@PathVariable Long id, @Valid @RequestBody CategoryRequest req) {
-		catalog.updateCategory(id, req.name(), req.active());
+		catalog.updateCategory(id, req.name(), req.active(), req.parentId(), req.mainCategory());
 		return categories();
 	}
 
