@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
 import { Loader2, Lock, MapPin, ShoppingBag, Tag, Truck, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
@@ -56,7 +56,7 @@ export function CheckoutPage() {
     phone: user?.phone ?? '',
     email: user?.email ?? '',
     address: '',
-    city: 'Addis Ababa',
+    city: 'Wolaita Sodo',
     notes: '',
   })
   const [errors, setErrors] = useState<Errors>({})
@@ -71,6 +71,13 @@ export function CheckoutPage() {
   const [codeError, setCodeError] = useState('')
   const cartItems = lines.map((l) => ({ productId: l.productId, quantity: l.quantity }))
   const cartKey = JSON.stringify(cartItems)
+  // Server price for the cart: one parcel per seller, each with its own delivery fee
+  const cartQuote = useQuery({
+    queryKey: ['cart-quote', cartKey],
+    queryFn: () => api.cartQuote(cartItems),
+    enabled: lines.length > 0,
+    placeholderData: keepPreviousData,
+  })
   const applyCode = useMutation({
     mutationFn: (code: string) => api.checkDiscount(cartItems, code),
     onSuccess: (q) => {
@@ -90,8 +97,10 @@ export function CheckoutPage() {
 
   const discount = applied?.discount ?? 0
   const itemsAfterDiscount = subtotal - discount
-  const fee = applied ? applied.deliveryFee : deliveryFee(quote.data, itemsAfterDiscount)
-  const toFree = quote.data && quote.data.freeOver > 0 && fee > 0 ? quote.data.freeOver - itemsAfterDiscount : 0
+  const priced = applied ?? cartQuote.data
+  const fee = priced ? priced.deliveryFee : deliveryFee(quote.data, itemsAfterDiscount)
+  const parcels = priced?.parcels ?? []
+  const toFree = parcels.length <= 1 && quote.data && quote.data.freeOver > 0 && fee > 0 ? quote.data.freeOver - itemsAfterDiscount : 0
 
   const pickAddress = (a: Address) => {
     setChosen(a.id)
@@ -238,7 +247,7 @@ export function CheckoutPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Truck className="size-5" /> Delivery</CardTitle>
-              <CardDescription>We deliver within Addis Ababa in 2–3 days. The rider calls the phone above.</CardDescription>
+              <CardDescription>Delivery in Wolaita Sodo. The seller or rider calls the phone above.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {saved.data && saved.data.length > 0 && (
@@ -262,8 +271,8 @@ export function CheckoutPage() {
                   </div>
                 </div>
               )}
-              {field('address', 'Street, area and house / building', { autoComplete: 'street-address', placeholder: 'Bole, near Atlas, house 12' })}
-              {field('city', 'City', { autoComplete: 'address-level2', placeholder: 'Addis Ababa' })}
+              {field('address', 'Street, area and house / building', { autoComplete: 'street-address', placeholder: 'Arada, near the church, house 12' })}
+              {field('city', 'City', { autoComplete: 'address-level2', placeholder: 'Wolaita Sodo' })}
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes for the rider <span className="font-normal text-muted-foreground">(optional)</span></Label>
                 <Textarea id="notes" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Gate colour, landmark, best time to call…" aria-invalid={!!errors.notes} />
@@ -340,9 +349,20 @@ export function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Delivery</span>
+              <span className="text-muted-foreground">Delivery{parcels.length > 1 && ` (${parcels.length} sellers)`}</span>
               <span className="tabular-nums">{quote.isLoading ? '…' : fee === 0 ? 'Free' : formatETB(fee)}</span>
             </div>
+            {parcels.length > 1 && (
+              <ul className="space-y-1 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                {parcels.map((p, i) => (
+                  <li key={i} className="flex justify-between gap-2">
+                    <span className="truncate">From {p.seller ?? 'Sodo Gebeya'} ({formatETB(p.itemsTotal)})</span>
+                    <span className="tabular-nums">{p.deliveryFee === 0 ? 'Free' : formatETB(p.deliveryFee)}</span>
+                  </li>
+                ))}
+                <li className="pt-1">Each seller delivers their own items, so they may arrive separately.</li>
+              </ul>
+            )}
             {toFree > 0 && (
               <p className="rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
                 Add {formatETB(toFree)} more for free delivery.

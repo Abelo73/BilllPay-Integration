@@ -252,20 +252,21 @@ class SellerIntegrationTest extends IntegrationTest {
 		assertThat(strings(get("/api/seller/orders?tab=way", seller).body().path("content"), "orderNumber"))
 				.contains(own);
 
-		// mixed with Sodo Gebeya's and another seller's items: only their own line, no buyer contact, staff deliver
+		// bought together with Sodo Gebeya's and another seller's items: each seller gets their own parcel to deliver
 		String mixed = buyAndPay(List.of(shoes, house, otherItem));
 		JsonNode m = get("/api/seller/orders/" + mixed, seller).body();
 		assertThat(longs(m.path("items"), "productId")).containsExactly(shoes);
 		assertThat(m.path("order").path("itemsTotal").decimalValue()).isEqualByComparingTo("2450.00");
 		assertThat(m.path("order").path("otherSellers").asBoolean()).isTrue();
-		assertThat(m.path("order").path("customerName").asString()).isEqualTo("Hana G.");
-		assertThat(m.path("customerPhone").isNull()).isTrue();
-		assertThat(m.path("order").path("nextSteps").size()).isZero();
-		Res refused = post("/api/seller/orders/" + mixed + "/fulfilment", Map.of("status", "PROCESSING"), seller);
-		assertThat(refused.status()).isEqualTo(409);
-		assertThat(refused.text("code")).isEqualTo("MIXED_ORDER");
+		assertThat(m.path("order").path("parcelNumber").asString()).startsWith(mixed + "-");
+		assertThat(m.path("customerPhone").asString()).isEqualTo("+251911223344");
+		assertThat(strings(m.path("order").path("nextSteps"))).containsExactly("PROCESSING", "SHIPPED");
+		assertThat(post("/api/seller/orders/" + mixed + "/fulfilment", Map.of("status", "PROCESSING"), seller).status())
+				.isEqualTo(200);
 		assertThat(longs(get("/api/seller/orders/" + mixed, other).body().path("items"), "productId"))
 				.containsExactly(otherItem);
+		assertThat(get("/api/seller/orders/" + mixed, other).body().path("order").path("fulfilmentStatus").asString())
+				.isEqualTo("UNFULFILLED"); // the other seller's parcel didn't move
 
 		// the dashboard counts their share only
 		JsonNode summary = get("/api/seller/summary", seller).body();

@@ -75,7 +75,7 @@ function MyOrders() {
   )
 }
 
-const EMPTY_ADDRESS: AddressInput = { label: '', recipientName: '', phone: '', addressLine: '', city: 'Addis Ababa', notes: '' }
+const EMPTY_ADDRESS: AddressInput = { label: '', recipientName: '', phone: '', addressLine: '', city: 'Wolaita Sodo', notes: '' }
 
 function Addresses() {
   const qc = useQueryClient()

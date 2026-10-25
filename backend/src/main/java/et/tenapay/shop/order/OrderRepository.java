@@ -49,28 +49,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
 
 	Page<Order> findByUserId(UUID userId, Pageable pageable);
 
-	// ---------- seller views: paid orders that contain at least one line of the shop ----------
-
-	@Query("""
-			select o from Order o
-			where o.paidAt is not null and o.environment = :environment
-			  and o.fulfilmentStatus in :fulfilment
-			  and exists (select 1 from OrderItem i where i.order = o and i.shopId = :shopId)
-			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
-			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%')))
-			""")
-	Page<Order> findForShop(@Param("shopId") Long shopId,
-			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment,
-			@Param("fulfilment") Collection<FulfilmentStatus> fulfilment, @Param("q") String q, Pageable pageable);
-
-	@Query("""
-			select count(o) from Order o
-			where o.paidAt is not null and o.environment = :environment and o.fulfilmentStatus in :fulfilment
-			  and exists (select 1 from OrderItem i where i.order = o and i.shopId = :shopId)
-			""")
-	long countForShop(@Param("shopId") Long shopId,
-			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment,
-			@Param("fulfilment") Collection<FulfilmentStatus> fulfilment);
+	// ---------- seller dashboard (lines of the shop) ----------
 
 	/** [the shop's line totals, orders, units] for orders paid since {@code since} and not refunded. */
 	@Query("""

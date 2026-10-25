@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, Loader2, Mail, MapPin, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Loader2, Mail, MapPin, Package, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { adminApi, EMAIL_KIND_LABEL, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
+import { adminApi, EMAIL_KIND_LABEL, fulfilParcel, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { JsonBlock, PageHeader, StatusBadge } from './shared'
 
@@ -79,6 +79,70 @@ const STEP_LABEL: Record<string, string> = {
   SHIPPED: 'Mark shipped',
   DELIVERED: 'Mark delivered',
   CANCELLED: 'Cancel delivery',
+}
+
+/** Orders from several sellers: each seller's parcel with its own delivery steps. */
+function ParcelsCard({ data }: { data: OrderDetail }) {
+  const qc = useQueryClient()
+  const orderNumber = data.order.orderNumber
+  const [notes, setNotes] = useState<Record<number, string>>({})
+  const step = useMutation({
+    mutationFn: ({ parcelNo, to }: { parcelNo: number; to: string }) => fulfilParcel(orderNumber, parcelNo, to, notes[parcelNo]?.trim() || undefined),
+    onSuccess: (r) => {
+      toast.success(`Parcel ${r.parcelNo}: ${r.fulfilmentStatus.toLowerCase()}`)
+      setNotes((n) => ({ ...n, [r.parcelNo]: '' }))
+      qc.invalidateQueries({ queryKey: ['admin-order', orderNumber] })
+      qc.invalidateQueries({ queryKey: ['admin-orders'] })
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><Package className="size-4" /> Parcels · {data.parcels.length} sellers</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <p className="text-xs text-muted-foreground">Each seller delivers their own parcel. The order above follows the slowest parcel.</p>
+        {data.parcels.map((p) => {
+          const steps = p.nextSteps.filter((s) => s !== 'CANCELLED')
+          return (
+            <div key={p.number} className="space-y-2 rounded-lg border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold">{p.seller} <span className="font-mono text-xs font-normal text-muted-foreground">{p.number}</span></span>
+                {p.fulfilmentStatus && <StatusBadge status={p.fulfilmentStatus} />}
+              </div>
+              <p className="text-xs text-muted-foreground">{p.items.join(', ')}</p>
+              <p className="text-xs tabular-nums">
+                Items {formatETB(p.itemsTotal)}{p.discountShare > 0 && ` − ${formatETB(p.discountShare)} discount`} · delivery {p.deliveryFee > 0 ? formatETB(p.deliveryFee) : 'free'}
+              </p>
+              {p.trackingNote && <p className="text-xs text-muted-foreground">Tracking: {p.trackingNote}</p>}
+              {isAdmin() && (steps.length > 0 || p.nextSteps.includes('CANCELLED')) && (
+                <div className="space-y-2 pt-1">
+                  {steps.includes('SHIPPED') && (
+                    <Input aria-label={`Rider note for parcel ${p.parcelNo}`} value={notes[p.parcelNo] ?? ''} maxLength={300}
+                      onChange={(e) => setNotes((n) => ({ ...n, [p.parcelNo]: e.target.value }))} placeholder="Rider / tracking note (optional)" className="h-8" />
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {steps.map((s) => (
+                      <Button key={s} size="xs" variant={s === steps[0] ? 'default' : 'outline'} disabled={step.isPending} onClick={() => step.mutate({ parcelNo: p.parcelNo, to: s })}>
+                        {STEP_LABEL[s] ?? s}
+                      </Button>
+                    ))}
+                    {p.nextSteps.includes('CANCELLED') && (
+                      <Button size="xs" variant="ghost" className="text-destructive hover:text-destructive" disabled={step.isPending}
+                        onClick={() => confirm(`Cancel parcel ${p.number}? Refund the buyer for it from the Payments tab.`) && step.mutate({ parcelNo: p.parcelNo, to: 'CANCELLED' })}>
+                        Cancel parcel
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
 }
 
 function DeliveryCard({ data }: { data: OrderDetail }) {
@@ -152,6 +216,7 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
                 </Button>
               )}
             </div>
+            {data.parcels.length > 1 && <p className="text-xs text-muted-foreground">These buttons move every parcel that can take the step. To move one seller's parcel, use Parcels below.</p>}
             {canCancelDelivery && <p className="text-xs text-muted-foreground">Cancelling a paid order doesn’t refund it; issue the refund from the Payments tab.</p>}
           </div>
         )}
@@ -365,6 +430,7 @@ export function AdminOrderDetailPage() {
 
         <div className="space-y-6">
           <DeliveryCard data={data} />
+          {data.parcels.length > 1 && <ParcelsCard data={data} />}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Items</CardTitle>

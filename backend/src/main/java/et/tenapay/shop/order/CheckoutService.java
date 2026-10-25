@@ -36,6 +36,7 @@ public class CheckoutService {
 	private final et.tenapay.shop.events.OrderEventPublisher publisher;
 	private final DiscountService discounts;
 	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
+	private final OrderParcelRepository parcels;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -85,29 +86,36 @@ public class CheckoutService {
 		order.setCustomerEmail(customer.email().trim().toLowerCase());
 		order.setUserId(userId);
 
-		BigDecimal subtotal = BigDecimal.ZERO;
-		for (Map.Entry<Long, Integer> e : qtyByProduct.entrySet()) {
-			Product p = byId.get(e.getKey());
-			int qty = e.getValue();
-			OrderItem item = new OrderItem();
-			item.setProductId(p.getId());
-			item.setShopId(p.getShop() == null ? null : p.getShop().getId());
-			item.setProductName(p.getName());
-			item.setUnitPrice(p.getPrice());
-			item.setQuantity(qty);
-			item.setLineTotal(p.getPrice().multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP));
-			order.addItem(item);
-			subtotal = subtotal.add(item.getLineTotal());
+		// One parcel per seller (Sodo Gebeya's own items first): each seller packs and delivers their own parcel.
+		List<Parcel> parcelPlan = plan(qtyByProduct, byId);
+		BigDecimal subtotal = BigDecimal.ZERO.setScale(2);
+		for (Parcel parcel : parcelPlan) {
+			for (Map.Entry<Product, Integer> e : parcel.lines()) {
+				Product p = e.getKey();
+				int qty = e.getValue();
+				OrderItem item = new OrderItem();
+				item.setProductId(p.getId());
+				item.setShopId(parcel.shopId());
+				item.setParcelNo(parcel.no());
+				item.setProductName(p.getName());
+				item.setUnitPrice(p.getPrice());
+				item.setQuantity(qty);
+				item.setLineTotal(p.getPrice().multiply(BigDecimal.valueOf(qty)).setScale(2, RoundingMode.HALF_UP));
+				order.addItem(item);
+			}
+			subtotal = subtotal.add(parcel.itemsTotal());
 		}
-		// Discount comes off the items; the delivery fee is worked out on what's left.
+		// Discount comes off the items (spread over the parcels by value); each parcel's delivery fee is worked out
+		// on what's left of it.
 		BigDecimal discount = BigDecimal.ZERO.setScale(2);
 		if (discountCode != null && !discountCode.isBlank()) {
 			DiscountService.Applied applied = discounts.use(discountCode, subtotal);
 			discount = applied.amount();
 			order.setDiscountCode(applied.code());
 		}
+		List<Priced> priced = price(parcelPlan, discount);
 		BigDecimal items = subtotal.subtract(discount);
-		BigDecimal fee = app.delivery().feeFor(items);
+		BigDecimal fee = priced.stream().map(Priced::deliveryFee).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
 		BigDecimal total = items.add(fee);
 		if (total.compareTo(BigDecimal.ONE) < 0) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "DISCOUNT_INVALID",
@@ -123,7 +131,18 @@ public class CheckoutService {
 		order.setDeliveryNotes(delivery.notes() == null || delivery.notes().isBlank() ? null : delivery.notes().trim());
 		order.setCreatedAt(Instant.now());
 		orders.save(order);
-		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s), subtotal " + subtotal
+		for (Priced pr : priced) {
+			OrderParcel parcel = new OrderParcel();
+			parcel.setOrderId(order.getId());
+			parcel.setParcelNo(pr.parcel().no());
+			parcel.setShopId(pr.parcel().shopId());
+			parcel.setItemsTotal(pr.parcel().itemsTotal());
+			parcel.setDiscountShare(pr.discountShare());
+			parcel.setDeliveryFee(pr.deliveryFee());
+			parcels.save(parcel);
+		}
+		orderService.note(order, "ORDER_CREATED", qtyByProduct.size() + " product(s)"
+				+ (priced.size() > 1 ? " from " + priced.size() + " sellers" : "") + ", subtotal " + subtotal
 				+ (discount.signum() > 0 ? " - " + discount + " (" + order.getDiscountCode() + ")" : "")
 				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
 		publisher.publish(order, "order.placed", Map.of());
@@ -143,27 +162,82 @@ public class CheckoutService {
 		return order;
 	}
 
-	public record Quote(BigDecimal subtotal, String discountCode, String discountDescription, BigDecimal discount,
-			BigDecimal deliveryFee, BigDecimal total) {
+	/** One seller's part of a quote; {@code seller} null = Sodo Gebeya. */
+	public record ParcelQuote(String seller, String sellerSlug, BigDecimal itemsTotal, BigDecimal deliveryFee) {
 	}
 
-	/** What the cart would cost with this code, using server prices. Nothing is reserved or used. */
+	public record Quote(BigDecimal subtotal, String discountCode, String discountDescription, BigDecimal discount,
+			BigDecimal deliveryFee, BigDecimal total, List<ParcelQuote> parcels) {
+	}
+
+	/** What the cart would cost (with this code, if any), using server prices. Nothing is reserved or used. */
 	@Transactional(readOnly = true)
 	public Quote quote(List<Line> lines, String discountCode) {
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
 		}
-		BigDecimal subtotal = BigDecimal.ZERO.setScale(2);
-		for (Product p : products.findAllById(qtyByProduct.keySet())) {
-			if (p.sellable()) {
-				subtotal = subtotal.add(p.getPrice().multiply(BigDecimal.valueOf(qtyByProduct.get(p.getId()))));
+		Map<Long, Product> byId = new LinkedHashMap<>();
+		products.findAllById(qtyByProduct.keySet()).stream().filter(Product::sellable).forEach(p -> byId.put(p.getId(), p));
+		qtyByProduct.keySet().retainAll(byId.keySet());
+		List<Parcel> plan = plan(qtyByProduct, byId);
+		BigDecimal subtotal = plan.stream().map(Parcel::itemsTotal).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+		DiscountService.Applied applied = discountCode == null || discountCode.isBlank()
+				? new DiscountService.Applied(null, null, BigDecimal.ZERO.setScale(2))
+				: discounts.quote(discountCode, subtotal);
+		List<Priced> priced = price(plan, applied.amount());
+		BigDecimal fee = priced.stream().map(Priced::deliveryFee).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+		List<ParcelQuote> parcelQuotes = priced.stream().map(p -> new ParcelQuote(p.parcel().sellerName(),
+				p.parcel().sellerSlug(), p.parcel().itemsTotal(), p.deliveryFee())).toList();
+		return new Quote(subtotal, applied.code(), applied.description(), applied.amount(), fee,
+				subtotal.subtract(applied.amount()).add(fee), parcelQuotes);
+	}
+
+	/** A seller's lines in a cart; {@code shopId} null = Sodo Gebeya. */
+	record Parcel(int no, Long shopId, String sellerName, String sellerSlug, List<Map.Entry<Product, Integer>> lines,
+			BigDecimal itemsTotal) {
+	}
+
+	record Priced(Parcel parcel, BigDecimal discountShare, BigDecimal deliveryFee) {
+	}
+
+	/** Groups the cart by seller: Sodo Gebeya's own items first, then each shop in the order its items were added. */
+	static List<Parcel> plan(Map<Long, Integer> qtyByProduct, Map<Long, Product> byId) {
+		Map<Long, List<Map.Entry<Product, Integer>>> bySeller = new LinkedHashMap<>();
+		bySeller.put(null, new ArrayList<>());
+		qtyByProduct.forEach((id, qty) -> {
+			Product p = byId.get(id);
+			Long shopId = p.getShop() == null ? null : p.getShop().getId();
+			bySeller.computeIfAbsent(shopId, k -> new ArrayList<>()).add(Map.entry(p, qty));
+		});
+		List<Parcel> out = new ArrayList<>();
+		for (Map.Entry<Long, List<Map.Entry<Product, Integer>>> e : bySeller.entrySet()) {
+			if (e.getValue().isEmpty()) {
+				continue;
 			}
+			BigDecimal total = e.getValue().stream()
+					.map(l -> l.getKey().getPrice().multiply(BigDecimal.valueOf(l.getValue())).setScale(2, RoundingMode.HALF_UP))
+					.reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
+			var shop = e.getValue().get(0).getKey().getShop();
+			out.add(new Parcel(out.size() + 1, e.getKey(), shop == null ? null : shop.getName(),
+					shop == null ? null : shop.getSlug(), e.getValue(), total));
 		}
-		DiscountService.Applied applied = discounts.quote(discountCode, subtotal);
-		BigDecimal items = subtotal.subtract(applied.amount());
-		BigDecimal fee = app.delivery().feeFor(items);
-		return new Quote(subtotal, applied.code(), applied.description(), applied.amount(), fee, items.add(fee));
+		return out;
+	}
+
+	/** Spreads the discount over the parcels by value (the last takes the rounding rest) and prices each delivery. */
+	List<Priced> price(List<Parcel> plan, BigDecimal discount) {
+		BigDecimal subtotal = plan.stream().map(Parcel::itemsTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+		List<Priced> out = new ArrayList<>();
+		BigDecimal left = discount;
+		for (int i = 0; i < plan.size(); i++) {
+			Parcel p = plan.get(i);
+			BigDecimal share = i == plan.size() - 1 || subtotal.signum() == 0 ? left
+					: discount.multiply(p.itemsTotal()).divide(subtotal, 2, RoundingMode.HALF_UP).min(left);
+			left = left.subtract(share);
+			out.add(new Priced(p, share, app.delivery().feeFor(p.itemsTotal().subtract(share))));
+		}
+		return out;
 	}
 
 	private String nextOrderNumber() {

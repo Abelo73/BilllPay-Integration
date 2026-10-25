@@ -1,4 +1,4 @@
-import { Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react'
+import { Minus, Plus, ShoppingBag, Store, Trash2 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 
 import { ProductVisual } from '@/components/product-visual'
@@ -14,6 +14,14 @@ export function CartSheet() {
   const { count, subtotal } = cartTotals(lines)
   const navigate = useNavigate()
   const signedIn = useSession((s) => !!s.session)
+  // grouped by seller (design S4); Sodo Gebeya's own items first, like the parcels at checkout
+  const groups: { key: string; name: string; lines: typeof lines }[] = []
+  for (const l of [...lines].sort((a, b) => Number(!!a.seller) - Number(!!b.seller))) {
+    const key = l.seller?.slug ?? ''
+    let g = groups.find((x) => x.key === key)
+    if (!g) groups.push((g = { key, name: l.seller?.name ?? 'Sodo Gebeya', lines: [] }))
+    g.lines.push(l)
+  }
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -34,8 +42,20 @@ export function CartSheet() {
             </Button>
           </div>
         ) : (
-          <div className="flex-1 space-y-4 overflow-y-auto px-4">
-            {lines.map((l) => (
+          <div className="flex-1 space-y-5 overflow-y-auto px-4">
+            {groups.length > 1 && (
+              <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                From {groups.length} sellers: each delivers their own items, with its own delivery fee.
+              </p>
+            )}
+            {groups.map((g) => (
+              <section key={g.key} className="space-y-3" aria-label={`From ${g.name}`}>
+                {groups.length > 1 && (
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <Store className="size-3.5" /> {g.name}
+                  </p>
+                )}
+            {g.lines.map((l) => (
               <div key={l.productId} className="flex gap-3">
                 <ProductVisual categorySlug={l.categorySlug} imageUrl={l.imageUrl} name={l.name} className="size-16 shrink-0 rounded-lg" iconClassName="size-6" />
                 <div className="flex min-w-0 flex-1 flex-col">
@@ -57,6 +77,8 @@ export function CartSheet() {
                   </div>
                 </div>
               </div>
+            ))}
+              </section>
             ))}
           </div>
         )}

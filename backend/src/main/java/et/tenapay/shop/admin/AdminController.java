@@ -72,6 +72,8 @@ public class AdminController {
 	private final BillPayMode billPayMode;
 	private final AppProperties app;
 	private final et.tenapay.shop.notification.NotificationRepository notificationRepo;
+	private final et.tenapay.shop.order.OrderParcelRepository parcelRepo;
+	private final et.tenapay.shop.seller.ShopRepository shopRepo;
 
 	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
 			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
@@ -147,7 +149,13 @@ public class AdminController {
 
 	public record OrderDetail(OrderRow order, String customerEmail, DeliveryDetail delivery, List<ItemRow> items,
 			List<OrderEvent> timeline, List<AttemptView> attempts, List<RefundView> refunds, List<WebhookView> webhooks,
-			List<NotificationAdminController.NotificationRow> emails) {
+			List<NotificationAdminController.NotificationRow> emails, List<ParcelRow> parcels) {
+	}
+
+	/** One seller's parcel of the order (shopId null = Sodo Gebeya's own); staff can move any parcel. */
+	public record ParcelRow(String number, int parcelNo, Long shopId, String seller, BigDecimal itemsTotal,
+			BigDecimal discountShare, BigDecimal deliveryFee, String fulfilmentStatus, List<String> nextSteps,
+			String trackingNote, Instant shippedAt, Instant deliveredAt, Instant cancelledAt, List<String> items) {
 	}
 
 	public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -247,6 +255,18 @@ public class AdminController {
 				.sorted((a, b) -> a.getReceivedAt().compareTo(b.getReceivedAt()))
 				.map(WebhookView::from)
 				.toList();
+		Map<Long, String> shopNames = new java.util.HashMap<>();
+		List<et.tenapay.shop.order.OrderParcel> parcelList = parcelRepo.findByOrderIdOrderByParcelNoAsc(o.getId());
+		shopRepo.findAllById(parcelList.stream().map(et.tenapay.shop.order.OrderParcel::getShopId)
+				.filter(java.util.Objects::nonNull).toList()).forEach(sh -> shopNames.put(sh.getId(), sh.getName()));
+		List<ParcelRow> parcelRows = parcelList.stream().map(p -> new ParcelRow(p.number(o.getOrderNumber()), p.getParcelNo(),
+				p.getShopId(), p.getShopId() == null ? "Sodo Gebeya" : shopNames.get(p.getShopId()), p.getItemsTotal(),
+				p.getDiscountShare(), p.getDeliveryFee(), p.getFulfilmentStatus() == null ? null : p.getFulfilmentStatus().name(),
+				p.getFulfilmentStatus() == null ? List.of() : p.getFulfilmentStatus().next().stream().map(Enum::name).sorted().toList(),
+				p.getTrackingNote(), p.getShippedAt(), p.getDeliveredAt(), p.getCancelledAt(),
+				o.getItems().stream().filter(i -> i.getParcelNo() != null && i.getParcelNo() == p.getParcelNo())
+						.map(i -> i.getQuantity() + " × " + i.getProductName()).toList()))
+				.toList();
 		return new OrderDetail(OrderRow.from(o), o.getCustomerEmail(), DeliveryDetail.from(o),
 				o.getItems().stream().map(ItemRow::from).toList(),
 				orderEvents.findByOrderIdOrderByCreatedAtAscIdAsc(o.getId()),
@@ -255,7 +275,7 @@ public class AdminController {
 						.map(r -> RefundView.from(r, o.getOrderNumber())).toList(),
 				hooks,
 				notificationRepo.findByOrderNumberOrderByCreatedAtAsc(o.getOrderNumber()).stream()
-						.map(NotificationAdminController.NotificationRow::of).toList());
+						.map(NotificationAdminController.NotificationRow::of).toList(), parcelRows);
 	}
 
 	@GetMapping("/payments")

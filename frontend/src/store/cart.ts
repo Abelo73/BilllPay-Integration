@@ -11,6 +11,8 @@ export type CartLine = {
   categorySlug: string
   imageUrl: string | null
   quantity: number
+  /** Who sells it (null or missing = Sodo Gebeya); the cart is grouped by seller */
+  seller?: { name: string; slug: string } | null
 }
 
 type CartState = {
@@ -49,6 +51,7 @@ export const useCart = create<CartState>()(
                   categorySlug: product.categorySlug,
                   imageUrl: product.imageUrl,
                   quantity,
+                  seller: product.seller ? { name: product.seller.name, slug: product.seller.slug } : null,
                 },
               ]
           return { lines, open: true }

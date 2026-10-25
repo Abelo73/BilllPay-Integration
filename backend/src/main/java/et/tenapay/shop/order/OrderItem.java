@@ -34,6 +34,9 @@ public class OrderItem {
 	/** Seller of this line at checkout; null = Sodo Gebeya itself. */
 	private Long shopId;
 
+	/** Which of the order's parcels this line travels in (one parcel per seller). */
+	private Integer parcelNo;
+
 	private String productName;
 
 	private BigDecimal unitPrice;

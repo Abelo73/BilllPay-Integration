@@ -261,9 +261,45 @@ const STEPS: { key: FulfilmentStatus; label: string; icon: typeof Package }[] = 
   { key: 'DELIVERED', label: 'Delivered', icon: Home },
 ]
 
+/** Orders from several sellers: one line per parcel, each with its own progress. */
+function ParcelList({ o }: { o: OrderStatusView }) {
+  return (
+    <ul className="space-y-3">
+      {o.parcels.map((p) => {
+        const reached = p.fulfilmentStatus ? STEPS.findIndex((s) => s.key === p.fulfilmentStatus) : -1
+        const items = o.items.filter((i) => i.parcelNo === p.parcelNo)
+        return (
+          <li key={p.number} className="space-y-2 rounded-lg bg-background p-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+              <span className="font-semibold">
+                From {p.sellerSlug ? <Link to={`/shops/${p.sellerSlug}`} className="hover:underline">{p.seller}</Link> : 'Sodo Gebeya'}
+              </span>
+              <span className={cn('text-xs font-semibold', p.fulfilmentStatus === 'CANCELLED' ? 'text-destructive' : reached >= 3 ? 'text-success' : 'text-muted-foreground')}>
+                {p.fulfilmentStatus === 'CANCELLED' ? 'Cancelled' : reached >= 0 ? STEPS[reached].label : ''}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {items.map((i) => `${i.quantity} × ${i.productName}`).join(', ')} · delivery {p.deliveryFee === 0 ? 'free' : formatETB(p.deliveryFee)}
+            </p>
+            {p.fulfilmentStatus !== 'CANCELLED' && (
+              <div className="flex gap-1" aria-hidden>
+                {STEPS.map((s, i) => <span key={s.key} className={cn('h-1.5 flex-1 rounded-full', i <= reached ? 'bg-success' : 'bg-border')} />)}
+              </div>
+            )}
+            {p.trackingNote && p.fulfilmentStatus === 'SHIPPED' && (
+              <p className="text-xs"><Truck className="mr-1 inline size-3.5" />{p.trackingNote}</p>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 function DeliveryBlock({ o }: { o: OrderStatusView }) {
   const status = o.delivery.fulfilmentStatus
   const reached = status ? STEPS.findIndex((s) => s.key === status) : -1
+  const multi = (o.parcels?.length ?? 0) > 1
   return (
     <div className="space-y-4 rounded-xl border bg-muted/30 p-4">
       <div className="flex items-start gap-3 text-sm">
@@ -273,7 +309,14 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
           {o.delivery.notes && <p className="text-muted-foreground">Note: {o.delivery.notes}</p>}
         </div>
       </div>
-      {status === 'CANCELLED' ? (
+      {multi && (
+        <p className="text-xs text-muted-foreground">
+          Your order comes from {o.parcels.length} sellers. Each delivers their own items, so they may arrive separately.
+        </p>
+      )}
+      {multi && status ? (
+        <ParcelList o={o} />
+      ) : status === 'CANCELLED' ? (
         <p className="text-sm text-destructive">Delivery was cancelled. Our team will contact you about a refund.</p>
       ) : status ? (
         <ol className="grid grid-cols-4 gap-1" aria-label="Delivery progress">
@@ -298,7 +341,7 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       ) : o.status === 'PENDING_PAYMENT' || o.status === 'PAYMENT_FAILED' ? (
         <p className="text-sm text-muted-foreground">Delivery starts once your payment is confirmed.</p>
       ) : null}
-      {o.delivery.trackingNote && status === 'SHIPPED' && (
+      {!multi && o.delivery.trackingNote && status === 'SHIPPED' && (
         <p className="rounded-lg bg-background px-3 py-2 text-sm"><Truck className="mr-1.5 inline size-4" />{o.delivery.trackingNote}</p>
       )}
     </div>

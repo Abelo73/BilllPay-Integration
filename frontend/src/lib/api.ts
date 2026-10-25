@@ -71,11 +71,29 @@ export type DeliveryQuote = { flatFee: number; freeOver: number; currency: strin
 
 export type PriceQuote = {
   subtotal: number
+  /** Set when a code was checked (empty in a plain cart quote) */
   discountCode: string
   discountDescription: string | null
   discount: number
   deliveryFee: number
   total: number
+  /** One per seller (Sodo Gebeya's own first, seller null), each with its own delivery fee */
+  parcels: { seller: string | null; sellerSlug: string | null; itemsTotal: number; deliveryFee: number }[]
+}
+
+/** One seller's parcel of an order. */
+export type ParcelView = {
+  number: string
+  parcelNo: number
+  /** null = Sodo Gebeya */
+  seller: string | null
+  sellerSlug: string | null
+  itemsTotal: number
+  deliveryFee: number
+  fulfilmentStatus: FulfilmentStatus | null
+  trackingNote: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
 }
 
 export function deliveryFee(quote: DeliveryQuote | undefined, subtotal: number) {
@@ -120,7 +138,7 @@ export type OrderStatusView = {
   total: number
   currency: string
   customerName: string
-  items: { productId: number; productSlug: string | null; productName: string; unitPrice: number; quantity: number; lineTotal: number }[]
+  items: { productId: number; productSlug: string | null; productName: string; unitPrice: number; quantity: number; lineTotal: number; parcelNo: number | null }[]
   payment: { attemptNo: number; status: string; reasonCode: string | null; paymentMethod: string | null } | null
   canRetry: boolean
   canCancel: boolean
@@ -138,6 +156,8 @@ export type OrderStatusView = {
   paidAt: string | null
   /** When an unpaid order's items are released; null once paid or closed */
   payBy: string | null
+  /** One per seller */
+  parcels: ParcelView[]
 }
 
 /** Reply to "text me a code". devCode is only filled in local test mode (no SMS provider). */
@@ -226,6 +246,8 @@ export const api = {
     }),
   delivery: () => request<DeliveryQuote>('/delivery'),
   storeInfo: () => request<{ sandbox: boolean }>('/store-info'),
+  cartQuote: (items: { productId: number; quantity: number }[]) =>
+    request<PriceQuote>('/checkout/quote', { method: 'POST', body: JSON.stringify({ items }) }),
   checkDiscount: (items: { productId: number; quantity: number }[], code: string) =>
     request<PriceQuote>('/discounts/check', { method: 'POST', body: JSON.stringify({ items, code }) }),
 

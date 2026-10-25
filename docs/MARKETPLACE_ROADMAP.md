@@ -90,10 +90,17 @@ Result:
 
 ## Phase 2: Buying and money
 
-### M5. Multi-seller cart and orders (1 week)
+### M5. Multi-seller cart and orders (1 week) ✅ Done 2026-10-25
 - Cart grouped by seller (**S4**); one checkout makes **one order per seller**, each with its own delivery fee
 - Order tracking per order (**S6**) with seller steps: packed → on the way → delivered
 - **Done when:** a cart with items from 2 shops becomes 2 orders, each tracked separately
+
+Result: one checkout, one BillPay payment, and **one parcel per seller** (`order_parcels`, numbered `<order>-1`, `-2`, …; Sodo Gebeya's own items first). Splitting the payment itself would have meant several BillPay payments per cart, so the buyer pays once and each parcel is fulfilled on its own; M6 payouts attach to parcels.
+- Cart drawer grouped by seller; checkout shows the delivery fee per seller (`POST /api/checkout/quote`). The free-delivery rule applies per parcel, and a discount is spread over the parcels by value (each parcel stores its share).
+- Each seller moves only their own parcel (packing → on the way with a rider note → delivered) and always gets the buyer's name, phone and address. Staff can move one parcel (Admin → order → Parcels) or the whole order (every parcel that can take the step). The order's status follows its slowest parcel, so it is "delivered" once all parcels are.
+- Buyer's order page: one progress line per seller with the rider note. Email, SMS and in-app messages say "part of your order" only when the order really has more than one parcel.
+- Existing orders got one parcel per seller found in their lines (migration V22).
+- Tests: `OrderParcelsIntegrationTest` (3: three sellers delivered separately, discount spread and partial cancel, single-seller orders unchanged); `SellerIntegrationTest` updated (a seller now delivers their parcel of a mixed order); browser walkthrough.
 
 ### M6. Protected payments and payouts (1.5 weeks)
 - BillPay payment held by the platform; **released** when the buyer taps "I received my items" (**S6**) or 48 h after delivery with no complaint

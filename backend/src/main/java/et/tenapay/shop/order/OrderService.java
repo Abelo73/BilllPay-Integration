@@ -21,6 +21,7 @@ public class OrderService {
 	private final OrderEventPublisher publisher;
 	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 	private final et.tenapay.shop.discount.DiscountService discounts;
+	private final OrderParcelRepository parcels;
 
 	public void transition(Order order, OrderStatus to, String eventType, String detail) {
 		OrderStatus from = order.getStatus();
@@ -48,6 +49,40 @@ public class OrderService {
 
 	public void commitStock(Order order) {
 		forEachProduct(order, products::commitReserved);
+	}
+
+	/** Paid: the order and each seller's parcel are ready to pack. */
+	public void startFulfilment(Order order) {
+		order.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
+		for (OrderParcel p : parcels.findByOrderIdOrderByParcelNoAsc(order.getId())) {
+			p.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
+		}
+	}
+
+	/**
+	 * The order's delivery status follows its parcels: the least advanced parcel that isn't cancelled (so the order is
+	 * "delivered" once every parcel is), or cancelled when all are. Shipped = first parcel sent; delivered = last one.
+	 */
+	public void rollUp(Order order, java.util.List<OrderParcel> all) {
+		java.util.List<OrderParcel> active = all.stream().filter(p -> p.getFulfilmentStatus() != FulfilmentStatus.CANCELLED).toList();
+		if (active.isEmpty()) {
+			order.setFulfilmentStatus(FulfilmentStatus.CANCELLED);
+			if (order.getCancelledAt() == null) {
+				order.setCancelledAt(java.time.Instant.now());
+			}
+			return;
+		}
+		FulfilmentStatus least = active.stream().map(OrderParcel::getFulfilmentStatus).filter(java.util.Objects::nonNull)
+				.min(java.util.Comparator.naturalOrder()).orElse(null);
+		order.setFulfilmentStatus(least);
+		active.stream().map(OrderParcel::getShippedAt).filter(java.util.Objects::nonNull).min(java.util.Comparator.naturalOrder())
+				.ifPresent(order::setShippedAt);
+		if (least == FulfilmentStatus.DELIVERED) {
+			active.stream().map(OrderParcel::getDeliveredAt).filter(java.util.Objects::nonNull).max(java.util.Comparator.naturalOrder())
+					.ifPresent(order::setDeliveredAt);
+		}
+		all.stream().filter(p -> p.getTrackingNote() != null).reduce((a, b) -> b)
+				.ifPresent(p -> order.setTrackingNote(p.getTrackingNote()));
 	}
 
 	/** One single-statement stock update per product, in ascending id order (no lock waits in a circle). */

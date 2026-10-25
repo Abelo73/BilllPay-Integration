@@ -55,6 +55,8 @@ public class CheckoutController {
 	private final et.tenapay.shop.config.AppProperties app;
 	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
 	private final et.tenapay.shop.catalog.ProductRepository products;
+	private final OrderParcelRepository parcelRepo;
+	private final et.tenapay.shop.seller.ShopRepository shops;
 
 	public record CheckoutItem(@NotNull Long productId, @Min(1) @Max(20) int quantity) {
 	}
@@ -97,7 +99,7 @@ public class CheckoutController {
 
 	/** productSlug is null when the product was removed; the shop uses it for "Order again". */
 	public record ItemView(long productId, String productSlug, String productName, BigDecimal unitPrice, int quantity,
-			BigDecimal lineTotal) {
+			BigDecimal lineTotal, Integer parcelNo) {
 	}
 
 	public record PaymentView(int attemptNo, String status, String reasonCode, String paymentMethod) {
@@ -105,6 +107,11 @@ public class CheckoutController {
 
 	public record DeliveryView(String address, String city, String notes, String fulfilmentStatus, String trackingNote,
 			Instant shippedAt, Instant deliveredAt) {
+	}
+
+	/** One seller's parcel of the order; {@code seller} null = Sodo Gebeya. */
+	public record ParcelView(String number, int parcelNo, String seller, String sellerSlug, BigDecimal itemsTotal,
+			BigDecimal deliveryFee, String fulfilmentStatus, String trackingNote, Instant shippedAt, Instant deliveredAt) {
 	}
 
 	/** One customer-visible step of the order (internal details are left out). */
@@ -116,7 +123,9 @@ public class CheckoutController {
 			boolean canRetry, boolean canCancel, DeliveryView delivery, List<StepView> timeline, Instant createdAt,
 			Instant paidAt,
 			/** When an unpaid order's items are released (null once it's paid or closed). */
-			Instant payBy) {
+			Instant payBy,
+			/** One per seller; items carry their parcelNo. */
+			List<ParcelView> parcels) {
 	}
 
 	private static final java.util.Set<String> CUSTOMER_STEPS = java.util.Set.of("ORDER_CREATED", "PAID", "EXPIRED",
@@ -135,6 +144,16 @@ public class CheckoutController {
 	@GetMapping("/delivery")
 	public DeliveryQuote delivery() {
 		return new DeliveryQuote(app.delivery().flatFee(), app.delivery().freeOver(), "ETB");
+	}
+
+	/** What the cart costs: per-seller parcels and their delivery fees, plus a discount code if given. */
+	@PostMapping("/checkout/quote")
+	public CheckoutService.Quote quote(@Valid @RequestBody CartQuoteRequest req) {
+		return checkout.quote(req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
+				req.code());
+	}
+
+	public record CartQuoteRequest(@NotEmpty @Size(max = 50) List<@Valid CheckoutItem> items, @Size(max = 40) String code) {
 	}
 
 	/** Checks a discount code against the cart and returns what the order would cost. Nothing is used up. */
@@ -250,10 +269,25 @@ public class CheckoutController {
 				order.getDiscountCode(), order.getDiscountAmount(), order.getDeliveryFee(), order.getTotal(), order.getCurrency(), order.getCustomerName(),
 				order.getItems().stream()
 						.map(i -> new ItemView(i.getProductId(), slugs.get(i.getProductId()), i.getProductName(),
-								i.getUnitPrice(), i.getQuantity(), i.getLineTotal()))
+								i.getUnitPrice(), i.getQuantity(), i.getLineTotal(), i.getParcelNo()))
 						.toList(),
 				payment, order.getStatus().awaitingPayment(), order.getStatus().awaitingPayment(), delivery, timeline,
 				order.getCreatedAt(), order.getPaidAt(),
-				order.getStatus().awaitingPayment() ? order.getCreatedAt().plus(app.paymentExpiry()) : null);
+				order.getStatus().awaitingPayment() ? order.getCreatedAt().plus(app.paymentExpiry()) : null,
+				parcels(order));
+	}
+
+	private List<ParcelView> parcels(Order order) {
+		List<OrderParcel> list = parcelRepo.findByOrderIdOrderByParcelNoAsc(order.getId());
+		Map<Long, et.tenapay.shop.seller.Shop> shopById = new java.util.HashMap<>();
+		shops.findAllById(list.stream().map(OrderParcel::getShopId).filter(java.util.Objects::nonNull).toList())
+				.forEach(sh -> shopById.put(sh.getId(), sh));
+		return list.stream().map(p -> {
+			var sh = p.getShopId() == null ? null : shopById.get(p.getShopId());
+			return new ParcelView(p.number(order.getOrderNumber()), p.getParcelNo(), sh == null ? null : sh.getName(),
+					sh == null ? null : sh.getSlug(), p.getItemsTotal(), p.getDeliveryFee(),
+					p.getFulfilmentStatus() == null ? null : p.getFulfilmentStatus().name(), p.getTrackingNote(),
+					p.getShippedAt(), p.getDeliveredAt());
+		}).toList();
 	}
 }

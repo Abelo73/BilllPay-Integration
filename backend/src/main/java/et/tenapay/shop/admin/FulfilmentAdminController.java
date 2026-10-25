@@ -37,6 +37,14 @@ public class FulfilmentAdminController {
 		return Map.of("orderNumber", o.getOrderNumber(), "fulfilmentStatus", o.getFulfilmentStatus().name());
 	}
 
+	/** One seller's parcel (staff can move any parcel, including cancelling it before it ships). */
+	@PostMapping("/parcels/{parcelNo}/fulfilment")
+	public Map<String, Object> advanceParcel(@PathVariable String orderNumber, @PathVariable int parcelNo,
+			@Valid @RequestBody FulfilmentRequest req) {
+		var p = fulfilment.advanceParcel(orderNumber, parcelNo, req.status(), req.note(), staff(), null);
+		return Map.of("orderNumber", orderNumber, "parcelNo", p.getParcelNo(), "fulfilmentStatus", p.getFulfilmentStatus().name());
+	}
+
 	@PostMapping("/cancel")
 	public Map<String, Object> cancel(@PathVariable String orderNumber,
 			@Valid @RequestBody(required = false) CancelRequest req) {

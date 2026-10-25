@@ -242,7 +242,34 @@ export type OrderDetail = {
   attempts: Attempt[]
   refunds: Refund[]
   webhooks: Webhook[]
+  /** One per seller (seller "Sodo Gebeya" = our own items) */
+  parcels: ParcelRow[]
 }
+
+export type ParcelRow = {
+  number: string
+  parcelNo: number
+  shopId: number | null
+  seller: string
+  itemsTotal: number
+  discountShare: number
+  deliveryFee: number
+  fulfilmentStatus: string | null
+  nextSteps: string[]
+  trackingNote: string | null
+  shippedAt: string | null
+  deliveredAt: string | null
+  cancelledAt: string | null
+  /** "2 × Leather shoes" */
+  items: string[]
+}
+
+/** Moves one seller's parcel (staff can move any parcel). */
+export const fulfilParcel = (orderNumber: string, parcelNo: number, status: string, note?: string) =>
+  request<{ orderNumber: string; parcelNo: number; fulfilmentStatus: string }>(
+    `/orders/${encodeURIComponent(orderNumber)}/parcels/${parcelNo}/fulfilment`,
+    { method: 'POST', body: JSON.stringify({ status, note }) },
+  )
 
 export const adminApi = {
   login: (email: string, password: string) =>

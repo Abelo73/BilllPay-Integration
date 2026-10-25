@@ -240,7 +240,7 @@ public class PaymentService {
 		if (order.getStatus().awaitingPayment()) {
 			orderService.commitStock(order);
 			order.setPaidAt(Instant.now());
-			order.setFulfilmentStatus(et.tenapay.shop.order.FulfilmentStatus.UNFULFILLED);
+			orderService.startFulfilment(order);
 			orderService.transition(order, OrderStatus.PAID, "PAID", detail);
 		} else {
 			// Late payment after expiry, or a second successful attempt: a person must decide (refund or fulfil).

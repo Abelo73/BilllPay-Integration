@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.data.domain.PageRequest;
@@ -46,6 +47,7 @@ import et.tenapay.shop.order.FulfilmentService;
 import et.tenapay.shop.order.FulfilmentStatus;
 import et.tenapay.shop.order.Order;
 import et.tenapay.shop.order.OrderItem;
+import et.tenapay.shop.order.OrderParcel;
 import et.tenapay.shop.order.OrderRepository;
 import et.tenapay.shop.payment.billpay.BillPayMode;
 import et.tenapay.shop.seller.ShopViews.ShopDto;
@@ -83,6 +85,7 @@ public class SellerController {
 	private final CatalogChangeRepository changes;
 	private final OrderRepository orders;
 	private final FulfilmentService fulfilment;
+	private final et.tenapay.shop.order.OrderParcelRepository parcels;
 	private final BillPayMode billPayMode;
 	private final MediaProperties media;
 
@@ -135,12 +138,12 @@ public class SellerController {
 	}
 
 	/**
-	 * A paid order as one seller sees it: only their own lines and their share. {@code otherSellers} = the order also
-	 * has lines from other sellers (until orders are split per seller, Sodo Gebeya delivers those).
+	 * The seller's parcel of a paid order: only their own lines, their share and their delivery steps.
+	 * {@code otherSellers} = the buyer also bought from other sellers in the same checkout (they deliver their own).
 	 */
-	public record OrderRow(String orderNumber, String status, String fulfilmentStatus, Instant paidAt,
-			String customerName, String deliveryCity, int units, BigDecimal itemsTotal, boolean otherSellers,
-			List<String> nextSteps) {
+	public record OrderRow(String orderNumber, String parcelNumber, String status, String fulfilmentStatus,
+			Instant paidAt, String customerName, String deliveryCity, int units, BigDecimal itemsTotal,
+			BigDecimal deliveryFee, boolean otherSellers, List<String> nextSteps) {
 	}
 
 	public record OrderDetail(OrderRow order, String customerPhone, String deliveryAddress, String deliveryNotes,
@@ -194,11 +197,11 @@ public class SellerController {
 		Object[] month = orders.shopSales(shop.getId(), monthStart, env).get(0);
 		List<BestSeller> best = orders.shopBestSellers(shop.getId(), monthStart, env, PageRequest.of(0, 5)).stream()
 				.map(r -> new BestSeller((String) r[0], ((Number) r[1]).longValue())).toList();
-		List<OrderRow> toSendNow = orders.findForShop(shop.getId(), env, TO_SEND, null,
-				PageRequest.of(0, 5, Sort.by("paidAt").ascending())).map(o -> row(o, shop)).getContent();
+		List<OrderRow> toSendNow = rows(parcels.findForShop(shop.getId(), env, TO_SEND, null,
+				PageRequest.of(0, 5, Sort.by("id").ascending())).getContent());
 		return new Summary(ShopDto.of(shop, media), n(c[0]), n(c[1]), n(c[2]), n(c[3]),
-				orders.countForShop(shop.getId(), env, TO_SEND),
-				orders.countForShop(shop.getId(), env, EnumSet.of(FulfilmentStatus.SHIPPED)),
+				parcels.countForShop(shop.getId(), env, TO_SEND),
+				parcels.countForShop(shop.getId(), env, EnumSet.of(FulfilmentStatus.SHIPPED)),
 				(BigDecimal) day[0], n(day[1]), (BigDecimal) month[0], n(month[1]), n(month[2]), best, toSendNow);
 	}
 
@@ -320,33 +323,31 @@ public class SellerController {
 			case "all" -> EnumSet.allOf(FulfilmentStatus.class);
 			default -> TO_SEND;
 		};
-		Sort sort = "send".equals(tab) ? Sort.by("paidAt").ascending() : Sort.by("paidAt").descending();
-		return PageDto.of(orders.findForShop(shop.getId(), billPayMode.current(), f,
-				q == null || q.isBlank() ? null : q.trim(), PageRequest.of(page, 20, sort)).map(o -> row(o, shop)));
+		// oldest first while there's something to send, newest first otherwise
+		Sort sort = "send".equals(tab) ? Sort.by("id").ascending() : Sort.by("id").descending();
+		var result = parcels.findForShop(shop.getId(), billPayMode.current(), f, q == null || q.isBlank() ? null : q.trim(),
+				PageRequest.of(page, 20, sort));
+		return PageDto.of(new org.springframework.data.domain.PageImpl<>(rows(result.getContent()), result.getPageable(),
+				result.getTotalElements()));
 	}
 
 	@GetMapping("/orders/{orderNumber}")
 	@Transactional(readOnly = true)
 	public OrderDetail order(@PathVariable String orderNumber) {
 		Shop shop = shopService.requireMine();
-		return detail(ownOrder(shop, orderNumber), shop);
+		Order o = ownOrder(orderNumber);
+		return detail(o, ownParcel(shop, o));
 	}
 
-	/** Packed → on the way → delivered, for orders that only hold this seller's items. */
+	/** Packing → on the way → delivered, for this seller's parcel of the order. */
 	@PostMapping("/orders/{orderNumber}/fulfilment")
 	public OrderDetail advance(@PathVariable String orderNumber, @Valid @RequestBody FulfilmentRequest req) {
 		Shop shop = shopService.requireMine();
-		Order o = ownOrder(shop, orderNumber);
-		if (otherSellers(o, shop)) {
-			throw new ApiException(HttpStatus.CONFLICT, "MIXED_ORDER",
-					"This order also has items from other sellers, so Sodo Gebeya delivers it.");
-		}
-		if (req.status() == FulfilmentStatus.CANCELLED || req.status() == FulfilmentStatus.UNFULFILLED) {
-			throw new ApiException(HttpStatus.FORBIDDEN, "SELLER_CANNOT_CANCEL",
-					"A paid order can only be cancelled by Sodo Gebeya, because the buyer gets a refund. Call us.");
-		}
-		fulfilment.advance(orderNumber, req.status(), req.note(), "seller " + shop.getName());
-		return detail(ownOrder(shop, orderNumber), shop);
+		OrderParcel parcel = ownParcel(shop, ownOrder(orderNumber));
+		fulfilment.advanceParcel(orderNumber, parcel.getParcelNo(), req.status(), req.note(), "seller " + shop.getName(),
+				shop.getId());
+		Order o = ownOrder(orderNumber);
+		return detail(o, ownParcel(shop, o));
 	}
 
 	// ---------- helpers ----------
@@ -357,11 +358,16 @@ public class SellerController {
 				.orElseThrow(() -> ApiException.notFound("Product"));
 	}
 
-	private Order ownOrder(Shop shop, String orderNumber) {
+	/** A paid order (current BillPay environment); 404 otherwise. Pair it with {@link #ownParcel}. */
+	private Order ownOrder(String orderNumber) {
 		return orders.findByOrderNumber(orderNumber)
 				.filter(o -> o.getPaidAt() != null && o.getEnvironment() == billPayMode.current())
-				.filter(o -> o.getItems().stream().anyMatch(i -> shop.getId().equals(i.getShopId())))
 				.orElseThrow(() -> ApiException.notFound("Order"));
+	}
+
+	/** This seller's parcel of the order; an order without one answers 404, like a missing order. */
+	private OrderParcel ownParcel(Shop shop, Order o) {
+		return parcels.findByOrderIdAndShopId(o.getId(), shop.getId()).orElseThrow(() -> ApiException.notFound("Order"));
 	}
 
 	private void activeCategory(Long id) {
@@ -377,37 +383,40 @@ public class SellerController {
 		return ProductDetail.of(p, images.findByProductIdOrderByPositionAsc(p.getId()), media);
 	}
 
-	private static boolean otherSellers(Order o, Shop shop) {
-		return o.getItems().stream().anyMatch(i -> !shop.getId().equals(i.getShopId()));
+	/** Rows for parcels, loading their orders in one go. */
+	private List<OrderRow> rows(List<OrderParcel> list) {
+		Map<java.util.UUID, Order> byId = new java.util.HashMap<>();
+		orders.findAllById(list.stream().map(OrderParcel::getOrderId).toList()).forEach(o -> byId.put(o.getId(), o));
+		return list.stream().map(p -> row(byId.get(p.getOrderId()), p)).toList();
 	}
 
-	private static OrderRow row(Order o, Shop shop) {
-		List<OrderItem> mine = o.getItems().stream().filter(i -> shop.getId().equals(i.getShopId())).toList();
-		boolean mixed = otherSellers(o, shop);
-		List<String> next = mixed || o.getFulfilmentStatus() == null ? List.of()
-				: o.getFulfilmentStatus().next().stream().filter(s -> s != FulfilmentStatus.CANCELLED)
-						.sorted().map(Enum::name).toList();
-		return new OrderRow(o.getOrderNumber(), o.getStatus().name(),
-				o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(), o.getPaidAt(),
+	private OrderRow row(Order o, OrderParcel p) {
+		List<OrderItem> mine = mine(o, p);
+		boolean others = parcels.findByOrderIdOrderByParcelNoAsc(o.getId()).size() > 1;
+		List<String> next = p.getFulfilmentStatus() == null ? List.of()
+				: p.getFulfilmentStatus().next().stream().filter(st -> st != FulfilmentStatus.CANCELLED).sorted()
+						.map(Enum::name).toList();
+		return new OrderRow(o.getOrderNumber(), p.number(o.getOrderNumber()), o.getStatus().name(),
+				p.getFulfilmentStatus() == null ? null : p.getFulfilmentStatus().name(), o.getPaidAt(),
 				firstName(o.getCustomerName()), o.getDeliveryCity(), mine.stream().mapToInt(OrderItem::getQuantity).sum(),
-				mine.stream().map(OrderItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add), mixed, next);
+				p.getItemsTotal(), p.getDeliveryFee(), others, next);
 	}
 
-	private static OrderDetail detail(Order o, Shop shop) {
-		List<OrderLine> lines = o.getItems().stream().filter(i -> shop.getId().equals(i.getShopId()))
-				.map(i -> new OrderLine(i.getProductId(), i.getProductName(), i.getUnitPrice(), i.getQuantity(),
-						i.getLineTotal()))
+	/** The seller delivers their own parcel, so they get the buyer's full name, phone and address. */
+	private OrderDetail detail(Order o, OrderParcel p) {
+		List<OrderLine> lines = mine(o, p).stream()
+				.map(i -> new OrderLine(i.getProductId(), i.getProductName(), i.getUnitPrice(), i.getQuantity(), i.getLineTotal()))
 				.toList();
-		OrderRow r = row(o, shop);
-		// the full name and phone are for delivering; a mixed order is delivered by Sodo Gebeya, so the seller gets neither
-		return new OrderDetail(
-				new OrderRow(r.orderNumber(), r.status(), r.fulfilmentStatus(), r.paidAt(),
-						r.otherSellers() ? r.customerName() : o.getCustomerName(), r.deliveryCity(), r.units(),
-						r.itemsTotal(), r.otherSellers(), r.nextSteps()),
-				r.otherSellers() ? null : o.getCustomerPhone(),
-				r.otherSellers() ? null : o.getDeliveryAddress(),
-				r.otherSellers() ? null : o.getDeliveryNotes(),
-				o.getTrackingNote(), o.getShippedAt(), o.getDeliveredAt(), lines);
+		OrderRow r = row(o, p);
+		return new OrderDetail(new OrderRow(r.orderNumber(), r.parcelNumber(), r.status(), r.fulfilmentStatus(), r.paidAt(),
+				o.getCustomerName(), r.deliveryCity(), r.units(), r.itemsTotal(), r.deliveryFee(), r.otherSellers(), r.nextSteps()),
+				o.getCustomerPhone(), o.getDeliveryAddress(), o.getDeliveryNotes(), p.getTrackingNote(), p.getShippedAt(),
+				p.getDeliveredAt(), lines);
+	}
+
+	private static List<OrderItem> mine(Order o, OrderParcel p) {
+		return o.getItems().stream().filter(i -> i.getParcelNo() != null ? i.getParcelNo() == p.getParcelNo()
+				: java.util.Objects.equals(i.getShopId(), p.getShopId())).toList();
 	}
 
 	/** "Hana Girma" → "Hana G." in lists. */

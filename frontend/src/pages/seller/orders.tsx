@@ -148,26 +148,29 @@ export function SellerOrderPage() {
         <p className="flex justify-between border-t pt-2 text-sm font-bold">
           <span>Your share</span> <span className="tabular-nums">{formatETB(o.itemsTotal)}</span>
         </p>
+        <p className="flex justify-between text-xs text-muted-foreground">
+          <span>Delivery the buyer paid for this parcel</span>
+          <span className="tabular-nums">{o.deliveryFee === 0 ? 'Free' : formatETB(o.deliveryFee)}</span>
+        </p>
       </section>
 
-      {o.otherSellers ? (
+      {o.otherSellers && (
         <p className="rounded-2xl bg-muted p-4 text-sm">
-          This order also has items from other sellers, so Sodo Gebeya collects and delivers it. Have your items ready; we'll call you.
+          The buyer also bought from other sellers in this order. You deliver only your parcel <span className="font-mono font-semibold">{o.parcelNumber}</span>; the others bring theirs.
         </p>
-      ) : (
-        <section className="space-y-2 rounded-2xl border bg-card p-4 text-sm">
-          <h3 className="flex items-center gap-2 font-bold"><Truck className="size-4" /> Deliver to</h3>
-          <p className="font-semibold">{o.customerName}</p>
-          {data.customerPhone && (
-            <a href={`tel:${data.customerPhone}`} className="flex items-center gap-2 font-semibold text-primary">
-              <Phone className="size-4" /> {data.customerPhone}
-            </a>
-          )}
-          <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0" /> {data.deliveryAddress}{o.deliveryCity && `, ${o.deliveryCity}`}</p>
-          {data.deliveryNotes && <p className="text-muted-foreground">Note: {data.deliveryNotes}</p>}
-          {data.trackingNote && <p className="text-muted-foreground">Sent with: {data.trackingNote}</p>}
-        </section>
       )}
+      <section className="space-y-2 rounded-2xl border bg-card p-4 text-sm">
+        <h3 className="flex items-center gap-2 font-bold"><Truck className="size-4" /> Deliver to</h3>
+        <p className="font-semibold">{o.customerName}</p>
+        {data.customerPhone && (
+          <a href={`tel:${data.customerPhone}`} className="flex items-center gap-2 font-semibold text-primary">
+            <Phone className="size-4" /> {data.customerPhone}
+          </a>
+        )}
+        <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0" /> {data.deliveryAddress}{o.deliveryCity && `, ${o.deliveryCity}`}</p>
+        {data.deliveryNotes && <p className="text-muted-foreground">Note: {data.deliveryNotes}</p>}
+        {data.trackingNote && <p className="text-muted-foreground">Sent with: {data.trackingNote}</p>}
+      </section>
 
       {o.nextSteps.length > 0 && (
         <section className="space-y-3 rounded-2xl border bg-card p-4">

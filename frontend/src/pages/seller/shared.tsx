@@ -18,11 +18,11 @@ export function OrderLine({ o }: { o: SellerOrderRow }) {
     <Link to={`/seller/orders/${o.orderNumber}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-muted/50">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">
-          {o.orderNumber} · {o.units} {o.units === 1 ? 'item' : 'items'}
+          {o.otherSellers ? o.parcelNumber : o.orderNumber} · {o.units} {o.units === 1 ? 'item' : 'items'}
         </p>
         <p className="truncate text-xs text-muted-foreground">
           {o.customerName}{o.deliveryCity && ` · ${o.deliveryCity}`} · paid {formatDate(o.paidAt)}
-          {o.otherSellers && ' · delivered by Sodo Gebeya'}
+          {o.otherSellers && ' · part of a bigger order'}
         </p>
       </div>
       <div className="text-right">

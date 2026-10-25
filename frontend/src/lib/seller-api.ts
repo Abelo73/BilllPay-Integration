@@ -44,14 +44,17 @@ export type SellerOrderRow = {
   deliveryCity: string | null
   units: number
   itemsTotal: number
-  /** Also has items from other sellers: Sodo Gebeya delivers it */
+  /** This seller's parcel of the order, e.g. TS-20261025-00012-2 */
+  parcelNumber: string
+  /** Delivery fee the buyer paid for this parcel */
+  deliveryFee: number
+  /** The buyer also bought from other sellers in the same checkout; they deliver their own parcels */
   otherSellers: boolean
   nextSteps: FulfilmentStatus[]
 }
 
 export type SellerOrderDetail = {
   order: SellerOrderRow
-  /** null when other sellers' items are in the order */
   customerPhone: string | null
   deliveryAddress: string | null
   deliveryNotes: string | null
