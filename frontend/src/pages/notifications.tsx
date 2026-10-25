@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
+import { TelegramConnect } from '@/components/telegram-connect'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { formatDate } from '@/lib/format'
@@ -110,6 +111,7 @@ export function NotificationsPage() {
           <Button variant="outline" size="sm" disabled={page + 1 >= data.items.totalPages} onClick={() => setPage(page + 1)}>Older</Button>
         </div>
       )}
+      <TelegramConnect />
       <SmsChoices />
     </div>
   )

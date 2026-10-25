@@ -119,6 +119,18 @@ sms:
     sender: ${AFROMESSAGE_SENDER:}
     callback: ${AFROMESSAGE_CALLBACK:}
 
+# Telegram bot. No TELEGRAM_BOT_TOKEN = test mode: replies and alerts are logged (Admin → SMS), never sent.
+telegram:
+  token: ${TELEGRAM_BOT_TOKEN:}
+  bot-username: ${TELEGRAM_BOT_USERNAME:}
+  # new listings are posted here, e.g. @sodogebeya (the bot must be a channel admin); blank = off
+  channel-id: ${TELEGRAM_CHANNEL_ID:}
+  # Telegram sends it with every webhook call; blank = webhook off
+  webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+  base-url: ${TELEGRAM_BASE_URL:https://api.telegram.org}
+  timeout: ${TELEGRAM_TIMEOUT:PT10S}
+  channel-every: ${TELEGRAM_CHANNEL_EVERY:PT5M}
+
 app:
   public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:5280}
   # BillPay requires https return/cancel URLs; locally set this to the ngrok URL (see BillPayRedirectController)

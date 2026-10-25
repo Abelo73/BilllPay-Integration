@@ -26,7 +26,9 @@ public class SmsNotificationListener {
 	void onOrderEvent(String message) {
 		JsonNode m = json.readTree(message);
 		String occurred = m.path("occurredAt").asString(null);
+		// split orders: fulfilment events come once per parcel, with the seller name
+		String seller = m.path("detail").hasNonNull("parcel") ? m.path("detail").path("seller").asString("") : null;
 		notifier.onOrderEvent(m.path("type").asString(null), m.path("orderNumber").asString(null),
-				occurred == null ? null : Instant.parse(occurred));
+				occurred == null ? null : Instant.parse(occurred), seller);
 	}
 }

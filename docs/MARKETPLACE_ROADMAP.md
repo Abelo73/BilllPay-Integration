@@ -211,6 +211,8 @@ All of these must be true:
 ### M20. Telegram bot (1 week)
 - Order and chat alerts in Telegram; browse new listings; channel auto-posts
 
+🟡 Built 2026-10-24, waiting for a bot (V23). **Connect Telegram** on the Notifications page opens the bot with a one-time code (15 minutes); after Start, every in-app notification (orders, chats, jobs) also arrives in Telegram with an "Open" button. Bot commands: /new (5 newest listings), /stop (alerts off), /help. New listings from the last day are posted to the channel every 5 minutes, each once. The webhook only accepts calls carrying the secret. Admin → SMS shows the bot status, linked people, and "Connect webhook" and "Post new listings now" buttons. With no token it runs in test mode (messages are only logged and shown there). Test: `TelegramIntegrationTest`. **Needs you:** create the bot with @BotFather and a channel, put `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_CHANNEL_ID` in .env, then press "Connect webhook". Still open: Amharic bot texts, browsing by category in the bot.
+
 ---
 
 ## Phase 7: Delivery network

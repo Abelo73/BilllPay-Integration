@@ -58,6 +58,11 @@ public class SmsOrderNotifier {
 
 	/** Handles one orders.events message. Unknown types send nothing. */
 	public void onOrderEvent(String type, String orderNumber, Instant occurredAt) {
+		onOrderEvent(type, orderNumber, occurredAt, null);
+	}
+
+	/** {@code seller} is set when the event is about one seller's part of a split order (null = the whole order). */
+	public void onOrderEvent(String type, String orderNumber, Instant occurredAt, String seller) {
 		if (!enabled || type == null || orderNumber == null) {
 			return;
 		}
@@ -86,10 +91,11 @@ public class SmsOrderNotifier {
 		if (!inbox.wantsSms(o.userId(), et.tenapay.shop.inbox.InboxService.SmsTopic.ORDERS)) {
 			return; // the customer turned order texts off (they still see it in the app)
 		}
-		String text = text(type, o);
+		String text = text(type, o, seller);
 		// one reminder per order; the others once per event
 		String key = type.equals("order.payment.reminder") ? "SMS:REMINDER:" + o.number()
-				: "SMS:" + type + ":" + o.number() + ":" + (occurredAt == null ? "" : occurredAt.toString());
+				: "SMS:" + type + ":" + o.number() + ":" + (seller == null ? "" : seller + ":")
+						+ (occurredAt == null ? "" : occurredAt.toString());
 		sms.sendOnce(kind, o.phone(), text, o.number(), key.length() > 160 ? key.substring(0, 160) : key);
 	}
 
@@ -100,16 +106,30 @@ public class SmsOrderNotifier {
 	}
 
 	String text(String type, OrderInfo o) {
+		return text(type, o, null);
+	}
+
+	String text(String type, OrderInfo o, String seller) {
+		String part = seller == null ? null : "part of " + o.number() + from(seller);
 		String link = app.publicBaseUrl().replaceAll("/+$", "") + "/orders/track?order=" + o.number();
 		return switch (type) {
 			case "order.payment.reminder" -> "Sodo Gebeya: " + o.number() + " is not paid yet. Pay by "
 					+ (o.payBy() == null ? "soon" : TIME.format(o.payBy())) + " or the items are released: " + link;
-			case "order.fulfilment.shipped" -> "Sodo Gebeya: " + o.number() + " is on the way."
+			case "order.fulfilment.shipped" -> "Sodo Gebeya: " + (part != null ? part : o.number()) + " is on the way."
 					+ rider(o.trackingNote()) + " Track: " + link;
-			case "order.fulfilment.delivered" -> "Sodo Gebeya: " + o.number() + " was delivered. Thank you! Problem? " + link;
+			case "order.fulfilment.delivered" -> "Sodo Gebeya: " + (part != null ? part : o.number()) + " was delivered. Thank you! Problem? " + link;
 			default -> "Sodo Gebeya: payment of " + etb(o.total()) + " received for " + o.number()
 					+ ". We'll text when it ships. " + link;
 		};
+	}
+
+	/** " (from Abebe Shoes)": plain letters only, so the SMS stays one part; empty when nothing is left. */
+	private static String from(String seller) {
+		String plain = seller.replaceAll("[^\\x20-\\x7E]", "").trim();
+		if (plain.isEmpty()) {
+			return "";
+		}
+		return " (from " + (plain.length() > 24 ? plain.substring(0, 24).trim() : plain) + ")";
 	}
 
 	/** The rider note, kept short and plain so the SMS stays one part. */

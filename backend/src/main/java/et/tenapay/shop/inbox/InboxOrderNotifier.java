@@ -62,7 +62,11 @@ public class InboxOrderNotifier {
 		}
 		Info o = info.get();
 		String link = "/orders/track?order=" + number;
-		String key = "INBOX:" + type + ":" + number + ":" + occurred;
+		// split orders: fulfilment events come once per parcel, with the seller name
+		String parcel = m.path("detail").path("parcel").asString(null);
+		String seller = parcel == null ? null : m.path("detail").path("seller").asString("");
+		String key = "INBOX:" + type + ":" + number + ":" + (parcel == null ? "" : parcel + ":") + occurred;
+		String fromSeller = seller == null || seller.isBlank() ? "" : " from " + seller;
 		switch (type) {
 			case "order.paid", "order.review.resolved" -> {
 				inbox.notify(o.buyer(), InboxItem.Kind.PAYMENT, "Payment received", "Order " + number + " is paid. We'll tell you when it's on the way.", link, key);
@@ -74,10 +78,13 @@ public class InboxOrderNotifier {
 					"Your items are still held. Try again with another number or method.", link, key);
 			case "order.payment.reminder" -> inbox.notify(o.buyer(), InboxItem.Kind.PAYMENT, "Finish paying",
 					"Order " + number + " is waiting for payment. Pay soon or the items are released.", link, "INBOX:REMINDER:" + number);
-			case "order.fulfilment.shipped" -> inbox.notify(o.buyer(), InboxItem.Kind.DELIVERY, "Your order is on the way",
-					"Order " + number + " left the shop.", link, key);
-			case "order.fulfilment.delivered" -> inbox.notify(o.buyer(), InboxItem.Kind.DELIVERY, "Delivered",
-					"Order " + number + " was delivered. Tell others what you think: rate your items.", "/account", key);
+			case "order.fulfilment.shipped" -> inbox.notify(o.buyer(), InboxItem.Kind.DELIVERY,
+					parcel == null ? "Your order is on the way" : "Part of your order is on the way",
+					parcel == null ? "Order " + number + " left the shop." : "Items" + fromSeller + " in order " + number + " left the shop.",
+					link, key);
+			case "order.fulfilment.delivered" -> inbox.notify(o.buyer(), InboxItem.Kind.DELIVERY,
+					parcel == null ? "Delivered" : "Part of your order was delivered",
+					(parcel == null ? "Order " + number : "Items" + fromSeller + " in order " + number) + " was delivered. Tell others what you think: rate your items.", "/account", key);
 			case "order.expired" -> inbox.notify(o.buyer(), InboxItem.Kind.ORDER, "Payment window closed",
 					"Order " + number + " was released. You can order the items again.", link, key);
 			case "order.cancelled", "order.fulfilment.cancelled" -> inbox.notify(o.buyer(), InboxItem.Kind.ORDER, "Order cancelled",

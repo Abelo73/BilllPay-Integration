@@ -3,6 +3,7 @@ import { CheckCircle2, FlaskConical, Search } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 
+import { AdminTelegramCard } from '@/components/admin-telegram-card'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -61,6 +62,7 @@ export function AdminSmsPage() {
           </CardContent>
         </Card>
       )}
+      <AdminTelegramCard />
       <div className="flex flex-wrap gap-2">
         <div className="relative min-w-60 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

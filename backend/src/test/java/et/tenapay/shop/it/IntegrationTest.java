@@ -57,6 +57,9 @@ import tools.jackson.databind.ObjectMapper;
 		"app.redirect-base-url=https://shop.test",
 		"app.public-base-url=http://localhost:5280",
 		"app.scheduling.enabled=false",
+		// Telegram stays in test mode (no token); the webhook needs this secret
+		"telegram.webhook-secret=" + IntegrationTest.TELEGRAM_SECRET,
+		"telegram.channel-id=@sodo-test",
 		// SMS stays in test mode (no AfroMessage token); sign-in codes come back in the response so tests can use them
 		"sms.dev-codes-in-response=true",
 		// the SMS listener group joins after the first events are published; read from the start so none is missed
@@ -75,6 +78,7 @@ public abstract class IntegrationTest {
 	public static final String WEBHOOK_SECRET = "whsec_integration_test_secret";
 	public static final String LIVE_API_KEY = "test-live-key";
 	public static final String LIVE_WEBHOOK_SECRET = "whsec_integration_live_secret";
+	public static final String TELEGRAM_SECRET = "tg_integration_test_secret";
 	public static final String ADMIN_EMAIL = "admin@it.test";
 	public static final String ADMIN_PASSWORD = "Admin-pass-2026";
 
