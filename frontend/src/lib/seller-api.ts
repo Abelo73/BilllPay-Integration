@@ -149,3 +149,64 @@ export const SHOP_STATUS_LABEL: Record<ShopStatus, string> = {
 }
 
 export const KIND_LABEL: Record<ShopKind, string> = { SHOP: 'Shop', INDIVIDUAL: 'Individual seller' }
+
+// ---------- money (M6) ----------
+
+export type PayoutMethod = 'BANK' | 'TELEBIRR' | 'CBE_BIRR' | 'OTHER'
+
+export type Balance = {
+  /** Paid by buyers, waiting for delivery to be confirmed */
+  held: number
+  /** Can be withdrawn now */
+  available: number
+  /** Asked for, not sent yet */
+  requested: number
+  paidOut: number
+  minimum: number
+}
+
+export type PayoutAccount = { method: PayoutMethod; provider: string | null; accountName: string; account: string }
+
+export type PayoutView = {
+  id: number
+  amount: number
+  status: 'REQUESTED' | 'PAID' | 'REJECTED'
+  method: PayoutMethod
+  provider: string | null
+  /** masked, e.g. "•••• 5678" */
+  account: string
+  reference: string | null
+  note: string | null
+  requestedAt: string
+  decidedAt: string | null
+}
+
+export type SellerMoney = { balance: Balance; account: PayoutAccount | null; releaseAfterHours: number; recentPayouts: PayoutView[] }
+
+export type StatementLine = {
+  parcelNumber: string
+  paidAt: string
+  itemsTotal: number
+  deliveryFee: number
+  commissionPercent: number
+  commission: number
+  sellerAmount: number
+  fulfilmentStatus: string | null
+  payoutStatus: 'HELD' | 'RELEASED' | 'CANCELLED'
+  releasedAt: string | null
+}
+
+export const PAYOUT_METHOD_LABEL: Record<PayoutMethod, string> = {
+  BANK: 'Bank account',
+  TELEBIRR: 'telebirr',
+  CBE_BIRR: 'CBE Birr',
+  OTHER: 'Other',
+}
+
+export const moneyApi = {
+  get: () => request<SellerMoney>('/seller/money'),
+  saveAccount: (body: { method: PayoutMethod; provider?: string; accountName: string; account: string }) =>
+    request<PayoutAccount>('/seller/money/account', json('PUT', body)),
+  requestPayout: (amount: number) => request<PayoutView>('/seller/money/payouts', json('POST', { amount })),
+  statement: (page = 0) => request<Page<StatementLine>>(`/seller/money/statement?page=${page}`),
+}

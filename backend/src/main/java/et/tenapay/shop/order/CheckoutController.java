@@ -111,7 +111,21 @@ public class CheckoutController {
 
 	/** One seller's parcel of the order; {@code seller} null = Sodo Gebeya. */
 	public record ParcelView(String number, int parcelNo, String seller, String sellerSlug, BigDecimal itemsTotal,
-			BigDecimal deliveryFee, String fulfilmentStatus, String trackingNote, Instant shippedAt, Instant deliveredAt) {
+			BigDecimal deliveryFee, String fulfilmentStatus, String trackingNote, Instant shippedAt, Instant deliveredAt,
+			/** The buyer may tap "I received my items" (sent, not confirmed yet) */
+			boolean canConfirmReceipt, Instant receivedAt) {
+	}
+
+	public record ReceivedRequest(@Size(max = 20) String phone) {
+	}
+
+	/** "I received my items" for one parcel: delivered, and the seller is paid sooner. */
+	@PostMapping("/orders/{orderNumber}/parcels/{parcelNo}/received")
+	public OrderStatusView received(@PathVariable String orderNumber, @PathVariable int parcelNo,
+			@Valid @RequestBody(required = false) ReceivedRequest req) {
+		Order order = findOwned(orderNumber, req == null ? null : req.phone());
+		fulfilment.confirmReceived(order.getOrderNumber(), parcelNo);
+		return tx.execute(s -> view(orders.findByOrderNumber(orderNumber).orElseThrow()));
 	}
 
 	/** One customer-visible step of the order (internal details are left out). */
@@ -287,7 +301,10 @@ public class CheckoutController {
 			return new ParcelView(p.number(order.getOrderNumber()), p.getParcelNo(), sh == null ? null : sh.getName(),
 					sh == null ? null : sh.getSlug(), p.getItemsTotal(), p.getDeliveryFee(),
 					p.getFulfilmentStatus() == null ? null : p.getFulfilmentStatus().name(), p.getTrackingNote(),
-					p.getShippedAt(), p.getDeliveredAt());
+					p.getShippedAt(), p.getDeliveredAt(),
+					p.getReceivedAt() == null && (p.getFulfilmentStatus() == FulfilmentStatus.SHIPPED
+							|| p.getFulfilmentStatus() == FulfilmentStatus.DELIVERED),
+					p.getReceivedAt());
 		}).toList();
 	}
 }

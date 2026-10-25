@@ -35,7 +35,7 @@ export function SellerHomePage() {
           <span>Today: <strong className="text-white">{formatETB(data.salesToday)}</strong> from {data.ordersToday} {data.ordersToday === 1 ? 'order' : 'orders'}</span>
           <span>This month: <strong className="text-white">{data.ordersThisMonth}</strong> {data.ordersThisMonth === 1 ? 'order' : 'orders'}, {data.unitsThisMonth} {data.unitsThisMonth === 1 ? 'item' : 'items'}</span>
         </div>
-        <p className="text-[11px] text-white/60">Your items only, before fees. Payouts to your account come in a later update.</p>
+        <p className="text-[11px] text-white/60">Your items only, before fees. <Link to="/seller/money" className="font-semibold text-white underline">See your money and withdraw</Link></p>
       </div>
 
       {!data.shop.verifiedAt && (

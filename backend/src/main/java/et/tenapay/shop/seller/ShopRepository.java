@@ -14,6 +14,10 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
 
 	Optional<Shop> findByOwnerId(UUID ownerId);
 
+	@org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+	@Query("select s from Shop s where s.id = :id")
+	Optional<Shop> lockById(@Param("id") Long id);
+
 	Optional<Shop> findBySlug(String slug);
 
 	boolean existsBySlug(String slug);

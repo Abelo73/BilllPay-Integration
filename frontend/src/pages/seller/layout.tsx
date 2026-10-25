@@ -13,6 +13,7 @@ const TABS = [
   { to: '/seller', label: 'Home', end: true },
   { to: '/seller/orders', label: 'Orders' },
   { to: '/seller/products', label: 'Products' },
+  { to: '/seller/money', label: 'Money' },
   { to: '/seller/shop', label: 'Shop details' },
   { to: '/seller/verify', label: 'Get verified' },
 ]

@@ -648,3 +648,62 @@ export const shopAdminApi = {
   decide: (id: number, status: 'APPROVED' | 'REJECTED' | 'SUSPENDED', note?: string) =>
     request<AdminShopRow>(`/shops/${id}/decision`, json('POST', { status, note })),
 }
+
+// ---------- payouts and fees (M6) ----------
+
+export type PayoutRow = {
+  id: number
+  shopId: number
+  shopName: string | null
+  shopPhone: string | null
+  amount: number
+  status: 'REQUESTED' | 'PAID' | 'REJECTED'
+  method: string
+  provider: string | null
+  accountName: string
+  account: string
+  reference: string | null
+  note: string | null
+  requestedBy: string | null
+  decidedBy: string | null
+  requestedAt: string
+  decidedAt: string | null
+  /** what the seller could still withdraw */
+  shopAvailable: number
+}
+
+export type MoneyTotals = { held: number; available: number; requested: number; requestedCount: number; paidOut: number; commission: number }
+
+export type CommissionRuleRow = {
+  id: number
+  shopId: number | null
+  shopName: string | null
+  categoryId: number | null
+  categoryName: string | null
+  percent: number
+  note: string | null
+  updatedBy: string | null
+  updatedAt: string
+}
+
+export const payoutAdminApi = {
+  list: (status: string, page = 0) => request<{ totals: MoneyTotals; page: Page<PayoutRow> }>(`/payouts?status=${status}&page=${page}`),
+  decide: (id: number, status: 'PAID' | 'REJECTED', reference?: string, note?: string) =>
+    request<{ id: number; status: string }>(`/payouts/${id}/decision`, json('POST', { status, reference, note })),
+  releaseDue: () => request<{ released: number }>('/payouts/release-due', { method: 'POST' }),
+  /** Downloads with the staff token (a plain link would have none). */
+  async csv() {
+    const res = await fetch('/api/admin/payouts.csv', { headers: { Authorization: `Bearer ${adminToken.get() ?? ''}` } })
+    if (!res.ok) throw new ApiError(res.status, {})
+    const url = URL.createObjectURL(await res.blob())
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sodo-gebeya-payouts-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
+  rules: () => request<CommissionRuleRow[]>('/commission-rules'),
+  saveRule: (body: { shopId?: number | null; categoryId?: number | null; percent: number; note?: string }) =>
+    request<CommissionRuleRow[]>('/commission-rules', json('PUT', body)),
+  deleteRule: (id: number) => request<CommissionRuleRow[]>(`/commission-rules/${id}`, { method: 'DELETE' }),
+}

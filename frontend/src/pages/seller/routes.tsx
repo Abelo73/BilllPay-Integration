@@ -2,6 +2,7 @@ import { useRoutes, type RouteObject } from 'react-router'
 
 import { SellerHomePage } from './home'
 import { SellerLayout } from './layout'
+import { SellerMoneyPage } from './money'
 import { SellerOrderPage, SellerOrdersPage } from './orders'
 import { SellerProductEditPage, SellerProductsPage } from './products'
 import { SellerShopPage } from './shop-settings'
@@ -16,6 +17,7 @@ const sellerRoutes: RouteObject[] = [
       { path: 'orders/:orderNumber', element: <SellerOrderPage /> },
       { path: 'products', element: <SellerProductsPage /> },
       { path: 'products/:productId', element: <SellerProductEditPage /> },
+      { path: 'money', element: <SellerMoneyPage /> },
       { path: 'shop', element: <SellerShopPage /> },
       { path: 'verify', element: <SellerVerifyPage /> },
     ],

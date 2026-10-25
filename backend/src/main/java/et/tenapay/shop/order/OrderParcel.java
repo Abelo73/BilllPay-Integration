@@ -59,6 +59,24 @@ public class OrderParcel {
 
 	private Instant cancelledAt;
 
+	/** Seller's money for this parcel: held until the buyer confirms receipt or 48 h after delivery. Null for unpaid
+	 * orders and for Sodo Gebeya's own parcels. */
+	@Enumerated(EnumType.STRING)
+	private et.tenapay.shop.payout.EarningStatus payoutStatus;
+
+	/** Commission locked when the order was paid. */
+	private BigDecimal commissionPercent;
+
+	private BigDecimal commissionAmount;
+
+	/** What the seller gets: items + delivery fee - commission (discount codes are paid by Sodo Gebeya). */
+	private BigDecimal sellerAmount;
+
+	/** The buyer tapped "I received my items". */
+	private Instant receivedAt;
+
+	private Instant releasedAt;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

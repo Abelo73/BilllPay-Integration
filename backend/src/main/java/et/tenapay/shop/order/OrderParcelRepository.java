@@ -47,6 +47,32 @@ public interface OrderParcelRepository extends JpaRepository<OrderParcel, Long> 
 			@Param("environment") et.tenapay.shop.payment.billpay.BillPayEnvironment environment,
 			@Param("fulfilment") java.util.Collection<FulfilmentStatus> fulfilment);
 
+	// ---------- seller money (M6) ----------
+
+	@Query("select coalesce(sum(p.sellerAmount), 0) from OrderParcel p where p.shopId = :shopId and p.payoutStatus = :status")
+	java.math.BigDecimal sumEarnings(@Param("shopId") Long shopId, @Param("status") et.tenapay.shop.payout.EarningStatus status);
+
+	/** Delivered parcels whose money is still held after the buyer's window to complain. */
+	@Query("""
+			select p from OrderParcel p
+			where p.payoutStatus = et.tenapay.shop.payout.EarningStatus.HELD
+			  and p.fulfilmentStatus = et.tenapay.shop.order.FulfilmentStatus.DELIVERED and p.deliveredAt < :before
+			""")
+	List<OrderParcel> dueForRelease(@Param("before") java.time.Instant before);
+
+	/** A seller's statement: every paid parcel, newest first. */
+	org.springframework.data.domain.Page<OrderParcel> findByShopIdAndPayoutStatusIsNotNull(Long shopId,
+			org.springframework.data.domain.Pageable pageable);
+
+	/** [held, released] money of all sellers, and [commission earned] on parcels not cancelled. */
+	@Query("""
+			select coalesce(sum(case when p.payoutStatus = et.tenapay.shop.payout.EarningStatus.HELD then p.sellerAmount else 0 end), 0),
+			       coalesce(sum(case when p.payoutStatus = et.tenapay.shop.payout.EarningStatus.RELEASED then p.sellerAmount else 0 end), 0),
+			       coalesce(sum(case when p.payoutStatus <> et.tenapay.shop.payout.EarningStatus.CANCELLED then p.commissionAmount else 0 end), 0)
+			from OrderParcel p where p.payoutStatus is not null
+			""")
+	List<Object[]> platformTotals();
+
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from OrderParcel p where p.orderId = :orderId order by p.parcelNo")
 	List<OrderParcel> lockByOrderId(@Param("orderId") UUID orderId);

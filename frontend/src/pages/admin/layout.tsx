@@ -25,6 +25,8 @@ import {
   ShoppingBag,
   Store,
   TicketPercent,
+  Wallet,
+  Percent,
   UserRound,
   Users,
   Webhook,
@@ -38,11 +40,11 @@ import { LogoMark } from '@/components/logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { adminApi, adminToken, shopAdminApi } from '@/lib/admin-api'
+import { adminApi, adminToken, payoutAdminApi, shopAdminApi } from '@/lib/admin-api'
 import { trustAdminApi } from '@/lib/trust-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -59,6 +61,8 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/payments', label: 'Payments', icon: ArrowLeftRight },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw },
       { to: '/admin/discounts', label: 'Discounts', icon: TicketPercent },
+      { to: '/admin/payouts', label: 'Payouts', icon: Wallet, badge: 'payouts' },
+      { to: '/admin/fees', label: 'Fees', icon: Percent },
     ],
   },
   {
@@ -211,8 +215,8 @@ export function AdminLayout() {
   const trustQueue = useQuery({
     queryKey: ['admin-trust-badges'],
     queryFn: async () => {
-      const [v, r] = await Promise.all([trustAdminApi.verifications('SUBMITTED'), trustAdminApi.reports('OPEN')])
-      return { verifications: v.counts.SUBMITTED ?? 0, listings: r.open }
+      const [v, r, p] = await Promise.all([trustAdminApi.verifications('SUBMITTED'), trustAdminApi.reports('OPEN'), payoutAdminApi.list('REQUESTED')])
+      return { verifications: v.counts.SUBMITTED ?? 0, listings: r.open, payouts: p.totals.requestedCount }
     },
     enabled: signedIn,
     refetchInterval: 60_000,
@@ -235,6 +239,7 @@ export function AdminLayout() {
     sellers: shopQueue.data?.counts.PENDING ?? 0,
     verifications: trustQueue.data?.verifications ?? 0,
     listings: trustQueue.data?.listings ?? 0,
+    payouts: trustQueue.data?.payouts ?? 0,
   }
 
   const toggle = () => {

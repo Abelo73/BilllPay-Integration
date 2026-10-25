@@ -94,6 +94,9 @@ export type ParcelView = {
   trackingNote: string | null
   shippedAt: string | null
   deliveredAt: string | null
+  /** Sent and not confirmed yet: the buyer can tap "I received my items" */
+  canConfirmReceipt: boolean
+  receivedAt: string | null
 }
 
 export function deliveryFee(quote: DeliveryQuote | undefined, subtotal: number) {
@@ -239,6 +242,11 @@ export const api = {
     request<OrderStatusView>(
       `/orders/${encodeURIComponent(orderNumber)}/status?phone=${encodeURIComponent(phone)}`,
     ),
+  confirmReceived: (orderNumber: string, parcelNo: number, phone?: string) =>
+    request<OrderStatusView>(`/orders/${encodeURIComponent(orderNumber)}/parcels/${parcelNo}/received`, {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
   cancelOrder: (orderNumber: string, phone: string, reason?: string) =>
     request<OrderStatusView>(`/orders/${encodeURIComponent(orderNumber)}/cancel`, {
       method: 'POST',

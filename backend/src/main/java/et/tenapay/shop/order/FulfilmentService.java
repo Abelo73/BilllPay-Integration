@@ -29,6 +29,7 @@ public class FulfilmentService {
 	private final OrderEventPublisher publisher;
 	private final OrderEventRepository events;
 	private final OrderParcelRepository parcels;
+	private final et.tenapay.shop.payout.PayoutService payouts;
 	private final et.tenapay.shop.seller.ShopRepository shops;
 
 	/**
@@ -150,10 +151,48 @@ public class FulfilmentService {
 				p.setTrackingNote(text);
 			}
 			case DELIVERED -> p.setDeliveredAt(now);
-			case CANCELLED -> p.setCancelledAt(now);
+			case CANCELLED -> {
+				p.setCancelledAt(now);
+				et.tenapay.shop.payout.PayoutService.cancel(p); // the buyer gets this parcel's money back
+			}
 			default -> {
 			}
 		}
+	}
+
+	/**
+	 * The buyer taps "I received my items" (design S6): a parcel on its way becomes delivered, and the seller's money
+	 * is released at once instead of after the waiting time.
+	 */
+	@Transactional
+	public OrderParcel confirmReceived(String orderNumber, int parcelNo) {
+		Order order = lock(orderNumber);
+		List<OrderParcel> all = parcels.lockByOrderId(order.getId());
+		OrderParcel parcel = all.stream().filter(p -> p.getParcelNo() == parcelNo).findFirst()
+				.orElseThrow(() -> ApiException.notFound("Parcel"));
+		FulfilmentStatus from = parcel.getFulfilmentStatus();
+		if (from != FulfilmentStatus.SHIPPED && from != FulfilmentStatus.DELIVERED) {
+			throw new ApiException(HttpStatus.CONFLICT, "NOT_ON_THE_WAY", "You can confirm once the seller has sent it.");
+		}
+		Instant now = Instant.now();
+		if (parcel.getReceivedAt() == null) {
+			parcel.setReceivedAt(now);
+		}
+		if (from == FulfilmentStatus.SHIPPED) {
+			step(parcel, FulfilmentStatus.DELIVERED, null, now);
+			orderService.rollUp(order, all);
+			events.save(new OrderEvent(order.getId(), "FULFILMENT_DELIVERED", order.getStatus(), order.getStatus(),
+					"parcel " + parcel.number(order.getOrderNumber()) + " received, confirmed by the buyer"));
+			Map<String, Object> extra = new HashMap<>();
+			extra.put("fulfilmentStatus", FulfilmentStatus.DELIVERED.name());
+			extra.put("confirmedBy", "buyer");
+			if (all.size() > 1) {
+				extra.put("parcel", parcel.number(order.getOrderNumber()));
+			}
+			publisher.publish(order, "order.fulfilment.delivered", extra);
+		}
+		payouts.release(parcel, "buyer confirmed receipt");
+		return parcel;
 	}
 
 	private static String blankToNull(String s) {

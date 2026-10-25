@@ -210,6 +210,7 @@ public class RefundService {
 		BigDecimal kept = totalPaid.subtract(totalRefunded);
 
 		if (kept.signum() <= 0) {
+			orderService.cancelHeldEarnings(order);
 			orderService.transition(order, OrderStatus.REFUNDED, "REFUNDED", detail);
 		} else if (order.getStatus() == OrderStatus.REVIEW_REQUIRED && kept.compareTo(order.getTotal()) == 0) {
 			// e.g. a duplicate payment was refunded and exactly one order total remains

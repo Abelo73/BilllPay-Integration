@@ -6,6 +6,7 @@ import { AdminChatReportsPage } from './chat-reports'
 import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
+import { AdminFeesPage } from './fees'
 import { AdminSmsPage } from './sms'
 import { AdminLayout } from './layout'
 import { AdminListingReportsPage } from './listing-reports'
@@ -16,6 +17,7 @@ import { AdminMyAccountPage } from './my-account'
 import { AdminOrderDetailPage } from './order-detail'
 import { AdminOrdersPage } from './orders'
 import { AdminPaymentsPage } from './payments'
+import { AdminPayoutsPage } from './payouts'
 import { AdminProductEditPage } from './product-edit'
 import { AdminProductsPage } from './products'
 import { AdminProsPage } from './pros'
@@ -47,6 +49,8 @@ const adminRoutes: RouteObject[] = [
       { path: 'verifications', element: <AdminVerificationsPage /> },
       { path: 'listing-reports', element: <AdminListingReportsPage /> },
       { path: 'areas', element: <AdminAreasPage /> },
+      { path: 'payouts', element: <AdminPayoutsPage /> },
+      { path: 'fees', element: <AdminFeesPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

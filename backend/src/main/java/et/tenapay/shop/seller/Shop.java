@@ -63,6 +63,16 @@ public class Shop {
 	/** Set when staff approved the owner's ID (Verified badge); null = not verified. */
 	private Instant verifiedAt;
 
+	/** Where payouts go: BANK, TELEBIRR, CBE_BIRR or OTHER. */
+	private String payoutMethod;
+
+	/** Bank name, for BANK. */
+	private String payoutProvider;
+
+	private String payoutAccountName;
+
+	private String payoutAccount;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

@@ -22,6 +22,7 @@ public class OrderService {
 	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 	private final et.tenapay.shop.discount.DiscountService discounts;
 	private final OrderParcelRepository parcels;
+	private final et.tenapay.shop.payout.PayoutService payouts;
 
 	public void transition(Order order, OrderStatus to, String eventType, String detail) {
 		OrderStatus from = order.getStatus();
@@ -51,12 +52,18 @@ public class OrderService {
 		forEachProduct(order, products::commitReserved);
 	}
 
-	/** Paid: the order and each seller's parcel are ready to pack. */
+	/** Paid: the order and each seller's parcel are ready to pack; sellers' earnings are locked and held. */
 	public void startFulfilment(Order order) {
 		order.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
 		for (OrderParcel p : parcels.findByOrderIdOrderByParcelNoAsc(order.getId())) {
 			p.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
 		}
+		payouts.lockEarnings(order);
+	}
+
+	/** Fully refunded: money still held for sellers goes back to the buyer instead. */
+	public void cancelHeldEarnings(Order order) {
+		parcels.findByOrderIdOrderByParcelNoAsc(order.getId()).forEach(et.tenapay.shop.payout.PayoutService::cancel);
 	}
 
 	/**

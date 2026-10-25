@@ -261,6 +261,28 @@ const STEPS: { key: FulfilmentStatus; label: string; icon: typeof Package }[] = 
   { key: 'DELIVERED', label: 'Delivered', icon: Home },
 ]
 
+/** "I received my items": marks the parcel delivered and lets Sodo Gebeya pay the seller. */
+function ConfirmReceipt({ o, parcelNo, label }: { o: OrderStatusView; parcelNo: number; label: string }) {
+  const qc = useQueryClient()
+  const confirm = useMutation({
+    mutationFn: () => api.confirmReceived(o.orderNumber, parcelNo),
+    onSuccess: (next) => {
+      qc.setQueriesData({ queryKey: ['order-status', o.orderNumber] }, next)
+      qc.invalidateQueries({ queryKey: ['order-status', o.orderNumber] })
+      toast.success('Thanks! The seller gets paid now.')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  return (
+    <div className="space-y-1">
+      <Button size="sm" className="w-full" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+        {confirm.isPending ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} {label}
+      </Button>
+      <p className="text-[11px] text-muted-foreground">Only tap this once you have the items. Problem? Don't confirm; contact us.</p>
+    </div>
+  )
+}
+
 /** Orders from several sellers: one line per parcel, each with its own progress. */
 function ParcelList({ o }: { o: OrderStatusView }) {
   return (
@@ -289,6 +311,7 @@ function ParcelList({ o }: { o: OrderStatusView }) {
             {p.trackingNote && p.fulfilmentStatus === 'SHIPPED' && (
               <p className="text-xs"><Truck className="mr-1 inline size-3.5" />{p.trackingNote}</p>
             )}
+            {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={`I received the items from ${p.seller ?? 'Sodo Gebeya'}`} />}
           </li>
         )
       })}
@@ -344,6 +367,7 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       {!multi && o.delivery.trackingNote && status === 'SHIPPED' && (
         <p className="rounded-lg bg-background px-3 py-2 text-sm"><Truck className="mr-1.5 inline size-4" />{o.delivery.trackingNote}</p>
       )}
+      {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label="I received my items" />}
     </div>
   )
 }
