@@ -26,6 +26,7 @@ import {
   Store,
   TicketPercent,
   Wallet,
+  ToggleRight,
   Percent,
   UserRound,
   Users,
@@ -52,6 +53,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     items: [
       { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
       { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
+      { to: '/admin/features', label: 'Features', icon: ToggleRight },
     ],
   },
   {

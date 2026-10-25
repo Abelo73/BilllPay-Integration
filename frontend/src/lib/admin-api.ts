@@ -707,3 +707,20 @@ export const payoutAdminApi = {
     request<CommissionRuleRow[]>('/commission-rules', json('PUT', body)),
   deleteRule: (id: number) => request<CommissionRuleRow[]>(`/commission-rules/${id}`, { method: 'DELETE' }),
 }
+
+// ---------- feature switches ----------
+
+export type FeatureSetting = {
+  key: string
+  type: 'SWITCH' | 'NUMBER' | 'TEXT'
+  value: string
+  defaultValue: string
+  group: string
+  label: string
+  help: string | null
+}
+
+export const featureAdminApi = {
+  list: () => request<FeatureSetting[]>('/features'),
+  set: (key: string, value: string) => request<FeatureSetting[]>(`/features/${key}`, json('PUT', { value })),
+}

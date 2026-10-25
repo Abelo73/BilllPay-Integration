@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { ChatWithSeller } from '@/components/chat-with-seller'
+import { ContactSeller, SafetyTips } from '@/components/contact-seller'
 import { ProductVisual } from '@/components/product-visual'
 import { ReportListing } from '@/components/report-listing'
 import { ReviewsSection } from '@/components/reviews'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { api, ApiError, CONDITION_LABEL } from '@/lib/api'
+import { useFeatures } from '@/lib/features'
 import { formatETB } from '@/lib/format'
 import { MAX_QTY, useCart } from '@/store/cart'
 import { NotFoundPage } from './not-found'
@@ -45,6 +47,7 @@ function Gallery({ name, categorySlug, images }: { name: string; categorySlug: s
 }
 
 export function ProductPage() {
+  const features = useFeatures()
   const { slug = '' } = useParams()
   const [qty, setQty] = useState(1)
   const add = useCart((s) => s.add)
@@ -114,6 +117,14 @@ export function ProductPage() {
               <p className="text-xs text-muted-foreground">Sold and delivered by Sodo Gebeya</p>
             )}
 
+            {!features.payments ? (
+              <div className="space-y-3">
+                <ContactSeller productId={p.id} slug={p.slug} />
+                {p.seller && <ChatWithSeller productId={p.id} slug={p.slug} className="h-12 w-full text-base" />}
+                <SafetyTips />
+              </div>
+            ) : (
+            <>
             <div className="flex items-center gap-3">
               <div className="flex items-center rounded-lg border">
                 <Button variant="ghost" size="icon" aria-label="Decrease" onClick={() => setQty((q) => Math.max(1, q - 1))}>
@@ -140,6 +151,8 @@ export function ProductPage() {
               <li className="flex items-center gap-3"><Truck className="size-4 text-brand" /> Delivery in Wolaita Sodo</li>
               <li className="flex items-center gap-3"><RotateCcw className="size-4 text-brand" /> Refunds back to your BillPay method</li>
             </ul>
+            </>
+            )}
             {p.seller && <ReportListing productId={p.id} slug={p.slug} />}
           </div>
         </div>

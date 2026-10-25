@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { useFeatures } from '@/lib/features'
 import { api, ApiError, deliveryFee, type Address, type PriceQuote } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -44,7 +45,26 @@ function fieldErrors(raw: Record<string, string>): Errors {
   return out
 }
 
+/** Online payment is switched off (Admin → Features): buying works by contacting the seller. */
+function PaymentsOff() {
+  return (
+    <div className="mx-auto max-w-lg space-y-4 px-4 py-16 text-center">
+      <h1 className="text-2xl font-bold">Contact the seller to buy</h1>
+      <p className="text-muted-foreground">
+        Open an item, then chat with the seller or tap "Show phone number" to call them. Agree on the price, meet in a safe place, check the item, then pay.
+      </p>
+      <Button asChild size="lg"><Link to="/shop">Browse items</Link></Button>
+    </div>
+  )
+}
+
 export function CheckoutPage() {
+  const { payments, loaded } = useFeatures()
+  if (loaded && !payments) return <PaymentsOff />
+  return <CheckoutForm />
+}
+
+function CheckoutForm() {
   const { lines, clear } = useCart()
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()

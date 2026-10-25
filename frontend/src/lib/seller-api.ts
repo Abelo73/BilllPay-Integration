@@ -79,6 +79,8 @@ export type SellerSummary = {
   unitsThisMonth: number
   bestSellers: { productName: string; units: number }[]
   toSendNow: SellerOrderRow[]
+  /** Buyers who revealed your phone in the last 30 days */
+  contacts30d: number
 }
 
 export type SellerOrderTab = 'send' | 'way' | 'done' | 'all'

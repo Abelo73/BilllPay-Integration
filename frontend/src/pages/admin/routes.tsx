@@ -6,6 +6,7 @@ import { AdminChatReportsPage } from './chat-reports'
 import { AdminDashboardPage } from './dashboard'
 import { AdminDiscountsPage } from './discounts'
 import { AdminEmailsPage } from './emails'
+import { AdminFeaturesPage } from './features'
 import { AdminFeesPage } from './fees'
 import { AdminSmsPage } from './sms'
 import { AdminLayout } from './layout'
@@ -51,6 +52,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'areas', element: <AdminAreasPage /> },
       { path: 'payouts', element: <AdminPayoutsPage /> },
       { path: 'fees', element: <AdminFeesPage /> },
+      { path: 'features', element: <AdminFeaturesPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

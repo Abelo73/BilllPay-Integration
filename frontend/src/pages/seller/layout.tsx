@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { ApiError } from '@/lib/api'
 import { KIND_LABEL, SHOP_STATUS_LABEL, sellerApi, type MyShop } from '@/lib/seller-api'
+import { useFeatures } from '@/lib/features'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
@@ -54,6 +55,7 @@ export function SellerLayout() {
   const location = useLocation()
   const signedIn = !!session && session.user.role === 'CUSTOMER'
   const shop = useQuery({ queryKey: ['seller-shop'], queryFn: sellerApi.shop, enabled: signedIn, retry: false })
+  const { payments } = useFeatures()
 
   if (!session) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
   if (!signedIn || (shop.error instanceof ApiError && shop.error.code === 'NO_SHOP')) return <Navigate to="/sell" replace />
@@ -92,7 +94,7 @@ export function SellerLayout() {
       <StatusBanner shop={s} />
 
       <nav aria-label="Seller" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {TABS.map((t) => (
+        {TABS.filter((t) => payments || (t.to !== '/seller/orders' && t.to !== '/seller/money')).map((t) => (
           <NavLink
             key={t.to}
             to={t.to}

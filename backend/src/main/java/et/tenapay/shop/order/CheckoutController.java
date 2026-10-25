@@ -57,6 +57,15 @@ public class CheckoutController {
 	private final et.tenapay.shop.catalog.ProductRepository products;
 	private final OrderParcelRepository parcelRepo;
 	private final et.tenapay.shop.seller.ShopRepository shops;
+	private final et.tenapay.shop.config.Features features;
+
+	/** Online payment is a switch (Admin → Features), off by default: buyers then contact the seller instead. */
+	private void requireOnlinePayments() {
+		if (!features.on(et.tenapay.shop.config.Features.ONLINE_PAYMENTS)) {
+			throw new ApiException(HttpStatus.CONFLICT, "PAYMENTS_OFF",
+					"Online payment is turned off. Contact the seller by chat or phone to buy.");
+		}
+	}
 
 	public record CheckoutItem(@NotNull Long productId, @Min(1) @Max(20) int quantity) {
 	}
@@ -179,6 +188,7 @@ public class CheckoutController {
 
 	@PostMapping("/checkout")
 	public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest req) {
+		requireOnlinePayments();
 		java.util.UUID customerId = CurrentUser.customerId().orElse(null);
 		Order order = checkout.createOrder(
 				req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
@@ -193,6 +203,7 @@ public class CheckoutController {
 
 	@PostMapping("/orders/{orderNumber}/pay")
 	public CheckoutResponse pay(@PathVariable String orderNumber, @RequestBody(required = false) PayRequest req) {
+		requireOnlinePayments();
 		Order order = findOwned(orderNumber, req == null ? null : req.phone());
 		return new CheckoutResponse(order.getOrderNumber(), startPayment(order));
 	}

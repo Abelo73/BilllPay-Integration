@@ -133,6 +133,21 @@ public abstract class IntegrationTest {
 		billPay.resetAll();
 	}
 
+	/** Online payment is off by default (Jiji-style buying); the payment tests need it on. */
+	@BeforeEach
+	void onlinePaymentsOn() {
+		if (!onlinePaymentsOn) {
+			Res r = put("/api/admin/features/online_payments", java.util.Map.of("value", "true"), adminToken());
+			if (r.status() != 200) {
+				throw new AssertionError("could not switch online payment on: " + r.status() + " " + r.raw());
+			}
+			onlinePaymentsOn = true;
+		}
+	}
+
+	/** Set false by a test that switches payments off (and back on) itself. */
+	protected static volatile boolean onlinePaymentsOn;
+
 	// ---------- HTTP ----------
 
 	public record Res(int status, String raw, JsonNode body) {

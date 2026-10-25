@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { CONDITION_LABEL, type Product } from '@/lib/api'
 import { formatETB } from '@/lib/format'
+import { useFeatures } from '@/lib/features'
 import { useCart } from '@/store/cart'
 
 export function ProductCard({ product }: { product: Product }) {
   const add = useCart((s) => s.add)
   const soldOut = product.available <= 0
+  const { payments } = useFeatures()
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:-translate-y-0.5 hover:shadow-lg">
       <Link to={`/product/${product.slug}`} className="block overflow-hidden" tabIndex={-1} aria-hidden>
@@ -50,7 +52,7 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <span className="text-base font-extrabold tabular-nums">{formatETB(product.price)}</span>
-          <Button
+          {payments && <Button
             size="icon"
             variant={soldOut ? 'outline' : 'default'}
             disabled={soldOut}
@@ -59,7 +61,7 @@ export function ProductCard({ product }: { product: Product }) {
             className="size-9 shrink-0 rounded-xl"
           >
             <Plus />
-          </Button>
+          </Button>}
         </div>
       </div>
     </div>

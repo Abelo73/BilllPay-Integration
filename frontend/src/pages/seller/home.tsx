@@ -5,6 +5,7 @@ import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatETB } from '@/lib/format'
+import { useFeatures } from '@/lib/features'
 import { sellerApi } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
 import { OrderLine } from './shared'
@@ -22,11 +23,29 @@ function Tile({ value, label, to, warn }: { value: number; label: string; to: st
 export function SellerHomePage() {
   const { data, isLoading } = useQuery({ queryKey: ['seller-summary'], queryFn: sellerApi.summary, refetchInterval: 60_000 })
 
+  const { payments } = useFeatures()
+
   if (isLoading || !data) return <Skeleton className="h-96 rounded-2xl" />
 
   return (
     <div className="space-y-5 pb-20 md:pb-0">
-      <div className="space-y-3 rounded-2xl bg-[#1A1F1C] p-5 text-white">
+      {!payments && (
+        <div className="space-y-3 rounded-2xl bg-[#13201A] p-5 text-white">
+          <div>
+            <p className="text-xs text-white/70">People who asked for your number (30 days)</p>
+            <p className="text-3xl font-extrabold tabular-nums">{data.contacts30d}</p>
+          </div>
+          <p className="text-[11px] text-white/60">Buyers find your listings, then call you or chat in the app. Answer quickly: fast sellers sell more.</p>
+        </div>
+      )}
+      {!payments && (
+        <div className="grid grid-cols-2 gap-2">
+          <Tile value={data.inStore} label={`Listings shown (of ${data.products})`} to="/seller/products" />
+          <Tile value={data.lowStock + data.soldOut} label="Low or sold out" to="/seller/products?status=low" warn />
+        </div>
+      )}
+      {payments && (<>
+      <div className="space-y-3 rounded-2xl bg-[#13201A] p-5 text-white">
         <div>
           <p className="text-xs text-white/70">Sales this month</p>
           <p className="text-3xl font-extrabold tabular-nums">{formatETB(data.salesThisMonth)}</p>
@@ -37,16 +56,6 @@ export function SellerHomePage() {
         </div>
         <p className="text-[11px] text-white/60">Your items only, before fees. <Link to="/seller/money" className="font-semibold text-white underline">See your money and withdraw</Link></p>
       </div>
-
-      {!data.shop.verifiedAt && (
-        <Link to="/seller/verify" className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition hover:border-primary">
-          <ShieldCheck className="size-6 shrink-0 text-primary" />
-          <span className="flex-1 text-sm">
-            <span className="block font-bold">Get the Verified badge</span>
-            <span className="block text-muted-foreground">Buyers trust verified sellers more. It takes a photo of your ID and a selfie.</span>
-          </span>
-        </Link>
-      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile value={data.toSend} label="To pack and send" to="/seller/orders" warn />
@@ -70,6 +79,17 @@ export function SellerHomePage() {
           </div>
         )}
       </section>
+      </>)}
+
+      {!data.shop.verifiedAt && (
+        <Link to="/seller/verify" className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 transition hover:border-primary">
+          <ShieldCheck className="size-6 shrink-0 text-primary" />
+          <span className="flex-1 text-sm">
+            <span className="block font-bold">Get the Verified badge</span>
+            <span className="block text-muted-foreground">Buyers trust verified sellers more. It takes a photo of your ID and a selfie.</span>
+          </span>
+        </Link>
+      )}
 
       {data.bestSellers.length > 0 && (
         <section aria-labelledby="best" className="space-y-2">

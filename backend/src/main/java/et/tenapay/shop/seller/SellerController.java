@@ -87,6 +87,7 @@ public class SellerController {
 	private final FulfilmentService fulfilment;
 	private final et.tenapay.shop.order.OrderParcelRepository parcels;
 	private final BillPayMode billPayMode;
+	private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 	private final MediaProperties media;
 
 	public record ShopRequest(ShopKind kind, @NotBlank @Size(min = 2, max = 120) String name,
@@ -131,7 +132,9 @@ public class SellerController {
 
 	public record Summary(ShopDto shop, long products, long inStore, long lowStock, long soldOut, long toSend,
 			long onTheWay, BigDecimal salesToday, long ordersToday, BigDecimal salesThisMonth, long ordersThisMonth,
-			long unitsThisMonth, List<BestSeller> bestSellers, List<OrderRow> toSendNow) {
+			long unitsThisMonth, List<BestSeller> bestSellers, List<OrderRow> toSendNow,
+			/** Buyers who revealed the shop's phone in the last 30 days (Jiji-style buying). */
+			long contacts30d) {
 	}
 
 	public record OrderLine(Long productId, String productName, BigDecimal unitPrice, int quantity, BigDecimal lineTotal) {
@@ -202,7 +205,9 @@ public class SellerController {
 		return new Summary(ShopDto.of(shop, media), n(c[0]), n(c[1]), n(c[2]), n(c[3]),
 				parcels.countForShop(shop.getId(), env, TO_SEND),
 				parcels.countForShop(shop.getId(), env, EnumSet.of(FulfilmentStatus.SHIPPED)),
-				(BigDecimal) day[0], n(day[1]), (BigDecimal) month[0], n(month[1]), n(month[2]), best, toSendNow);
+				(BigDecimal) day[0], n(day[1]), (BigDecimal) month[0], n(month[1]), n(month[2]), best, toSendNow,
+				n(jdbc.queryForObject("select count(*) from contact_reveals where shop_id = ? and created_at > now() - interval '30 days'",
+						Long.class, shop.getId())));
 	}
 
 	// ---------- products ----------

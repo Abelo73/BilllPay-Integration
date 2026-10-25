@@ -11,6 +11,7 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { UserMenu } from '@/components/user-menu'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
+import { useFeatures } from '@/lib/features'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
 
@@ -58,6 +59,7 @@ function CartButton({ className }: { className?: string }) {
 }
 
 function Header() {
+  const { payments } = useFeatures()
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     cn('text-sm font-semibold transition-colors hover:text-foreground', isActive ? 'text-foreground' : 'text-muted-foreground')
 
@@ -85,7 +87,7 @@ function Header() {
           <div className="hidden md:block">
             <UserMenu />
           </div>
-          <CartButton />
+          {payments && <CartButton />}
         </div>
       </div>
     </header>
@@ -169,6 +171,7 @@ function Footer() {
 }
 
 export function SiteLayout() {
+  const { payments } = useFeatures()
   return (
     <div className="flex min-h-svh flex-col">
       <SandboxBanner />
@@ -178,7 +181,7 @@ export function SiteLayout() {
       </main>
       <Footer />
       <BottomNav />
-      <CartSheet />
+      {payments && <CartSheet />}
       <ScrollRestoration />
     </div>
   )
