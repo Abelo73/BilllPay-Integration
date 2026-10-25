@@ -76,7 +76,7 @@ export function ServicesPage() {
           <span className="block font-bold">Not sure who to call?</span>
           <span className="block text-sm opacity-80">Describe the job once and get prices from several pros. Free to ask.</span>
         </span>
-        <span className="rounded-xl bg-warning px-3 py-2 text-sm font-bold text-[#1A1F1C]">Get quotes</span>
+        <span className="rounded-xl bg-warning px-3 py-2 text-sm font-bold text-[#13201A]">Get quotes</span>
       </Link>
       <div className="grid gap-3 sm:grid-cols-2">
         {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}

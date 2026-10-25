@@ -1,16 +1,16 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/plus-jakarta-sans";
+@import "@fontsource-variable/inter";
 @import "@fontsource-variable/noto-sans-ethiopic";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Sodo Gebeya: Latin text in Plus Jakarta Sans, Ge'ez script (Amharic, Wolaytta) falls through to Noto Sans Ethiopic. */
+/* Sodo Gebeya brand guide: Inter (ExtraBold for headings), Ge'ez script (Amharic, Wolaytta) in Noto Sans Ethiopic. */
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Plus Jakarta Sans Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
-    --font-ethiopic: 'Noto Sans Ethiopic Variable', 'Plus Jakarta Sans Variable', sans-serif;
+    --font-sans: 'Inter Variable', 'Noto Sans Ethiopic Variable', system-ui, sans-serif;
+    --font-ethiopic: 'Noto Sans Ethiopic Variable', 'Inter Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -59,87 +59,94 @@
     --color-warning: var(--warning);
     --color-amber-soft: var(--amber-soft);
     --color-amber-ink: var(--amber-ink);
+    --color-market: var(--market);
+    --color-market-deep: var(--market-deep);
 }
 /* Sodo Gebeya palette (see the design canvas): warm off-white ground, deep green for trust, amber for boosts and offers. */
 :root {
-    --background: #F6F4EE;
-    --foreground: #1A1F1C;
+    /* Brand guide: Sodo green #0E5A43, light green #13785A, market amber #E39B2D, deep amber #B8741A, ink #13201A, mist #F4F8F6 */
+    --background: #F4F8F6;
+    --foreground: #13201A;
     --card: #FFFFFF;
-    --card-foreground: #1A1F1C;
+    --card-foreground: #13201A;
     --popover: #FFFFFF;
-    --popover-foreground: #1A1F1C;
-    --primary: #146C43;
+    --popover-foreground: #13201A;
+    --primary: #0E5A43;
     --primary-foreground: #FFFFFF;
-    --secondary: #ECE8DE;
-    --secondary-foreground: #1A1F1C;
-    --muted: #ECE8DE;
-    --muted-foreground: #5B635E;
-    --accent: #E6F1EA;
-    --accent-foreground: #0E5133;
+    --secondary: #E7EFEB;
+    --secondary-foreground: #13201A;
+    --muted: #E7EFEB;
+    --muted-foreground: #53625A;
+    --accent: #DDEFE6;
+    --accent-foreground: #0E5A43;
     --destructive: #B42318;
-    --border: #E4E0D6;
-    --input: #D9D4C8;
-    --ring: #146C43;
-    --chart-1: #146C43;
-    --chart-2: #E09A1A;
-    --chart-3: #2F8F9D;
+    --border: #DCE6E1;
+    --input: #CCD9D2;
+    --ring: #13785A;
+    --chart-1: #0E5A43;
+    --chart-2: #E39B2D;
+    --chart-3: #13785A;
     --chart-4: #B42318;
-    --chart-5: #5B635E;
+    --chart-5: #53625A;
     --radius: 0.875rem;
     --sidebar: #FFFFFF;
-    --sidebar-foreground: #1A1F1C;
-    --sidebar-primary: #146C43;
+    --sidebar-foreground: #13201A;
+    --sidebar-primary: #0E5A43;
     --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: #E6F1EA;
-    --sidebar-accent-foreground: #0E5133;
-    --sidebar-border: #E4E0D6;
-    --sidebar-ring: #146C43;
-    --brand: #146C43;
+    --sidebar-accent: #DDEFE6;
+    --sidebar-accent-foreground: #0E5A43;
+    --sidebar-border: #DCE6E1;
+    --sidebar-ring: #13785A;
+    --brand: #0E5A43;
     --brand-foreground: #FFFFFF;
-    --success: #1E7B4F;
-    --warning: #F2B441;
-    --amber-soft: #FBF0D9;
-    --amber-ink: #6B4600;
+    --success: #13785A;
+    --warning: #E39B2D;
+    --amber-soft: #FBEFD9;
+    --amber-ink: #8A5512;
+    --market: #E39B2D;
+    --market-deep: #B8741A;
 }
 
 .dark {
-    --background: #121614;
-    --foreground: #EEF0EC;
-    --card: #1A201C;
-    --card-foreground: #EEF0EC;
-    --popover: #1A201C;
-    --popover-foreground: #EEF0EC;
-    --primary: #4CBF85;
-    --primary-foreground: #08130D;
-    --secondary: #232A26;
-    --secondary-foreground: #EEF0EC;
-    --muted: #232A26;
-    --muted-foreground: #A3ACA6;
-    --accent: #1F3A2C;
-    --accent-foreground: #CFEBDB;
+    --background: #0F1915;
+    --foreground: #EDF3F0;
+    --card: #15221C;
+    --card-foreground: #EDF3F0;
+    --popover: #15221C;
+    --popover-foreground: #EDF3F0;
+    --primary: #3FB58A;
+    --primary-foreground: #06140E;
+    --secondary: #1C2B24;
+    --secondary-foreground: #EDF3F0;
+    --muted: #1C2B24;
+    --muted-foreground: #9DB0A6;
+    --accent: #173A2D;
+    --accent-foreground: #CBEBDD;
     --destructive: #F0645A;
     --border: rgb(255 255 255 / 10%);
     --input: rgb(255 255 255 / 16%);
-    --ring: #4CBF85;
-    --chart-1: #4CBF85;
-    --chart-2: #F2B441;
-    --chart-3: #5BC0CE;
+    --ring: #3FB58A;
+    --chart-1: #3FB58A;
+    --chart-2: #E39B2D;
+    --chart-3: #6FD3AE;
     --chart-4: #F0645A;
-    --chart-5: #A3ACA6;
-    --sidebar: #1A201C;
-    --sidebar-foreground: #EEF0EC;
-    --sidebar-primary: #4CBF85;
-    --sidebar-primary-foreground: #08130D;
-    --sidebar-accent: #1F3A2C;
-    --sidebar-accent-foreground: #CFEBDB;
+    --chart-5: #9DB0A6;
+    --sidebar: #15221C;
+    --sidebar-foreground: #EDF3F0;
+    --sidebar-primary: #3FB58A;
+    --sidebar-primary-foreground: #06140E;
+    --sidebar-accent: #173A2D;
+    --sidebar-accent-foreground: #CBEBDD;
     --sidebar-border: rgb(255 255 255 / 10%);
-    --sidebar-ring: #4CBF85;
-    --brand: #5CC08E;
-    --brand-foreground: #08130D;
-    --success: #4CBF85;
-    --warning: #F2B441;
-    --amber-soft: #3A2E14;
-    --amber-ink: #F6D58E;
+    --sidebar-ring: #3FB58A;
+    --brand: #3FB58A;
+    --brand-foreground: #06140E;
+    --success: #3FB58A;
+    --warning: #E39B2D;
+    --amber-soft: #3A2C12;
+    --amber-ink: #F2C77E;
+    --market: #E39B2D;
+    --market-deep: #F2B45C;
 }
 
 @layer base {
@@ -175,5 +182,43 @@
   }
   @media (prefers-reduced-motion: reduce) {
     .chart-reveal { animation: none; }
+  }
+}
+
+@layer base {
+  h1, h2, .font-display {
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Landing page motion: sections rise in as they scroll into view; floating cards drift; nothing moves for people who ask for less motion. */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes pin-drop {
+  0% { opacity: 0; transform: translateY(-28px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(4px) scale(1.02); }
+  100% { opacity: 1; transform: none; }
+}
+@layer utilities {
+  .reveal { opacity: 0; }
+  .reveal.is-visible { animation: rise-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .drift { animation: drift 6s ease-in-out infinite; }
+  .drift-slow { animation: drift 8s ease-in-out infinite; }
+  .marquee { animation: marquee 40s linear infinite; }
+  .pin-drop { animation: pin-drop 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; }
+    .reveal.is-visible, .drift, .drift-slow, .marquee, .pin-drop { animation: none; }
   }
 }

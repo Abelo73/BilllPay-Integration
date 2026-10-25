@@ -24,7 +24,7 @@ export function ProductCard({ product }: { product: Product }) {
         />
       </Link>
       {product.featured && (
-        <span className="absolute left-2 top-2 rounded-full bg-warning px-2 py-0.5 text-[11px] font-bold text-foreground dark:text-[#1A1F1C]">
+        <span className="absolute left-2 top-2 rounded-full bg-warning px-2 py-0.5 text-[11px] font-bold text-foreground dark:text-[#13201A]">
           Featured
         </span>
       )}

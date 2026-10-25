@@ -27,7 +27,9 @@ const NAV = [
 /** Shown only while payments go to BillPay's sandbox; with live keys real money moves, so it must not claim otherwise. */
 function SandboxBanner() {
   const info = useQuery({ queryKey: ['store-info'], queryFn: api.storeInfo, staleTime: 5 * 60_000 })
-  if (!info.data?.sandbox) return null
+  const { payments } = useFeatures()
+  // only matters while buyers can pay online
+  if (!payments || !info.data?.sandbox) return null
   return (
     <div className="flex items-center justify-center gap-2 bg-warning/20 px-4 py-1.5 text-center text-xs font-medium text-foreground">
       <FlaskConical className="size-3.5 shrink-0" />
@@ -68,7 +70,7 @@ function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Logo withPlace />
         <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
-          {NAV.map((n) => (
+          {NAV.filter((n) => payments || n.to !== '/orders/track').map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={linkClass}>
               {n.label}
             </NavLink>

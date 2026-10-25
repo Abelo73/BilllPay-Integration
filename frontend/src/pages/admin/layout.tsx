@@ -171,7 +171,7 @@ function Nav({ collapsed = false, counts, onNavigate }: { collapsed?: boolean; c
 function Brand({ collapsed }: { collapsed?: boolean }) {
   return (
     <Link to="/admin" className={cn('flex items-center gap-2 font-semibold tracking-tight', collapsed && 'justify-center')}>
-      <LogoMark className="size-7" />
+      <LogoMark className="h-7" />
       {!collapsed && (
         <span className="leading-tight font-extrabold">
           Sodo <span className="text-brand">Gebeya</span>

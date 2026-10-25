@@ -32,7 +32,7 @@ function AuthShell({ title, description, children }: { title: string; descriptio
       <Card className="w-full">
         <CardContent className="space-y-6 pt-2">
           <div className="flex flex-col items-center gap-2 text-center">
-            <LogoMark className="size-12 rounded-2xl [&_svg]:size-6" />
+            <LogoMark className="h-12" />
             <h1 className="text-2xl font-extrabold tracking-tight">{title}</h1>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>

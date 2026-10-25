@@ -89,7 +89,7 @@ export function SellerMoneyPage() {
 
   return (
     <div className="space-y-5 pb-6">
-      <div className="space-y-3 rounded-2xl bg-[#1A1F1C] p-5 text-white">
+      <div className="space-y-3 rounded-2xl bg-[#13201A] p-5 text-white">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs text-white/70">Ready to withdraw</p>

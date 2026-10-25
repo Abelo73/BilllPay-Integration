@@ -1,14 +1,14 @@
 {
   "name": "Sodo Gebeya",
   "short_name": "Sodo Gebeya",
-  "description": "Buy and sell in Wolaita Sodo. Pay with BillPay, get it delivered.",
+  "description": "Buy, sell, hire and get hired in Wolaita Sodo.",
   "id": "/",
   "start_url": "/?source=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F6F4EE",
-  "theme_color": "#146C43",
+  "background_color": "#F4F8F6",
+  "theme_color": "#0E5A43",
   "lang": "en",
   "categories": ["shopping", "business"],
   "icons": [

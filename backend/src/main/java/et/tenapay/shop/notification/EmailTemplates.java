@@ -36,7 +36,7 @@ final class EmailTemplates {
 			String payBy) {
 	}
 
-	private static final String BRAND = "#146C43";
+	private static final String BRAND = "#0E5A43";
 
 	static Email order(Kind kind, OrderView o) {
 		String first = firstName(o.customerName());
