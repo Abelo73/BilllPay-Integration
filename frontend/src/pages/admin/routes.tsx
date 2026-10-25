@@ -30,6 +30,7 @@ import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
 import { AdminVerificationsPage } from './verifications'
 import { AdminWebhooksPage } from './webhooks'
+import { AdminCvOrdersPage, AdminJobsPage, AdminStudentsPage } from './work'
 
 const adminRoutes: RouteObject[] = [
   { path: 'login', element: <AdminLoginPage /> },
@@ -53,6 +54,9 @@ const adminRoutes: RouteObject[] = [
       { path: 'payouts', element: <AdminPayoutsPage /> },
       { path: 'fees', element: <AdminFeesPage /> },
       { path: 'features', element: <AdminFeaturesPage /> },
+      { path: 'jobs', element: <AdminJobsPage /> },
+      { path: 'cv-orders', element: <AdminCvOrdersPage /> },
+      { path: 'students', element: <AdminStudentsPage /> },
       { path: 'discounts', element: <AdminDiscountsPage /> },
       { path: 'webhooks', element: <AdminWebhooksPage /> },
       { path: 'refunds', element: <AdminRefundsPage /> },

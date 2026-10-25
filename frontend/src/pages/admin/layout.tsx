@@ -33,6 +33,9 @@ import {
   Webhook,
   Wrench,
   Star,
+  BriefcaseBusiness,
+  FileText,
+  GraduationCap,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router'
@@ -43,9 +46,10 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { adminApi, adminToken, payoutAdminApi, shopAdminApi } from '@/lib/admin-api'
 import { trustAdminApi } from '@/lib/trust-api'
+import { workAdminApi } from '@/lib/work-admin-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' | 'jobs' | 'cv' | 'students' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -84,6 +88,14 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/listing-reports', label: 'Listing reports', icon: Flag, badge: 'listings' },
       { to: '/admin/chat-reports', label: 'Chat reports', icon: MessageSquareWarning },
       { to: '/admin/reviews', label: 'Reviews', icon: Star },
+    ],
+  },
+  {
+    label: 'Jobs & CVs',
+    items: [
+      { to: '/admin/jobs', label: 'Job posts', icon: BriefcaseBusiness, badge: 'jobs' },
+      { to: '/admin/cv-orders', label: 'CV orders', icon: FileText, badge: 'cv' },
+      { to: '/admin/students', label: 'Students', icon: GraduationCap, badge: 'students' },
     ],
   },
   {
@@ -230,6 +242,8 @@ export function AdminLayout() {
     refetchInterval: 60_000,
   })
 
+  const workQueue = useQuery({ queryKey: ['admin-work-counts'], queryFn: workAdminApi.counts, enabled: signedIn, refetchInterval: 60_000 })
+
   const staff = adminToken.session()
   if (!signedIn) {
     return <Navigate to={`/admin/login?next=${encodeURIComponent(location.pathname)}`} replace />
@@ -242,6 +256,9 @@ export function AdminLayout() {
     verifications: trustQueue.data?.verifications ?? 0,
     listings: trustQueue.data?.listings ?? 0,
     payouts: trustQueue.data?.payouts ?? 0,
+    jobs: workQueue.data?.jobsPending ?? 0,
+    cv: workQueue.data?.cvOrdersOpen ?? 0,
+    students: workQueue.data?.studentsWaiting ?? 0,
   }
 
   const toggle = () => {

@@ -19,6 +19,7 @@ const NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/shop', label: 'Shop' },
   { to: '/services', label: 'Services' },
+  { to: '/work', label: 'Jobs' },
   { to: '/orders/track', label: 'Track order' },
   { to: '/chats', label: 'Chats' },
   { to: '/sell', label: 'Sell' },
@@ -66,7 +67,7 @@ function Header() {
     cn('text-sm font-semibold transition-colors hover:text-foreground', isActive ? 'text-foreground' : 'text-muted-foreground')
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-lg">
+    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur-lg print:hidden">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Logo withPlace />
         <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
@@ -118,7 +119,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-center justify-around border-t bg-card pb-[env(safe-area-inset-bottom)] md:hidden print:hidden"
     >
       <NavLink to="/" end className={item}>
         <Home className="size-[22px]" /> Home
@@ -138,15 +139,18 @@ function BottomNav() {
 const YEAR = new Date().getFullYear()
 
 function Footer() {
+  const { payments } = useFeatures()
   return (
-    <footer className="mt-20 border-t bg-card pb-20 md:pb-0">
+    <footer className="mt-20 border-t bg-card pb-20 md:pb-0 print:hidden">
       {/* installable app (shown only when the browser offers it) */}
       <InstallApp className="mx-4 mt-8 sm:mx-auto sm:max-w-xl" />
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-4">
         <div className="space-y-3 md:col-span-2">
           <Logo withPlace />
           <p className="max-w-sm text-sm text-muted-foreground">
-            The online market for Wolaita Sodo: buy from local shops and people, pay with BillPay, get it delivered in town.
+            {payments
+              ? 'The online market for Wolaita Sodo: buy from local shops and people, pay with BillPay, get it delivered in town.'
+              : 'The online market for Wolaita Sodo: buy and sell with local shops and people, find work, and hire skilled workers.'}
           </p>
         </div>
         <div className="space-y-3 text-sm">
@@ -154,6 +158,8 @@ function Footer() {
           <ul className="space-y-2 text-muted-foreground">
             <li><Link to="/shop" className="hover:text-foreground">All products</Link></li>
             <li><Link to="/shop?sort=newest" className="hover:text-foreground">New arrivals</Link></li>
+            <li><Link to="/work" className="hover:text-foreground">Jobs in Sodo</Link></li>
+            <li><Link to="/work/cv" className="hover:text-foreground">Professional CV</Link></li>
           </ul>
         </div>
         <div className="space-y-3 text-sm">
@@ -166,7 +172,7 @@ function Footer() {
         </div>
       </div>
       <div className="border-t py-6 text-center text-xs text-muted-foreground">
-        © {YEAR} Sodo Gebeya · Wolaita Sodo, Ethiopia · Payments by BillPay
+        © {YEAR} Sodo Gebeya · Wolaita Sodo, Ethiopia{payments && ' · Payments by BillPay'}
       </div>
     </footer>
   )
@@ -176,7 +182,7 @@ export function SiteLayout() {
   const { payments } = useFeatures()
   return (
     <div className="flex min-h-svh flex-col">
-      <SandboxBanner />
+      <div className="print:hidden"><SandboxBanner /></div>
       <Header />
       <main className="flex-1">
         <Outlet />

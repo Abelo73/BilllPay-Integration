@@ -102,13 +102,19 @@ Result: one checkout, one BillPay payment, and **one parcel per seller** (`order
 - Existing orders got one parcel per seller found in their lines (migration V22).
 - Tests: `OrderParcelsIntegrationTest` (3: three sellers delivered separately, discount spread and partial cancel, single-seller orders unchanged); `SellerIntegrationTest` updated (a seller now delivers their parcel of a mixed order); browser walkthrough.
 
-### M6. Protected payments and payouts (1.5 weeks)
+### M6. Protected payments and payouts (1.5 weeks) ✅ Done 2026-10-25
 - BillPay payment held by the platform; **released** when the buyer taps "I received my items" (**S6**) or 48 h after delivery with no complaint
 - Commission per seller and category (configurable in admin, 0% at launch if you choose)
 - Seller balance: held, available, paid out (**S17**, **S20**); payout requests and payout history
 - Admin payouts screen; export for accounting
 - **Done when:** a test sale moves money held → available → paid out, with the commission recorded, and the numbers match BillPay settlements
 - **Depends on:** P0.4 (BillPay's answer on payouts)
+
+Result: each parcel's earnings are held when fulfilment starts, released when the buyer confirms receipt (or 48 h after delivery, hourly job), and cancelled with the parcel or a full refund. Sellers request payouts in Seller → Money; staff mark them sent in Admin → Payouts (CSV export) and set commission rules in Admin → Fees (most specific rule wins, 0% by default). Tests: `PayoutIntegrationTest`.
+
+### Feature switches and Jiji-style buying ✅ Done 2026-10-25
+- Admin → Features: ON/OFF switches and prices without a restart (online payment, sellers' phones, Sodo Gebeya's phone, Jobs & CVs).
+- **Online payment is OFF by default.** Buyers call, WhatsApp or chat with the seller and pay them directly; switching it on brings back cart, checkout and held payments (M5, M6).
 
 ### M7. Cash on delivery (0.5 week)
 - Checkout choice BillPay / cash (**S5**); cash only for verified sellers and under a limit
@@ -221,6 +227,20 @@ All of these must be true:
 - Zones and fees for Sodo and outskirts; admin assigns orders to partner riders; rider phone shown to buyer (**S6**)
 ### M22. Rider app (1.5 weeks)
 - Rider sees jobs, accepts, pickup photo, delivered photo or code, cash collection for COD orders, daily earnings
+
+---
+
+## Jobs and CVs (J1–J7) ✅ Done 2026-10-25
+From *Sodo-Gebeya-Jobs-and-CV-Features.pdf*. Each part has its own switch and price in Admin → Features. Pages live under `/work` (`/jobs` is the hire-a-pro feature).
+- **J1 Talent profile** (`/work/profile`): status, education, skills, languages, experience, the work wanted; private by default ("let employers find me" to show it in search). CVs (PDF) and certificates are private files, opened only by the owner, staff, and employers the person applied to. Deleting the profile removes its files.
+- **J2 Free CV** (`/work/my-cv`): made from the profile, Modern or Simple design, English or Amharic headings, "Made with Sodo Gebeya"; saved as PDF with the browser's print.
+- **J3 Job posts** (`/work/post`, `/work/employer`): first post free, then the job post price; staff check every post (Admin → Job posts) and can feature it; posts asking applicants for money are refused; deadline within 90 days.
+- **J4 One-tap apply**: with the free CV or an uploaded/professional CV, limit per day, once per job; the employer sees the applicant and phone and moves them along (shortlisted, interview, hired, not selected). Interview and hired send an SMS.
+- **J5 Professional CV** (`/work/cv`): three packages, express option, student discount. With online payment off, the customer pays by telebirr or bank and enters the transaction number; staff mark it paid, write, send a draft (SMS), handle changes and send the final, which is saved to the profile (Admin → CV orders). `max_open_cv_orders` pauses new orders when the team is full.
+- **J6 Featured talent**: staff feature a profile for some days at the top of employers' search (off by default).
+- **J7 Verified student**: student ID upload, staff approve in Admin → Students; badge on the profile and CV, and the CV discount.
+- Tests: `WorkIntegrationTest` (2); browser walkthrough of the whole flow.
+- Not built yet from the landing page PDF: seller plans, the invite reward and the airtime streak (they belong to M16–M17).
 
 ---
 

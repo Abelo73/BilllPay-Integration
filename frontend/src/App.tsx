@@ -11,6 +11,11 @@ import { ChatPage } from '@/pages/chat'
 import { ChatsPage } from '@/pages/chats'
 import { NotificationsPage } from '@/pages/notifications'
 import { JobPage, MyJobsPage, NewJobPage } from '@/pages/jobs'
+import { EmployerPage, MyApplicationsPage, PersonPage, PostJobPage } from '@/pages/work/employer'
+import { JobDetailPage, JobsPage } from '@/pages/work/jobs'
+import { MyCvPage } from '@/pages/work/my-cv'
+import { ProCvPage } from '@/pages/work/pro-cv'
+import { ProfilePage } from '@/pages/work/profile'
 import { ProDashboardPage } from '@/pages/pro-dashboard'
 import { ProProfilePage, ServicesPage } from '@/pages/services'
 import { LoginPage, RegisterPage } from '@/pages/auth'
@@ -75,6 +80,15 @@ const router = createBrowserRouter([
       { path: '/jobs', element: <MyJobsPage /> },
       { path: '/jobs/new', element: <NewJobPage /> },
       { path: '/jobs/:id', element: <JobPage /> },
+      { path: '/work', element: <JobsPage /> },
+      { path: '/work/jobs/:id', element: <JobDetailPage /> },
+      { path: '/work/profile', element: <ProfilePage /> },
+      { path: '/work/my-cv', element: <MyCvPage /> },
+      { path: '/work/applications', element: <MyApplicationsPage /> },
+      { path: '/work/cv', element: <ProCvPage /> },
+      { path: '/work/post', element: <PostJobPage /> },
+      { path: '/work/employer', element: <EmployerPage /> },
+      { path: '/work/people/:id', element: <PersonPage /> },
       { path: '/pro', element: <ProDashboardPage /> },
       { path: '/pro/jobs/:id', element: <JobPage /> },
       { path: '*', element: <NotFoundPage /> },
