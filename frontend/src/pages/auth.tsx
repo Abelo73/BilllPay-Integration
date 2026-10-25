@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, CheckCircle2, FlaskConical, Loader2, MessageSquareText, ShieldCheck, Truck } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, FlaskConical, Loader2, Mail, MessageSquareText, Phone, ShieldCheck, Truck, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -8,6 +8,7 @@ import { LogoMark } from '@/components/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { IconInput, PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { api, ApiError, type PhoneCodeSent } from '@/lib/api'
 import { type Session, useSession } from '@/store/session'
@@ -44,11 +45,19 @@ function AuthShell({ title, description, children }: { title: string; descriptio
 }
 
 function Field(props: { id: string; label: string; error?: string } & React.ComponentProps<'input'>) {
-  const { id, label, error, ...input } = props
+  const { id, label, error, type, ...input } = props
+  const common = { id, className: 'h-11', 'aria-invalid': !!error, 'aria-describedby': error ? `${id}-error` : undefined, ...input }
+  const icon = type === 'email' ? Mail : type === 'tel' ? Phone : input.autoComplete === 'name' ? UserRound : null
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} className="h-11" aria-invalid={!!error} aria-describedby={error ? `${id}-error` : undefined} {...input} />
+      {type === 'password' ? (
+        <PasswordInput {...common} />
+      ) : icon ? (
+        <IconInput icon={icon} type={type} {...common} />
+      ) : (
+        <Input type={type} {...common} />
+      )}
       {error && <p id={`${id}-error`} className="text-sm text-destructive">{error}</p>}
     </div>
   )

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -83,7 +84,7 @@ function CreateStaffDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="s-pw">Temporary password</Label>
-            <Input id="s-pw" type="password" autoComplete="new-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <PasswordInput id="s-pw" autoComplete="new-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             <p className="text-xs text-muted-foreground">{PASSWORD_HINT} Share it privately and ask them to change it.</p>
           </div>
           {create.error && <p className="text-sm text-destructive">{create.error.message}</p>}
@@ -117,7 +118,7 @@ function ResetPasswordDialog({ user, onClose }: { user: UserRow; onClose: () => 
         </DialogHeader>
         <form id="reset-pw" className="space-y-2" onSubmit={(e) => { e.preventDefault(); reset.mutate() }}>
           <Label htmlFor="r-pw">New password</Label>
-          <Input id="r-pw" type="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordInput id="r-pw" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
           {reset.error && <p className="text-sm text-destructive">{reset.error.message}</p>}
         </form>

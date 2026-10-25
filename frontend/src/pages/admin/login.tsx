@@ -1,12 +1,12 @@
 import { useMutation } from '@tanstack/react-query'
-import { Loader2, LockKeyhole } from 'lucide-react'
+import { Loader2, LockKeyhole, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 
 import { Logo } from '@/components/logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { IconInput, PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { adminApi, adminToken } from '@/lib/admin-api'
 
@@ -47,11 +47,11 @@ export function AdminLoginPage() {
             >
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" className="h-10" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" placeholder="admin@tenashop.local" required />
+                <IconInput icon={Mail} id="email" type="email" className="h-10" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" placeholder="admin@tenashop.local" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" className="h-10" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+                <PasswordInput id="password" className="h-10" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
               </div>
               {login.error && <p className="text-sm text-destructive">{login.error.message}</p>}
               <Button type="submit" size="lg" className="h-10 w-full" disabled={login.isPending}>
