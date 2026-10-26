@@ -64,6 +64,10 @@ public class Features {
 	public static final String PRO_COMMISSION_OFF = "pro_commission_off";
 	public static final String BANNERS = "banners";
 	public static final String STAFF_TWO_STEP = "staff_two_step";
+	public static final String AUTO_HOLD_REPORTS = "auto_hold_reports";
+	public static final String AUTO_HOLD_LOW_PRICE = "auto_hold_low_price";
+	public static final String AUTO_HOLD_SCAM_WORDS = "auto_hold_scam_words";
+	public static final String NEW_SHOP_HOURLY_LISTINGS = "new_shop_hourly_listings";
 
 	public static final List<Def> DEFS = List.of(
 			new Def(ONLINE_PAYMENTS, Type.SWITCH, "false", "Marketplace", "Online payment (BillPay)",
@@ -112,7 +116,15 @@ public class Features {
 					"Taken off the commission percent, e.g. 5% becomes 3%.", true),
 			new Def(BANNERS, Type.SWITCH, "true", "Selling", "Home page banners", "Banners from Admin → Banners.", true),
 			new Def(STAFF_TWO_STEP, Type.SWITCH, "false", "Security", "2-step sign-in for staff",
-					"After the password, staff type a code sent by SMS and email. Check that SMS or email works first.", false));
+					"After the password, staff type a code sent by SMS and email. Check that SMS or email works first.", false),
+			new Def(AUTO_HOLD_REPORTS, Type.NUMBER, "3", "Safety", "Hold a listing after this many reports",
+					"Different shoppers within a week; it leaves the store until staff check it. 0 = never.", false),
+			new Def(AUTO_HOLD_LOW_PRICE, Type.SWITCH, "true", "Safety", "Hold suspiciously cheap listings",
+					"New, unverified shops listing far below the usual price of the category.", false),
+			new Def(AUTO_HOLD_SCAM_WORDS, Type.SWITCH, "true", "Safety", "Hold listings that ask for money first",
+					"Words like \"send money first\", \"advance payment\", \"Western Union\".", false),
+			new Def(NEW_SHOP_HOURLY_LISTINGS, Type.NUMBER, "15", "Safety", "New shops: listings an hour at most",
+					"For unverified shops in their first 2 weeks. 0 = no limit.", false));
 
 	private static final Map<String, Def> BY_KEY = new LinkedHashMap<>();
 	static {

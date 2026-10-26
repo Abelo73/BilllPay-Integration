@@ -19,6 +19,7 @@ import { ProfilePage } from '@/pages/work/profile'
 import { ProDashboardPage } from '@/pages/pro-dashboard'
 import { ProProfilePage, ServicesPage } from '@/pages/services'
 import { ProblemPage } from '@/pages/problem'
+import { SavedSearchesPage } from '@/pages/saved-searches'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { CheckoutPage } from '@/pages/checkout'
 import { HomePage } from '@/pages/home'
@@ -77,6 +78,7 @@ const router = createBrowserRouter([
       { path: '/chats/:id', element: <ChatPage /> },
       { path: '/notifications', element: <NotificationsPage /> },
       { path: '/problems/:id', element: <ProblemPage /> },
+      { path: '/searches', element: <SavedSearchesPage /> },
       { path: '/services', element: <ServicesPage /> },
       { path: '/pros/:id', element: <ProProfilePage /> },
       { path: '/jobs', element: <MyJobsPage /> },

@@ -24,7 +24,7 @@ import lombok.Setter;
 public class InboxItem {
 
 	/** Decides the icon in the app. */
-	public enum Kind { ORDER, PAYMENT, DELIVERY, CHAT, JOB, SHOP, REVIEW, SYSTEM }
+	public enum Kind { ORDER, PAYMENT, DELIVERY, CHAT, JOB, SHOP, REVIEW, SYSTEM, ALERT }
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

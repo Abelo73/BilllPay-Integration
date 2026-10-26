@@ -27,6 +27,7 @@ public class ListingReportService {
 	private final SmsService sms;
 	private final ShopMetrics metrics;
 	private final TransactionTemplate tx;
+	private final FraudRules fraudRules;
 
 	public ListingReport report(Long productId, UUID reporterId, ListingReport.Reason reason, String details) {
 		Product p = products.findWithCategoryById(productId).filter(Product::sellable)
@@ -49,6 +50,7 @@ public class ListingReportService {
 		}
 		metrics.shopEvent("listing_reported");
 		log.info("Listing #{} reported ({})", productId, reason);
+		fraudRules.checkReports(productId);
 		return r;
 	}
 

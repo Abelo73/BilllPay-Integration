@@ -84,6 +84,8 @@ public class CatalogController {
 			@RequestParam(defaultValue = "newest") String sort,
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "12") int size,
+			@RequestParam(required = false) BigDecimal minPrice,
+			@RequestParam(required = false) BigDecimal maxPrice,
 			@RequestParam Map<String, String> params) {
 		Sort order = switch (sort) {
 			case "price_asc" -> Sort.by("price").ascending();
@@ -107,7 +109,7 @@ public class CatalogController {
 		});
 		String specFilter = cat == null || wanted.isEmpty() ? null
 				: categories.findBySlug(cat).map(c -> specs.filterJson(c.getId(), wanted)).orElse(null);
-		return PageDto.of(products.search(cat, query, shopId, specFilter, PageRequest.of(page, Math.min(size, 48), order))
+		return PageDto.of(products.search(cat, query, shopId, specFilter, minPrice, maxPrice, 0L, PageRequest.of(page, Math.min(size, 48), order))
 				.map(ProductDto::from));
 	}
 

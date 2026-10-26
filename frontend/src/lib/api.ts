@@ -231,7 +231,7 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
 
 export const api = {
   /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
-  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; [spec: `spec.${string}`]: string }) => {
+  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; [spec: `spec.${string}`]: string }) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     return request<Page<Product>>(`/products?${qs}`)

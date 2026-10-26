@@ -33,10 +33,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%'))
 			       or function('specs_has_text', p.specs, cast(:q as string)) = true)
 			  and function('specs_match', p.specs, coalesce(cast(:specs as string), '{}')) = true
+			  and (:minPrice is null or p.price >= :minPrice)
+			  and (:maxPrice is null or p.price <= :maxPrice)
+			  and p.id > :afterId
 			order by case when p.boostedUntil > current_timestamp then 0 else 1 end
 			""")
 	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
-			@Param("specs") String specs, Pageable pageable);
+			@Param("specs") String specs, @Param("minPrice") java.math.BigDecimal minPrice, @Param("maxPrice") java.math.BigDecimal maxPrice,
+			@Param("afterId") long afterId, Pageable pageable);
+
+	/** Store listing with detail filters (no price range). */
+	default Page<Product> search(String category, String q, Long shopId, String specs, Pageable pageable) {
+		return search(category, q, shopId, specs, null, null, 0L, pageable);
+	}
 
 	/** Store listing without spec filters. A main category's slug also lists its subcategories' products. */
 	default Page<Product> search(String category, String q, Long shopId, Pageable pageable) {
@@ -107,6 +116,10 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 	List<Object[]> shopCounts(@Param("shopId") Long shopId);
 
 	boolean existsBySlug(String slug);
+
+	/** The newest product id (a saved search only alerts about listings after it). */
+	@Query("select coalesce(max(p.id), 0) from Product p")
+	long maxId();
 
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select p from Product p where p.id = :id")

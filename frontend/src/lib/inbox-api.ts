@@ -1,6 +1,6 @@
 import { request, type Page } from '@/lib/api'
 
-export type InboxKind = 'ORDER' | 'PAYMENT' | 'DELIVERY' | 'CHAT' | 'JOB' | 'SHOP' | 'REVIEW' | 'SYSTEM'
+export type InboxKind = 'ORDER' | 'PAYMENT' | 'DELIVERY' | 'CHAT' | 'JOB' | 'SHOP' | 'REVIEW' | 'SYSTEM' | 'ALERT'
 
 export type InboxItem = { id: number; kind: InboxKind; title: string; body: string | null; link: string | null; read: boolean; createdAt: string }
 

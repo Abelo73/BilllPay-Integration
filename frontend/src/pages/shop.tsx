@@ -12,6 +12,7 @@ import { api } from '@/lib/api'
 import { useT } from '@/lib/i18n'
 import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
+import { PriceRange, SaveSearchButton } from '@/components/save-search'
 
 export function ShopPage() {
   const t = useT()
@@ -20,6 +21,8 @@ export function ShopPage() {
   const q = params.get('q') ?? ''
   const sort = params.get('sort') ?? 'newest'
   const page = Number(params.get('page') ?? 0)
+  const minPrice = params.get('minPrice') ?? ''
+  const maxPrice = params.get('maxPrice') ?? ''
   const [search, setSearch] = useState(q)
 
   const update = (changes: Record<string, string | null>) => {
@@ -54,8 +57,8 @@ export function ShopPage() {
     staleTime: 60_000,
   })
   const products = useQuery({
-    queryKey: ['products', category, q, sort, page, filterKey],
-    queryFn: () => api.products({ category, q, sort, page, size: 12, ...specFilters }),
+    queryKey: ['products', category, q, sort, page, filterKey, minPrice, maxPrice],
+    queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, ...specFilters }),
     placeholderData: keepPreviousData,
   })
   /** Picking another category clears the detail filters (they belong to the old one). */
@@ -108,6 +111,21 @@ export function ShopPage() {
           ))}
         </div>
       )}
+
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <PriceRange min={minPrice} max={maxPrice} onChange={(a, b) => update({ minPrice: a || null, maxPrice: b || null })} />
+        <SaveSearchButton
+          className="ml-auto"
+          input={{
+            q: q || undefined,
+            category: category || undefined,
+            specs: Object.fromEntries(Object.entries(specFilters).map(([k, v]) => [k.slice(5), v])),
+            minPrice: minPrice ? Number(minPrice) : null,
+            maxPrice: maxPrice ? Number(maxPrice) : null,
+          }}
+          disabled={!q && !category}
+        />
+      </div>
 
       {!!facets.data?.facets.length && (
         <div className="mt-4 flex flex-wrap items-end gap-3 rounded-2xl border bg-card p-3">

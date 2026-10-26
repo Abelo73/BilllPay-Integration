@@ -90,6 +90,7 @@ public class SellerController {
 	private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 	private final MediaProperties media;
 	private final et.tenapay.shop.promo.PromoService promo;
+	private final et.tenapay.shop.catalog.FraudRules fraud;
 
 	public record ShopRequest(ShopKind kind, @NotBlank @Size(min = 2, max = 120) String name,
 			@Size(max = 2000) String description, @NotBlank @Size(max = 20) String phone, @Size(max = 120) String area,
@@ -244,8 +245,10 @@ public class SellerController {
 		Shop shop = shopService.requireMine();
 		promo.checkProductLimit(shop, productCount(shop));
 		activeCategory(req.categoryId());
+		fraud.checkBurst(shop);
 		Product p = catalog.create(new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(),
 				req.stock(), req.lowStockThreshold(), false, req.active(), req.condition(), req.negotiable(), req.area(), req.specs()), shop);
+		fraud.checkListing(p.getId());
 		return detailOf(p.getId());
 	}
 
@@ -259,6 +262,7 @@ public class SellerController {
 		catalog.update(id, new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(), null,
 				req.lowStockThreshold(), null, req.active(), req.condition(), req.negotiable(), req.area() == null ? "" : req.area(),
 				req.specs()));
+		fraud.checkListing(id);
 		return detailOf(id);
 	}
 

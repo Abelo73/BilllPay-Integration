@@ -146,6 +146,8 @@ All of these must be true:
 - Sort: nearest, newest, price, best rated; saved items (heart)
 - **Done when:** searching "shoes" under 3,000 ETB near the university returns the right items quickly
 
+Progress 2026-10-26: price range filter (from/to), detail filters per category, search matches details (model, brand); **saved searches with alerts** (inbox, Telegram if linked, SMS at most once a day per search; Account → Saved searches). Still to do: "nearest" sort by area, saved items (heart), new/used filter.
+
 ### M10. Chat (1.5 weeks)
 - Buyer ↔ seller and customer ↔ pro chat (**S11**, **S12**): text, photos, listing card
 - **Make an offer** / counter / accept → goes straight to the cart at the agreed price
@@ -254,7 +256,7 @@ From *Sodo-Gebeya-Jobs-and-CV-Features.pdf*. Each part has its own switch and pr
 
 ## Phase 8: Scale (ongoing)
 - **M23 Security:** penetration test, rate limits everywhere, fraud rules (new account + high price + many reports), 2-step login for staff
-  - Done 2026-10-26: rate limits per visitor (sign-in 20/min, changes 120/min, reads 600/min); staff 2-step sign-in (code by SMS and email, trusted device for 30 days, off by default in Admin → Features). Still to do: fraud rules, penetration test.
+  - Done 2026-10-26: rate limits per visitor (sign-in 20/min, changes 120/min, reads 600/min); staff 2-step sign-in (code by SMS and email, trusted device for 30 days, off by default in Admin → Features). Fraud rules (2026-10-26): listings are held for a check (Admin → Products → Taken down, "Put back in the store") after 3 reports from different shoppers in a week, when a new unverified shop lists far below the category's usual price, or when the text asks for money first; new shops can add 15 listings an hour (all in Admin → Features → Safety). Still to do: penetration test.
 - **M24 Performance:** image CDN, caching, database indexes, load tests (the load-test tool already started)
 - **M25 Expansion:** add towns (Areka, Boditi, Arba Minch, Hawassa) as areas; local agents; Android app in the Play Store
 

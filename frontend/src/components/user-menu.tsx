@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { LogOut, Package, UserRound } from 'lucide-react'
+import { Bookmark, LogOut, Package, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -54,6 +54,9 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/account"><Package /> {t('My orders')}</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/searches"><Bookmark /> {t('Saved searches')}</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link to="/account?tab=profile"><UserRound /> {t('Account settings')}</Link>

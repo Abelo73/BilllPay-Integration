@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bell, CreditCard, Hammer, MessageCircle, Package, Star, Store, Truck } from 'lucide-react'
+import { Bell, Bookmark, CreditCard, Hammer, MessageCircle, Package, Star, Store, Truck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -22,6 +22,7 @@ const ICON: Record<InboxKind, typeof Bell> = {
   SHOP: Store,
   REVIEW: Star,
   SYSTEM: Bell,
+  ALERT: Bookmark,
 }
 
 function Row({ item }: { item: InboxItem }) {

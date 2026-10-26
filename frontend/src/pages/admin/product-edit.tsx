@@ -33,7 +33,7 @@ import { SpecFields } from '@/components/spec-fields'
 import { catalogApi, isAdmin, type ChangeRow, type ProductDetail, type ProductInput } from '@/lib/admin-api'
 import { categoryTree, type Specs } from '@/lib/specs-api'
 import type { ItemCondition, Page } from '@/lib/api'
-import { publicTrustApi } from '@/lib/trust-api'
+import { publicTrustApi, trustAdminApi } from '@/lib/trust-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { StockBadge } from './products'
@@ -568,12 +568,7 @@ function EditorPage() {
           )
         }
       />
-      {p?.blockedReason && (
-        <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-          <span className="font-semibold">Taken down by Sodo Gebeya after reports:</span> {p.blockedReason}.{' '}
-          {seller ? 'Fix it, then call us to put it back.' : 'Put it back from Admin → Listing reports.'}
-        </p>
-      )}
+      {p?.blockedReason && <BlockedNote id={p.id} reason={p.blockedReason} seller={!!seller} />}
       {seller && p && p.active && !p.inStore && !p.blockedReason && (
         <p className="rounded-lg bg-amber-soft p-3 text-sm text-amber-ink">
           Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.
@@ -600,5 +595,33 @@ function EditorPage() {
         )}
       </div>
     </>
+  )
+}
+
+const HOLD_PREFIX = 'Held for a check: '
+
+/** Why a listing is out of the store: held automatically (fraud rules) or taken down by staff after reports. */
+function BlockedNote({ id, reason, seller }: { id: number; reason: string; seller: boolean }) {
+  const qc = useQueryClient()
+  const held = reason.startsWith(HOLD_PREFIX)
+  const putBack = useMutation({
+    mutationFn: () => trustAdminApi.unblockListing(id),
+    onSuccess: () => {
+      qc.invalidateQueries()
+      toast.success('Put back in the store')
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  return (
+    <div className={cn('flex flex-wrap items-center gap-3 rounded-lg p-3 text-sm', held ? 'bg-amber-soft text-amber-ink' : 'bg-destructive/10 text-destructive')}>
+      <p className="min-w-0 flex-1">
+        <span className="font-semibold">{held ? 'Held for a quick check:' : 'Taken down by Sodo Gebeya after reports:'}</span>{' '}
+        {held ? reason.slice(HOLD_PREFIX.length) : `${reason}.`}{' '}
+        {seller ? (held ? 'We usually check within a day; you can edit it meanwhile.' : 'Fix it, then call us to put it back.') : ''}
+      </p>
+      {!seller && isAdmin() && (
+        <Button size="sm" variant="outline" disabled={putBack.isPending} onClick={() => putBack.mutate()}>Put back in the store</Button>
+      )}
+    </div>
   )
 }
