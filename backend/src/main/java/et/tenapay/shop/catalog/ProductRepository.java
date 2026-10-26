@@ -33,6 +33,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%'))
 			       or function('specs_has_text', p.specs, cast(:q as string)) = true)
 			  and function('specs_match', p.specs, coalesce(cast(:specs as string), '{}')) = true
+			order by case when p.boostedUntil > current_timestamp then 0 else 1 end
 			""")
 	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
 			@Param("specs") String specs, Pageable pageable);
@@ -59,6 +60,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			order by p.id
 			""")
 	List<Product> findFeaturedVisible();
+
+	/** M16: boosted listings for the home page, the newest boost first. */
+	@EntityGraph(attributePaths = { "category", "shop" })
+	@Query("""
+			select p from Product p left join p.shop s
+			where p.boostedUntil > current_timestamp and p.active = true and p.category.active = true
+			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			order by p.boostedUntil desc
+			""")
+	List<Product> findBoostedVisible(Pageable pageable);
 
 	/**
 	 * Admin and seller listing with status filter: active, hidden, low (low stock) or out (nothing available).

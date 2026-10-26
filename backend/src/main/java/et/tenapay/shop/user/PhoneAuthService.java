@@ -99,7 +99,7 @@ public class PhoneAuthService {
 		String phone = mobile(rawPhone);
 		Instant now = Instant.now();
 		String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-		tx.executeWithoutResult(s -> {
+		Long savedId = tx.execute(s -> {
 			PhoneCode last = codes.findFirstByPhoneOrderByCreatedAtDesc(phone).orElse(null);
 			if (last != null && last.getCreatedAt().isAfter(now.minus(RESEND_AFTER))) {
 				long wait = Duration.between(now, last.getCreatedAt().plus(RESEND_AFTER)).toSeconds() + 1;
@@ -118,7 +118,7 @@ public class PhoneAuthService {
 			c.setCodeHash(hash(phone, code));
 			c.setExpiresAt(now.plus(CODE_TTL));
 			c.setIp(client == null ? null : client.ip());
-			codes.save(c);
+			return codes.save(c).getId();
 		});
 		String text = et.tenapay.shop.sms.SmsLanguage.AMHARIC.equals(et.tenapay.shop.sms.SmsLanguage.normalize(language))
 				? "የሶዶ ገበያ ኮድ፦ " + code + "። በ5 ደቂቃ ያበቃል። ለማንም፣ ለሠራተኞቻችንም ቢሆን አያጋሩ።"
@@ -126,6 +126,8 @@ public class PhoneAuthService {
 		SmsService.Sent sent = sms.send(SmsService.Kind.SIGN_IN_CODE, phone, text, text.replace(code, "••••••"), null);
 		if (!sent.ok()) {
 			metrics.phoneSignIn("sms_failed");
+			// the code never left: forget it, so the person can try again at once (no "wait 60 seconds")
+			tx.executeWithoutResult(s -> codes.deleteById(savedId));
 			throw new ApiException(HttpStatus.BAD_GATEWAY, "SMS_FAILED",
 					"We couldn't send the SMS right now. Please try again in a minute.");
 		}

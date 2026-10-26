@@ -22,8 +22,11 @@ public class AuthController {
 
 	private final AuthService auth;
 	private final PhoneAuthService phoneAuth;
+	private final StaffTwoStepService twoStep;
+	private final UserRepository users;
 
-	public record LoginRequest(@NotBlank @Email String email, @NotBlank @Size(max = 200) String password) {
+	/** {@code deviceToken}: staff only, a device trusted after a 2-step sign-in (skips the code). */
+	public record LoginRequest(@NotBlank @Email String email, @NotBlank @Size(max = 200) String password, @Size(max = 200) String deviceToken) {
 	}
 
 	public record RegisterRequest(
@@ -63,9 +66,32 @@ public class AuthController {
 		return phoneAuth.verify(req.phone(), req.code(), req.fullName(), client(http));
 	}
 
+	public record StaffVerifyRequest(@jakarta.validation.constraints.NotNull java.util.UUID challengeId, @NotBlank @Size(max = 10) String code,
+			boolean trustDevice) {
+	}
+
+	/** A staff session; {@code deviceToken} when the device was just trusted for 30 days. */
+	public record StaffSession(String token, java.time.Instant expiresAt, AuthService.UserView user, String deviceToken) {
+	}
+
+	/**
+	 * Staff sign-in. With 2-step on (Admin → Features) and no trusted device, the answer is a challenge
+	 * ({@code twoStep: true}) and the session comes from {@code /api/admin/auth/verify} after the code.
+	 */
 	@PostMapping("/api/admin/auth/login")
-	public Session staffLogin(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
-		return auth.login(req.email(), req.password(), Portal.ADMIN, client(http));
+	public Object staffLogin(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+		Session s = auth.login(req.email(), req.password(), Portal.ADMIN, client(http));
+		if (!twoStep.required() || twoStep.trusted(s.user().id(), req.deviceToken())) {
+			return new StaffSession(s.token(), s.expiresAt(), s.user(), null);
+		}
+		User user = users.findById(s.user().id()).orElseThrow();
+		return twoStep.start(user, client(http).ip());
+	}
+
+	@PostMapping("/api/admin/auth/verify")
+	public StaffSession staffVerify(@Valid @RequestBody StaffVerifyRequest req, HttpServletRequest http) {
+		StaffTwoStepService.StaffSignIn in = twoStep.verify(req.challengeId(), req.code(), req.trustDevice(), http.getHeader("User-Agent"));
+		return new StaffSession(in.session().token(), in.session().expiresAt(), in.session().user(), in.deviceToken());
 	}
 
 	static ClientInfo client(HttpServletRequest http) {

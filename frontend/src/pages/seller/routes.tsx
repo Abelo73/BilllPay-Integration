@@ -6,6 +6,7 @@ import { SellerMoneyPage } from './money'
 import { SellerOrderPage, SellerOrdersPage } from './orders'
 import { SellerProductEditPage, SellerProductsPage } from './products'
 import { SellerShopPage } from './shop-settings'
+import { SellerPlanPage } from './plan'
 import { SellerProblemsPage } from '../problem'
 import { SellerVerifyPage } from './verify'
 
@@ -20,6 +21,7 @@ const sellerRoutes: RouteObject[] = [
       { path: 'products/:productId', element: <SellerProductEditPage /> },
       { path: 'money', element: <SellerMoneyPage /> },
       { path: 'problems', element: <SellerProblemsPage /> },
+      { path: 'plan', element: <SellerPlanPage /> },
       { path: 'shop', element: <SellerShopPage /> },
       { path: 'verify', element: <SellerVerifyPage /> },
     ],

@@ -36,11 +36,11 @@ public class CatalogController {
 	}
 
 	/** Who sells a product; null on the product = Sodo Gebeya itself. */
-	public record SellerDto(String name, String slug, String kind, String area, boolean verified) {
+	public record SellerDto(String name, String slug, String kind, String area, boolean verified, boolean pro) {
 
 		static SellerDto of(et.tenapay.shop.seller.Shop s) {
 			return s == null ? null
-					: new SellerDto(s.getName(), s.getSlug(), s.getKind().name(), s.getArea(), s.getVerifiedAt() != null);
+					: new SellerDto(s.getName(), s.getSlug(), s.getKind().name(), s.getArea(), s.getVerifiedAt() != null, s.pro());
 		}
 	}
 
@@ -48,19 +48,19 @@ public class CatalogController {
 	public record ProductDto(Long id, String name, String slug, String description, BigDecimal price,
 			String currency, int available, boolean lowStock, String imageUrl, boolean featured, String categorySlug,
 			String categoryName, List<ImageDto> images, SellerDto seller, String condition, boolean negotiable,
-			String area, List<SpecsService.SpecLine> specs) {
+			String area, List<SpecsService.SpecLine> specs, boolean boosted) {
 
 		public static ProductDto from(Product p, List<ImageDto> images) {
 			return new ProductDto(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
 					p.getCurrency(), Math.max(0, p.available()), p.lowStock(), p.getImageUrl(), p.isFeatured(),
 					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()),
-					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea(), List.of());
+					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea(), List.of(), p.boosted());
 		}
 
 		/** The product page also shows the details table (brand, RAM, storage, ...). */
 		public ProductDto withSpecs(List<SpecsService.SpecLine> lines) {
 			return new ProductDto(id, name, slug, description, price, currency, available, lowStock, imageUrl, featured,
-					categorySlug, categoryName, images, seller, condition, negotiable, area, lines);
+					categorySlug, categoryName, images, seller, condition, negotiable, area, lines, boosted);
 		}
 
 		public static ProductDto from(Product p) {
@@ -125,6 +125,12 @@ public class CatalogController {
 
 	static CategoryDto dto(Category c) {
 		return new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId());
+	}
+
+	/** M16: listings boosted right now, for the home page. */
+	@GetMapping("/products/boosted")
+	public List<ProductDto> boosted() {
+		return products.findBoostedVisible(PageRequest.of(0, 12)).stream().map(ProductDto::from).toList();
 	}
 
 	@GetMapping("/products/featured")

@@ -95,7 +95,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
 	static String bucketOf(HttpServletRequest r) {
 		String path = r.getRequestURI();
-		if (path.startsWith("/api/auth/") || path.equals("/api/admin/auth/login")) {
+		if (path.startsWith("/api/auth/") || path.startsWith("/api/admin/auth/")) {
 			return "POST".equals(r.getMethod()) ? "auth" : "read";
 		}
 		return switch (r.getMethod()) {

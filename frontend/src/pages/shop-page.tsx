@@ -8,12 +8,14 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { VerifiedBadge } from '@/components/verified-badge'
 import { api, ApiError } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { NotFoundPage } from './not-found'
 
 const SIZE = 24
 
 /** /shops/:slug: one seller's page with their products. Only approved shops are found. */
 export function ShopPublicPage() {
+  const t = useT()
   const { slug = '' } = useParams()
   const [page, setPage] = useState(0)
   const shop = useQuery({ queryKey: ['shop', slug], queryFn: () => api.shop(slug), retry: false })
@@ -53,6 +55,7 @@ export function ShopPublicPage() {
             <div className="min-w-0 flex-1 space-y-1">
               <h1 className="flex flex-wrap items-center gap-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
                 {s.name} {s.verified && <VerifiedBadge className="text-xs" />}
+                {s.pro && <span className="rounded-full bg-market px-2 py-0.5 text-xs font-bold text-[#13201A]">{t('Pro shop')}</span>}
               </h1>
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">

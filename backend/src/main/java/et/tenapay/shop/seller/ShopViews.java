@@ -13,24 +13,24 @@ public final class ShopViews {
 	/** For the shop's owner and for staff. */
 	public record ShopDto(Long id, String kind, String name, String slug, String description, String phone,
 			String area, String addressLine, String logoUrl, String coverUrl, String status, String statusNote,
-			Instant decidedAt, Instant createdAt, Instant verifiedAt) {
+			Instant decidedAt, Instant createdAt, Instant verifiedAt, boolean pro, Instant planUntil) {
 
 		public static ShopDto of(Shop s, MediaProperties media) {
 			return new ShopDto(s.getId(), s.getKind().name(), s.getName(), s.getSlug(), s.getDescription(),
 					s.getPhone(), s.getArea(), s.getAddressLine(), url(s.getLogoKey(), media),
 					url(s.getCoverKey(), media), s.getStatus().name(), s.getStatusNote(), s.getDecidedAt(),
-					s.getCreatedAt(), s.getVerifiedAt());
+					s.getCreatedAt(), s.getVerifiedAt(), s.pro(), s.getPlanUntil());
 		}
 	}
 
 	/** The public shop page. */
 	public record PublicShopDto(String name, String slug, String kind, String description, String area,
-			String logoUrl, String coverUrl, Instant memberSince, long productCount, boolean verified) {
+			String logoUrl, String coverUrl, Instant memberSince, long productCount, boolean verified, boolean pro) {
 
 		public static PublicShopDto of(Shop s, MediaProperties media, long productCount) {
 			return new PublicShopDto(s.getName(), s.getSlug(), s.getKind().name(), s.getDescription(), s.getArea(),
 					url(s.getLogoKey(), media), url(s.getCoverKey(), media), s.getCreatedAt(), productCount,
-					s.getVerifiedAt() != null);
+					s.getVerifiedAt() != null, s.pro());
 		}
 	}
 

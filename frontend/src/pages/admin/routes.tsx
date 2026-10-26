@@ -21,6 +21,7 @@ import { AdminOrdersPage } from './orders'
 import { AdminPaymentsPage } from './payments'
 import { AdminPayoutsPage } from './payouts'
 import { AdminProblemPage, AdminProblemsPage } from './problems'
+import { AdminBannersPage, AdminPromoPage } from './promo'
 import { AdminProductEditPage } from './product-edit'
 import { AdminProductsPage } from './products'
 import { AdminProsPage } from './pros'
@@ -57,6 +58,8 @@ const adminRoutes: RouteObject[] = [
       { path: 'payouts', element: <AdminPayoutsPage /> },
       { path: 'problems', element: <AdminProblemsPage /> },
       { path: 'problems/:id', element: <AdminProblemPage /> },
+      { path: 'promo', element: <AdminPromoPage /> },
+      { path: 'banners', element: <AdminBannersPage /> },
       { path: 'fees', element: <AdminFeesPage /> },
       { path: 'features', element: <AdminFeaturesPage /> },
       { path: 'jobs', element: <AdminJobsPage /> },

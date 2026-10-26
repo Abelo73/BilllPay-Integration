@@ -92,6 +92,11 @@ public class NotificationService {
 				EmailTemplates.passwordChanged(fullName, WHEN.format(Instant.now())));
 	}
 
+	/** M23: the staff 2-step sign-in code (one email per code). */
+	public void onStaffSignInCode(java.util.UUID codeId, String email, String fullName, String code) {
+		send(Kind.STAFF_SIGN_IN_CODE, "STAFF_SIGN_IN_CODE:" + codeId, null, email, EmailTemplates.staffSignInCode(fullName, code));
+	}
+
 	private EmailTemplates.OrderView view(Order o) {
 		String base = app.publicBaseUrl().replaceAll("/+$", "");
 		String reason = attempts.findFirstByOrderIdOrderByAttemptNoDesc(o.getId()).map(a -> a.getReasonCode())

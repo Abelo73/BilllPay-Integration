@@ -52,6 +52,7 @@ public class PayoutService {
 	private final SmsService sms;
 	private final ShopMetrics metrics;
 	private final et.tenapay.shop.dispute.DisputeRepository disputes;
+	private final et.tenapay.shop.config.Features features;
 	private final TransactionTemplate tx;
 
 	@Value("${app.payouts.release-after:48h}")
@@ -66,11 +67,18 @@ public class PayoutService {
 
 	// ---------- commission ----------
 
-	/** The commission percent for one line: seller + category > seller > category > default (0 if none). */
+	/**
+	 * The commission percent for one line: seller + category > seller > category > default (0 if none). Pro shops
+	 * (M17) pay a few points less, never below 0.
+	 */
 	public BigDecimal percentFor(Long shopId, Long categoryId) {
-		return rules.candidates(shopId, categoryId).stream()
+		BigDecimal percent = rules.candidates(shopId, categoryId).stream()
 				.max(Comparator.comparingInt((CommissionRule r) -> (r.getShopId() != null ? 2 : 0) + (r.getCategoryId() != null ? 1 : 0)))
 				.map(CommissionRule::getPercent).orElse(BigDecimal.ZERO);
+		if (shopId != null && percent.signum() > 0 && shops.findById(shopId).map(Shop::pro).orElse(false)) {
+			percent = percent.subtract(features.number(et.tenapay.shop.config.Features.PRO_COMMISSION_OFF)).max(BigDecimal.ZERO);
+		}
+		return percent;
 	}
 
 	/** Called in the transaction that marks the order paid: locks commission and earnings, held until delivery. */

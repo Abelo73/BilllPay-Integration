@@ -54,6 +54,17 @@ public class Features {
 	public static final String FEATURED_TALENT_PRICE = "featured_talent_price";
 	public static final String STUDENT_BADGE = "student_badge";
 
+	public static final String BOOSTS = "boosts";
+	public static final String BOOST_PRICE_3 = "boost_price_3d";
+	public static final String BOOST_PRICE_7 = "boost_price_7d";
+	public static final String BOOST_PRICE_14 = "boost_price_14d";
+	public static final String PRO_PLAN = "pro_plan";
+	public static final String PRO_PLAN_PRICE = "pro_plan_price";
+	public static final String FREE_PLAN_MAX_PRODUCTS = "free_plan_max_products";
+	public static final String PRO_COMMISSION_OFF = "pro_commission_off";
+	public static final String BANNERS = "banners";
+	public static final String STAFF_TWO_STEP = "staff_two_step";
+
 	public static final List<Def> DEFS = List.of(
 			new Def(ONLINE_PAYMENTS, Type.SWITCH, "false", "Marketplace", "Online payment (BillPay)",
 					"On: buyers add to cart and pay online, the money is held until delivery. Off: like Jiji, buyers contact the seller (chat or call) and agree on payment and pickup themselves.", true),
@@ -87,7 +98,21 @@ public class Features {
 					"Profiles shown first to employers. Turn on once there are 30+ active employers.", true),
 			new Def(FEATURED_TALENT_PRICE, Type.NUMBER, "49", "Jobs and CVs", "Featured talent (birr a month)", null, true),
 			new Def(STUDENT_BADGE, Type.SWITCH, "true", "Jobs and CVs", "J7 · Verified student badge",
-					"Students upload their student ID; staff check it.", true));
+					"Students upload their student ID; staff check it.", true),
+			new Def(BOOSTS, Type.SWITCH, "true", "Selling", "M16 · Boosts", "Sellers pay to put a listing on top of search and the home page.", true),
+			new Def(BOOST_PRICE_3, Type.NUMBER, "50", "Selling", "Boost 3 days (birr)", null, true),
+			new Def(BOOST_PRICE_7, Type.NUMBER, "100", "Selling", "Boost 7 days (birr)", null, true),
+			new Def(BOOST_PRICE_14, Type.NUMBER, "180", "Selling", "Boost 14 days (birr)", null, true),
+			new Def(PRO_PLAN, Type.SWITCH, "true", "Selling", "M17 · Pro shop plan",
+					"Monthly plan: no product limit, Pro badge, statistics, lower commission.", true),
+			new Def(PRO_PLAN_PRICE, Type.NUMBER, "500", "Selling", "Pro shop (birr a month)", null, true),
+			new Def(FREE_PLAN_MAX_PRODUCTS, Type.NUMBER, "20", "Selling", "Products on the free plan",
+					"Listings a free shop can have; Pro shops have no limit.", true),
+			new Def(PRO_COMMISSION_OFF, Type.NUMBER, "2", "Selling", "Pro shops pay less commission (points)",
+					"Taken off the commission percent, e.g. 5% becomes 3%.", true),
+			new Def(BANNERS, Type.SWITCH, "true", "Selling", "Home page banners", "Banners from Admin → Banners.", true),
+			new Def(STAFF_TWO_STEP, Type.SWITCH, "false", "Security", "2-step sign-in for staff",
+					"After the password, staff type a code sent by SMS and email. Check that SMS or email works first.", false));
 
 	private static final Map<String, Def> BY_KEY = new LinkedHashMap<>();
 	static {

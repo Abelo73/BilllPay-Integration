@@ -25,10 +25,14 @@ export function ProductCard({ product }: { product: Product }) {
           className="aspect-square w-full transition duration-500 group-hover:scale-[1.03]"
         />
       </Link>
-      {product.featured && (
-        <span className="absolute left-2 top-2 rounded-full bg-warning px-2 py-0.5 text-[11px] font-bold text-foreground dark:text-[#13201A]">
-          {t('Featured')}
-        </span>
+      {product.boosted ? (
+        <span className="absolute left-2 top-2 rounded-full bg-market px-2 py-0.5 text-[11px] font-bold text-[#13201A]">{t('Boosted')}</span>
+      ) : (
+        product.featured && (
+          <span className="absolute left-2 top-2 rounded-full bg-warning px-2 py-0.5 text-[11px] font-bold text-foreground dark:text-[#13201A]">
+            {t('Featured')}
+          </span>
+        )
       )}
       {soldOut ? (
         <span className="absolute right-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[11px] font-bold">{t('Sold out')}</span>

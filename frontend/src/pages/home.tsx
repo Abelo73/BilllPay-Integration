@@ -31,6 +31,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 
 import { LogoSymbol } from '@/components/logo'
+import { HomeBanners, TopListings } from '@/components/home-promos'
 import { ProductCard } from '@/components/product-card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
@@ -657,8 +658,10 @@ export function HomePage() {
     <>
       <Hero payments={features.payments} />
       <Marquee />
+      <HomeBanners />
       <Categories jobsOn={jobsOn} />
       <HowItWorks payments={features.payments} />
+      <TopListings />
       <Fresh />
       <Workers />
       <JobsAndCvs />

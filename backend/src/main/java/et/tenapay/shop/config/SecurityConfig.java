@@ -50,7 +50,7 @@ public class SecurityConfig {
 						.requestMatchers("/error").permitAll()
 						// metrics for Prometheus: only from this machine / the Docker network, never through a proxy
 						.requestMatchers("/actuator/prometheus").access(InternalNetwork::check)
-						.requestMatchers("/api/auth/**", "/api/admin/auth/login").permitAll()
+						.requestMatchers("/api/auth/**", "/api/admin/auth/login", "/api/admin/auth/verify").permitAll()
 						// user management and login history: admins only
 						.requestMatchers("/api/admin/users/**", "/api/admin/login-events/**").hasRole("ADMIN")
 						// support staff can look at everything, only admins can change things (refunds, replays, ...)

@@ -35,6 +35,8 @@ import {
   Star,
   BriefcaseBusiness,
   AlertTriangle,
+  Rocket,
+  GalleryHorizontal,
   FileText,
   GraduationCap,
 } from 'lucide-react'
@@ -49,9 +51,10 @@ import { adminApi, adminToken, payoutAdminApi, shopAdminApi } from '@/lib/admin-
 import { trustAdminApi } from '@/lib/trust-api'
 import { workAdminApi } from '@/lib/work-admin-api'
 import { problemAdminApi } from '@/lib/dispute-api'
+import { promoAdminApi } from '@/lib/promo-api'
 import { cn } from '@/lib/utils'
 
-type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' | 'jobs' | 'cv' | 'students' | 'problems' }
+type Item = { to: string; label: string; icon: typeof Package; end?: boolean; adminOnly?: boolean; badge?: 'review' | 'webhooks' | 'sellers' | 'verifications' | 'listings' | 'payouts' | 'jobs' | 'cv' | 'students' | 'problems' | 'promo' }
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
@@ -72,6 +75,8 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/discounts', label: 'Discounts', icon: TicketPercent },
       { to: '/admin/payouts', label: 'Payouts', icon: Wallet, badge: 'payouts' },
       { to: '/admin/fees', label: 'Fees', icon: Percent },
+      { to: '/admin/promo', label: 'Boosts & plans', icon: Rocket, badge: 'promo' },
+      { to: '/admin/banners', label: 'Banners', icon: GalleryHorizontal },
     ],
   },
   {
@@ -247,6 +252,7 @@ export function AdminLayout() {
 
   const workQueue = useQuery({ queryKey: ['admin-work-counts'], queryFn: workAdminApi.counts, enabled: signedIn, refetchInterval: 60_000 })
   const problemQueue = useQuery({ queryKey: ['admin-problem-count'], queryFn: problemAdminApi.count, enabled: signedIn, refetchInterval: 60_000 })
+  const promoQueue = useQuery({ queryKey: ['admin-promo-counts'], queryFn: promoAdminApi.counts, enabled: signedIn, refetchInterval: 60_000 })
 
   const staff = adminToken.session()
   if (!signedIn) {
@@ -264,6 +270,7 @@ export function AdminLayout() {
     cv: workQueue.data?.cvOrdersOpen ?? 0,
     students: workQueue.data?.studentsWaiting ?? 0,
     problems: problemQueue.data?.open ?? 0,
+    promo: (promoQueue.data?.boosts ?? 0) + (promoQueue.data?.plans ?? 0),
   }
 
   const toggle = () => {

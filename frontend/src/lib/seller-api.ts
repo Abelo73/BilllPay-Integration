@@ -23,6 +23,9 @@ export type MyShop = {
   createdAt: string
   /** Verified badge since; null = not verified */
   verifiedAt: string | null
+  /** M17: the Pro plan is paid up, until planUntil */
+  pro?: boolean
+  planUntil?: string | null
 }
 
 export type ShopInput = {

@@ -19,7 +19,7 @@ final class EmailTemplates {
 
 	enum Kind {
 		ORDER_PLACED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
-		PASSWORD_CHANGED
+		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE
 	}
 
 	record Email(String subject, String html, String text) {
@@ -72,7 +72,7 @@ final class EmailTemplates {
 					o, "Order again");
 			case REFUNDED -> build("Refund issued for " + o.orderNumber(), "Refund issued",
 					"We've sent a refund through BillPay to the method you paid with.", o, "View your order");
-			case PASSWORD_CHANGED -> throw new IllegalArgumentException("not an order email");
+			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE -> throw new IllegalArgumentException("not an order email");
 		};
 	}
 
@@ -82,6 +82,15 @@ final class EmailTemplates {
 				+ ". All other devices were signed out. If this wasn't you, reset your password and contact us.";
 		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p>");
 		return new Email("Your Sodo Gebeya password was changed", html, title + "\n\n" + body + "\n\n— Sodo Gebeya");
+	}
+
+	static Email staffSignInCode(String fullName, String code) {
+		String title = "Your sign-in code";
+		String body = "Hi " + firstName(fullName) + ", your Sodo Gebeya admin sign-in code is " + code
+				+ ". It works for 10 minutes. If you didn't just sign in, change your password now.";
+		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
+				+ esc(code) + "</p>");
+		return new Email("Sodo Gebeya admin sign-in code: " + code, html, title + "\n\n" + body + "\n\n— Sodo Gebeya");
 	}
 
 	private static Email build(String subject, String title, String intro, OrderView o, String cta) {

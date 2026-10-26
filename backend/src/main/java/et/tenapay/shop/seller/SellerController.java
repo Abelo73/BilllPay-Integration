@@ -89,6 +89,7 @@ public class SellerController {
 	private final BillPayMode billPayMode;
 	private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 	private final MediaProperties media;
+	private final et.tenapay.shop.promo.PromoService promo;
 
 	public record ShopRequest(ShopKind kind, @NotBlank @Size(min = 2, max = 120) String name,
 			@Size(max = 2000) String description, @NotBlank @Size(max = 20) String phone, @Size(max = 120) String area,
@@ -241,6 +242,7 @@ public class SellerController {
 	@PostMapping("/products")
 	public ProductDetail create(@Valid @RequestBody ProductRequest req) {
 		Shop shop = shopService.requireMine();
+		promo.checkProductLimit(shop, productCount(shop));
 		activeCategory(req.categoryId());
 		Product p = catalog.create(new ProductForm(req.name(), null, req.description(), req.categoryId(), req.price(),
 				req.stock(), req.lowStockThreshold(), false, req.active(), req.condition(), req.negotiable(), req.area(), req.specs()), shop);
@@ -280,7 +282,9 @@ public class SellerController {
 
 	@PostMapping("/products/{id}/duplicate")
 	public ProductDetail duplicate(@PathVariable Long id) {
-		own(shopService.requireMine(), id);
+		Shop shop = shopService.requireMine();
+		own(shop, id);
+		promo.checkProductLimit(shop, productCount(shop));
 		return detailOf(catalog.duplicate(id).getId());
 	}
 
@@ -380,6 +384,10 @@ public class SellerController {
 	private void activeCategory(Long id) {
 		categories.findById(id).filter(Category::isActive)
 				.orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "CATEGORY_UNAVAILABLE", "Choose one of the listed categories."));
+	}
+
+	private long productCount(Shop shop) {
+		return ((Number) products.shopCounts(shop.getId()).get(0)[0]).longValue();
 	}
 
 	private ProductDetail detailOf(Long id) {

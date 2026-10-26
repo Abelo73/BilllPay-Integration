@@ -63,6 +63,19 @@ public class Shop {
 	/** Set when staff approved the owner's ID (Verified badge); null = not verified. */
 	private Instant verifiedAt;
 
+	/** M17: FREE or PRO; PRO counts only while {@link #planUntil} is in the future (see {@link #pro()}). */
+	private String plan = "FREE";
+
+	private Instant planUntil;
+
+	/** The last "your Pro plan ends soon" SMS. */
+	private Instant planRemindedAt;
+
+	/** The Pro plan is paid up (M17): no product limit, Pro badge, statistics, lower commission. */
+	public boolean pro() {
+		return "PRO".equals(plan) && planUntil != null && planUntil.isAfter(Instant.now());
+	}
+
 	/** Where payouts go: BANK, TELEBIRR, CBE_BIRR or OTHER. */
 	private String payoutMethod;
 

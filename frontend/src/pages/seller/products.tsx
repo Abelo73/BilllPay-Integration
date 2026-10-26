@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ChevronRight, Plus, Search } from 'lucide-react'
+import { ChevronRight, Plus, Rocket, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 
@@ -8,7 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatETB } from '@/lib/format'
 import { sellerApi, sellerCatalog } from '@/lib/seller-api'
+import { useFeatures } from '@/lib/features'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { BoostDialog } from './plan'
 import { ProductEditor } from '../admin/product-edit'
 import { StockBadge, Thumb } from '../admin/products'
 import { Pager } from '../admin/shared'
@@ -22,6 +25,9 @@ const FILTERS = [
 ]
 
 export function SellerProductsPage() {
+  const t = useT()
+  const features = useFeatures()
+  const [boosting, setBoosting] = useState<{ id: number; name: string } | null>(null)
   const [params, setParams] = useSearchParams()
   const status = params.get('status') ?? 'all'
   const q = params.get('q') ?? ''
@@ -35,8 +41,8 @@ export function SellerProductsPage() {
     setParams(next, { replace: true })
   }
   useEffect(() => {
-    const t = setTimeout(() => search !== q && set('q', search || null), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => search !== q && set('q', search || null), 300)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
@@ -83,8 +89,8 @@ export function SellerProductsPage() {
       ) : (
         <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
           {data?.content.map((p) => (
-            <li key={p.id}>
-              <Link to={`/seller/products/${p.id}`} className="flex items-center gap-3 p-3 transition hover:bg-muted/50">
+            <li key={p.id} className="flex items-center">
+              <Link to={`/seller/products/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 p-3 transition hover:bg-muted/50">
                 <Thumb src={p.imageUrl} alt="" className="size-16 rounded-xl" />
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="truncate text-sm font-bold">{p.name}</p>
@@ -95,10 +101,16 @@ export function SellerProductsPage() {
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </Link>
+              {features.on('boosts') && p.active && !p.blockedReason && (
+                <Button variant="ghost" size="sm" className="mr-2 shrink-0 text-primary" onClick={() => setBoosting({ id: p.id, name: p.name })}>
+                  <Rocket /> {t('Boost')}
+                </Button>
+              )}
             </li>
           ))}
         </ul>
       )}
+      {boosting && <BoostDialog productId={boosting.id} productName={boosting.name} onClose={() => setBoosting(null)} />}
       {data && <Pager page={page} totalPages={data.totalPages} total={data.totalElements} size={data.size} onPage={(p) => set('page', String(p))} />}
     </div>
   )

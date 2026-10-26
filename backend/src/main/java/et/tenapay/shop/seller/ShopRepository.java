@@ -22,6 +22,9 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
 
 	boolean existsBySlug(String slug);
 
+	/** M17: Pro shops whose plan ends in a window (renewal reminders). */
+	java.util.List<Shop> findByPlanAndPlanUntilBetween(String plan, java.time.Instant from, java.time.Instant to);
+
 	@Query("""
 			select s from Shop s
 			where (:status is null or s.status = :status)

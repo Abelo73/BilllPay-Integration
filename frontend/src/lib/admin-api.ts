@@ -49,7 +49,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   })
-  if (res.status === 401 && path !== '/auth/login') {
+  if (res.status === 401 && path !== '/auth/login' && path !== '/auth/verify') {
     adminToken.clear()
     window.location.assign(`/admin/login?next=${encodeURIComponent(window.location.pathname)}`)
   }
@@ -273,8 +273,14 @@ export const fulfilParcel = (orderNumber: string, parcelNo: number, status: stri
   )
 
 export const adminApi = {
+  /** With 2-step sign-in on, the answer is a challenge; the session comes from verify() after the code. */
   login: (email: string, password: string) =>
-    request<StaffSession>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    request<StaffSession | StaffChallenge>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, deviceToken: staffDevice.get() ?? undefined }),
+    }),
+  verify: (challengeId: string, code: string, trustDevice: boolean) =>
+    request<StaffSession & { deviceToken: string | null }>('/auth/verify', { method: 'POST', body: JSON.stringify({ challengeId, code, trustDevice }) }),
   config: () => request<AdminConfig>('/config'),
   /** Switch which BillPay new orders use; going live needs confirm === 'LIVE'. */
   switchMode: (mode: BillPayEnv, confirm?: string) =>
@@ -751,4 +757,27 @@ export type FieldInput = {
   filterable?: boolean
   active?: boolean
   help?: string | null
+}
+
+/** M23: step 2 of staff sign-in (code sent by SMS and email). devCode only in local test mode. */
+export type StaffChallenge = { twoStep: true; challengeId: string; sentTo: string; expiresInSeconds: number; devCode: string | null }
+
+const DEVICE_KEY = 'sodo-staff-device'
+
+/** A device trusted for 30 days after a 2-step sign-in (skips the code). */
+export const staffDevice = {
+  get(): string | null {
+    try {
+      return localStorage.getItem(DEVICE_KEY)
+    } catch {
+      return null
+    }
+  },
+  set(token: string) {
+    try {
+      localStorage.setItem(DEVICE_KEY, token)
+    } catch {
+      /* private mode */
+    }
+  },
 }

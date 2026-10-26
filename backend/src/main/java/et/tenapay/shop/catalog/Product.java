@@ -80,6 +80,13 @@ public class Product {
 	@org.hibernate.annotations.ColumnTransformer(write = "?::jsonb")
 	private String specs = "{}";
 
+	/** M16: on top of search and the home page until then (a paid boost). */
+	private Instant boostedUntil;
+
+	public boolean boosted() {
+		return boostedUntil != null && boostedUntil.isAfter(Instant.now());
+	}
+
 	/** Set when staff took the listing down after reports; it stays off the store until staff lift it. */
 	private String blockedReason;
 

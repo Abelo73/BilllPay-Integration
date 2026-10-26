@@ -121,11 +121,13 @@ Result: each parcel's earnings are held when fulfilment starts, released when th
 - Seller marks "cash received"; commission for cash orders is charged to the seller's balance
 - **Done when:** a cash order completes and the commission shows on the seller's statement
 
-### M8. Disputes v1 (1 week)
+### M8. Disputes v1 (1 week) ✅ Done 2026-10-25
 - "Problem with this order?" with reason and photos (**S6**)
 - Admin dispute queue with deadline (**S21**): refund (full or partial through BillPay), release to seller, or split
 - Payout of a disputed order stays held until decided
 - **Done when:** a dispute is opened, decided, and the money goes the right way
+
+Result ("Problems"): the buyer reports a problem on a paid parcel (reason, details, up to 4 photos); its money stays held (no automatic or receipt release); buyer and seller talk in one thread (Seller → Problems); staff settle in Admin → Problems: refund, part refund (seller gets the rest) or pay the seller. Tests: `DisputeIntegrationTest`.
 
 ### 🚀 Pilot launch gate
 All of these must be true:
@@ -195,14 +197,18 @@ All of these must be true:
 
 ## Phase 5: Income
 
-### M16. Boosts (1 week)
+### M16. Boosts (1 week) ✅ Done 2026-10-26
 - Boost a listing (**S19**): 3/7/14 days, paid with BillPay; Boosted label; top of search and home; auto-post to Telegram channel
 - **Done when:** a paid boost moves a listing to the top and ends on time
 
-### M17. Pro shop plan and ads (1 week)
+Result: sellers boost from Seller → Products (3/7/14 days, prices in Admin → Features); while online payment is off they pay by telebirr or bank and enter the transaction number; staff confirm in Admin → Boosts & plans and the listing goes on top of search with a Boosted label and into "Top listings" on the home page until the end date. Telegram auto-post not done yet.
+
+### M17. Pro shop plan and ads (1 week) ✅ Done 2026-10-26
 - Free vs **Pro shop** monthly plan (more products, banner, statistics, lower commission), renewal reminders
 - Simple banner ads managed in admin
 - **Done when:** a shop upgrades, pays, and its limits and commission change automatically
+
+Result: free shops can list up to 20 products (Admin → Features); the Pro plan (1/3/6/12 months) removes the limit, adds a Pro badge on the shop and product pages, statistics per product (phone shown, chats, offers) and 2 points less commission; renewal SMS 3 days before the end. Home banners in Admin → Banners (picture, link, dates, click count). Tests: `PromoIntegrationTest`.
 
 ---
 
@@ -248,6 +254,7 @@ From *Sodo-Gebeya-Jobs-and-CV-Features.pdf*. Each part has its own switch and pr
 
 ## Phase 8: Scale (ongoing)
 - **M23 Security:** penetration test, rate limits everywhere, fraud rules (new account + high price + many reports), 2-step login for staff
+  - Done 2026-10-26: rate limits per visitor (sign-in 20/min, changes 120/min, reads 600/min); staff 2-step sign-in (code by SMS and email, trusted device for 30 days, off by default in Admin → Features). Still to do: fraud rules, penetration test.
 - **M24 Performance:** image CDN, caching, database indexes, load tests (the load-test tool already started)
 - **M25 Expansion:** add towns (Areka, Boditi, Arba Minch, Hawassa) as areas; local agents; Android app in the Play Store
 
