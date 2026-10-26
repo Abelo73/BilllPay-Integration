@@ -31,7 +31,8 @@ public class AreaAdminController {
 
 	private final AreaRepository areas;
 
-	public record AreaRow(Long id, String name, int sortOrder, boolean active) {
+	/** {@code deliveryFee} null = the standard delivery fee. */
+	public record AreaRow(Long id, String name, int sortOrder, boolean active, java.math.BigDecimal deliveryFee) {
 	}
 
 	public record AreaRequest(@Size(max = 120) String name, Boolean active) {
@@ -44,7 +45,7 @@ public class AreaAdminController {
 	@Transactional(readOnly = true)
 	public List<AreaRow> list() {
 		return areas.findAllByOrderBySortOrderAscIdAsc().stream()
-				.map(a -> new AreaRow(a.getId(), a.getName(), a.getSortOrder(), a.isActive())).toList();
+				.map(a -> new AreaRow(a.getId(), a.getName(), a.getSortOrder(), a.isActive(), a.getDeliveryFee())).toList();
 	}
 
 	@PostMapping
@@ -77,6 +78,19 @@ public class AreaAdminController {
 		if (req.active() != null) {
 			a.setActive(req.active());
 		}
+		return list();
+	}
+
+	/** {@code fee} null = back to the standard fee. */
+	public record FeeRequest(@jakarta.validation.constraints.DecimalMin("0") @jakarta.validation.constraints.DecimalMax("100000") java.math.BigDecimal fee) {
+	}
+
+	/** Delivery fee to one area (M21). */
+	@PutMapping("/{id}/delivery-fee")
+	@Transactional
+	public List<AreaRow> deliveryFee(@PathVariable Long id, @Valid @RequestBody FeeRequest req) {
+		Area a = areas.findById(id).orElseThrow(() -> ApiException.notFound("Area"));
+		a.setDeliveryFee(req.fee() == null ? null : req.fee().setScale(2, java.math.RoundingMode.HALF_UP));
 		return list();
 	}
 

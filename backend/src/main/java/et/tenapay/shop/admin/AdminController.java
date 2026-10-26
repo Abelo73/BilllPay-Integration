@@ -74,6 +74,7 @@ public class AdminController {
 	private final et.tenapay.shop.notification.NotificationRepository notificationRepo;
 	private final et.tenapay.shop.order.OrderParcelRepository parcelRepo;
 	private final et.tenapay.shop.seller.ShopRepository shopRepo;
+	private final et.tenapay.shop.delivery.RiderRepository riderRepo;
 
 	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
 			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
@@ -90,7 +91,9 @@ public class AdminController {
 	public record DeliveryDetail(String address, String city, String notes, BigDecimal subtotal, String discountCode,
 			BigDecimal discountAmount, BigDecimal deliveryFee,
 			String fulfilmentStatus, List<String> nextSteps, String trackingNote, Instant shippedAt,
-			Instant deliveredAt, Instant cancelledAt) {
+			Instant deliveredAt, Instant cancelledAt,
+			/** Area of Sodo picked at checkout (M21) */
+			String area) {
 
 		static DeliveryDetail from(Order o) {
 			return new DeliveryDetail(o.getDeliveryAddress(), o.getDeliveryCity(), o.getDeliveryNotes(), o.getSubtotal(),
@@ -98,7 +101,7 @@ public class AdminController {
 					o.getDeliveryFee(), o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(),
 					o.getFulfilmentStatus() == null ? List.of()
 							: o.getFulfilmentStatus().next().stream().map(Enum::name).sorted().toList(),
-					o.getTrackingNote(), o.getShippedAt(), o.getDeliveredAt(), o.getCancelledAt());
+					o.getTrackingNote(), o.getShippedAt(), o.getDeliveredAt(), o.getCancelledAt(), o.getDeliveryArea());
 		}
 	}
 
@@ -155,7 +158,9 @@ public class AdminController {
 	/** One seller's parcel of the order (shopId null = Sodo Gebeya's own); staff can move any parcel. */
 	public record ParcelRow(String number, int parcelNo, Long shopId, String seller, BigDecimal itemsTotal,
 			BigDecimal discountShare, BigDecimal deliveryFee, String fulfilmentStatus, List<String> nextSteps,
-			String trackingNote, Instant shippedAt, Instant deliveredAt, Instant cancelledAt, List<String> items) {
+			String trackingNote, Instant shippedAt, Instant deliveredAt, Instant cancelledAt, List<String> items,
+			/** Rider on this parcel (M21), null = none yet */
+			Long riderId, String riderName) {
 	}
 
 	public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -265,7 +270,9 @@ public class AdminController {
 				p.getFulfilmentStatus() == null ? List.of() : p.getFulfilmentStatus().next().stream().map(Enum::name).sorted().toList(),
 				p.getTrackingNote(), p.getShippedAt(), p.getDeliveredAt(), p.getCancelledAt(),
 				o.getItems().stream().filter(i -> i.getParcelNo() != null && i.getParcelNo() == p.getParcelNo())
-						.map(i -> i.getQuantity() + " × " + i.getProductName()).toList()))
+						.map(i -> i.getQuantity() + " × " + i.getProductName()).toList(),
+				p.getRiderId(), p.getRiderId() == null ? null
+						: riderRepo.findById(p.getRiderId()).map(r -> r.getName() + " (" + r.getPhone() + ")").orElse(null)))
 				.toList();
 		return new OrderDetail(OrderRow.from(o), o.getCustomerEmail(), DeliveryDetail.from(o),
 				o.getItems().stream().map(ItemRow::from).toList(),

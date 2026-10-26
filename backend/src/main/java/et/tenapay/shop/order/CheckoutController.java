@@ -58,6 +58,8 @@ public class CheckoutController {
 	private final OrderParcelRepository parcelRepo;
 	private final et.tenapay.shop.seller.ShopRepository shops;
 	private final et.tenapay.shop.config.Features features;
+	private final et.tenapay.shop.catalog.AreaRepository areas;
+	private final et.tenapay.shop.delivery.RiderRepository riderRepo;
 
 	/** Online payment is a switch (Admin → Features), off by default: buyers then contact the seller instead. */
 	private void requireOnlinePayments() {
@@ -79,7 +81,9 @@ public class CheckoutController {
 	public record DeliveryRequest(
 			@NotBlank @Size(max = 300) String address,
 			@NotBlank @Size(max = 100) String city,
-			@Size(max = 300) String notes) {
+			@Size(max = 300) String notes,
+			/** Area of Sodo from the list (optional); an area with its own fee sets the delivery fee. */
+			@Size(max = 120) String area) {
 	}
 
 	public record CheckoutRequest(@NotEmpty @Size(max = 30) List<@Valid CheckoutItem> items,
@@ -91,7 +95,7 @@ public class CheckoutController {
 	}
 
 	public record QuoteRequest(@NotEmpty @Size(max = 30) List<@Valid CheckoutItem> items,
-			@NotBlank @Size(max = 40) String code) {
+			@NotBlank @Size(max = 40) String code, @Size(max = 120) String area) {
 	}
 
 	public record CheckoutResponse(String orderNumber, String checkoutUrl) {
@@ -103,7 +107,15 @@ public class CheckoutController {
 	public record CancelRequest(String phone, @Size(max = 300) String reason) {
 	}
 
-	public record DeliveryQuote(BigDecimal flatFee, BigDecimal freeOver, String currency) {
+	/** {@code areas}: areas of Sodo to deliver to; an area's {@code fee} null = the standard fee. */
+	public record DeliveryQuote(BigDecimal flatFee, BigDecimal freeOver, String currency, List<AreaFee> areas) {
+	}
+
+	public record AreaFee(String name, BigDecimal fee) {
+	}
+
+	/** Who brings the parcel; shown once it's on the way. */
+	public record RiderView(String name, String phone) {
 	}
 
 	/** productSlug is null when the product was removed; the shop uses it for "Order again". */
@@ -122,7 +134,9 @@ public class CheckoutController {
 	public record ParcelView(String number, int parcelNo, String seller, String sellerSlug, BigDecimal itemsTotal,
 			BigDecimal deliveryFee, String fulfilmentStatus, String trackingNote, Instant shippedAt, Instant deliveredAt,
 			/** The buyer may tap "I received my items" (sent, not confirmed yet) */
-			boolean canConfirmReceipt, Instant receivedAt) {
+			boolean canConfirmReceipt, Instant receivedAt,
+			/** The rider bringing it (null until staff pick one) */
+			RiderView rider) {
 	}
 
 	public record ReceivedRequest(@Size(max = 20) String phone) {
@@ -166,24 +180,27 @@ public class CheckoutController {
 
 	@GetMapping("/delivery")
 	public DeliveryQuote delivery() {
-		return new DeliveryQuote(app.delivery().flatFee(), app.delivery().freeOver(), "ETB");
+		List<AreaFee> list = areas.findAllByOrderBySortOrderAscIdAsc().stream().filter(et.tenapay.shop.catalog.Area::isActive)
+				.map(a -> new AreaFee(a.getName(), a.getDeliveryFee())).toList();
+		return new DeliveryQuote(app.delivery().flatFee(), app.delivery().freeOver(), "ETB", list);
 	}
 
 	/** What the cart costs: per-seller parcels and their delivery fees, plus a discount code if given. */
 	@PostMapping("/checkout/quote")
 	public CheckoutService.Quote quote(@Valid @RequestBody CartQuoteRequest req) {
 		return checkout.quote(req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
-				req.code());
+				req.code(), req.area());
 	}
 
-	public record CartQuoteRequest(@NotEmpty @Size(max = 50) List<@Valid CheckoutItem> items, @Size(max = 40) String code) {
+	public record CartQuoteRequest(@NotEmpty @Size(max = 50) List<@Valid CheckoutItem> items, @Size(max = 40) String code,
+			@Size(max = 120) String area) {
 	}
 
 	/** Checks a discount code against the cart and returns what the order would cost. Nothing is used up. */
 	@PostMapping("/discounts/check")
 	public CheckoutService.Quote checkDiscount(@Valid @RequestBody QuoteRequest req) {
 		return checkout.quote(req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
-				req.code());
+				req.code(), req.area());
 	}
 
 	@PostMapping("/checkout")
@@ -193,7 +210,8 @@ public class CheckoutController {
 		Order order = checkout.createOrder(
 				req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
 				new CheckoutService.CustomerInfo(req.customer().name(), req.customer().phone(), req.customer().email()),
-				new CheckoutService.DeliveryInfo(req.delivery().address(), req.delivery().city(), req.delivery().notes()),
+				new CheckoutService.DeliveryInfo(req.delivery().address(), req.delivery().city(), req.delivery().notes(),
+						req.delivery().area()),
 				customerId, req.discountCode());
 		if (customerId != null && Boolean.TRUE.equals(req.saveAddress())) {
 			saveAddress(customerId, req);
@@ -315,7 +333,15 @@ public class CheckoutController {
 					p.getShippedAt(), p.getDeliveredAt(),
 					p.getReceivedAt() == null && (p.getFulfilmentStatus() == FulfilmentStatus.SHIPPED
 							|| p.getFulfilmentStatus() == FulfilmentStatus.DELIVERED),
-					p.getReceivedAt());
+					p.getReceivedAt(), riderFor(p));
 		}).toList();
+	}
+
+	/** The rider's name and phone, once the parcel is on its way (not before: plans can still change). */
+	private RiderView riderFor(OrderParcel p) {
+		if (p.getRiderId() == null || p.getFulfilmentStatus() != FulfilmentStatus.SHIPPED) {
+			return null;
+		}
+		return riderRepo.findById(p.getRiderId()).map(r -> new RiderView(r.getName(), r.getPhone())).orElse(null);
 	}
 }

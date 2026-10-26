@@ -219,7 +219,7 @@ Result: free shops can list up to 20 products (Admin → Features); the Pro plan
 ### M18. Amharic and Wolaytta (1 week)
 - Full Amharic translation; Wolaytta with a native speaker; language remembered per user; SMS in the user's language
 
-🟡 Mostly done 2026-10-25 (V29). **English / አማርኛ switch** in the header (starts in Amharic when the phone is set to Amharic; remembered on the device and on the account). **Every customer screen is translated** (about 1,000 lines in `frontend/src/locales/am/`, one file per area; the English text is the key, missing lines show in English): menus, home, sign-in, account, shop, product, cart, checkout, order tracking and problems, chats, notifications, reviews, Hire a pro, pro dashboard, job board, employer pages, talent profile and CV pages. **SMS in Amharic** for people who chose it: sign-in code, order updates, chat and job alerts (`sms/SmsLanguage` helper). Still to do: seller area (after boosts/plans), the printed CV body follows its own language switch, dates are formatted in English, dispute/payout/verification SMS, admin stays English. **Needs you:** a native speaker to review the Amharic (first draft by us), and someone to write Wolaytta.
+🟡 Mostly done 2026-10-25 (V29). **English / አማርኛ switch** in the header (starts in Amharic when the phone is set to Amharic; remembered on the device and on the account). **Every customer screen is translated** (about 1,000 lines in `frontend/src/locales/am/`, one file per area; the English text is the key, missing lines show in English): menus, home, sign-in, account, shop, product, cart, checkout, order tracking and problems, chats, notifications, reviews, Hire a pro, pro dashboard, job board, employer pages, talent profile and CV pages. **SMS in Amharic** for people who chose it: sign-in code, order updates, chat and job alerts (`sms/SmsLanguage` helper). Seller area too (dashboard, open a shop, verification, products and the product editor, orders, money, plan; 2026-10-26). Still to do: the printed CV body follows its own language switch, dates are formatted in English, dispute/payout/verification SMS, admin stays English. **Needs you:** a native speaker to review the Amharic (first draft by us), and someone to write Wolaytta.
 ### M19. Installable app (PWA) (1 week)
 - Add to home screen, works on slow connections, offline pages, push notifications on Android
 
@@ -235,6 +235,8 @@ Result: free shops can list up to 20 products (Admin → Features); the Pro plan
 
 ### M21. Delivery zones and riders (1.5 weeks)
 - Zones and fees for Sodo and outskirts; admin assigns orders to partner riders; rider phone shown to buyer (**S6**)
+
+✅ Done 2026-10-26 (V33). **Delivery fee per area:** Admin → Areas gives each area of Sodo its own fee (empty = the standard fee, 0 = free); buyers pick their area at checkout and the fee follows (free-delivery amount still applies). **Riders:** Admin → Riders keeps partner riders (name, phone, note, on/off); staff put a rider on each parcel from the order page; the buyer gets a notification and, once the parcel is on its way, sees the rider with a Call button on order tracking. Test: `DeliveryIntegrationTest`. Still open: zones outside Sodo town (add them as areas), rider payouts, rider app (M22). **Needs you:** the real list of areas and fees, and your first riders.
 ### M22. Rider app (1.5 weeks)
 - Rider sees jobs, accepts, pickup photo, delivered photo or code, cash collection for COD orders, daily earnings
 

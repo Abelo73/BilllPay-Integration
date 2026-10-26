@@ -53,6 +53,11 @@ public class OrderParcel {
 
 	private String trackingNote;
 
+	/** Partner rider bringing this parcel (M21), set by staff. */
+	private Long riderId;
+
+	private Instant riderAssignedAt;
+
 	private Instant shippedAt;
 
 	private Instant deliveredAt;

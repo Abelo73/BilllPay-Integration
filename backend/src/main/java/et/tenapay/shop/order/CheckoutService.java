@@ -44,7 +44,33 @@ public class CheckoutService {
 	public record CustomerInfo(String name, String phone, String email) {
 	}
 
-	public record DeliveryInfo(String address, String city, String notes) {
+	/** {@code area}: area of Sodo from Admin → Areas (optional); an area with its own fee sets the delivery fee. */
+	public record DeliveryInfo(String address, String city, String notes, String area) {
+
+		public DeliveryInfo(String address, String city, String notes) {
+			this(address, city, notes, null);
+		}
+	}
+
+	private et.tenapay.shop.catalog.AreaRepository areas;
+
+	@org.springframework.beans.factory.annotation.Autowired
+	void setAreas(et.tenapay.shop.catalog.AreaRepository areas) {
+		this.areas = areas;
+	}
+
+	/** The listed, active area with this name (any case), if there is one. */
+	java.util.Optional<et.tenapay.shop.catalog.Area> area(String name) {
+		if (name == null || name.isBlank() || areas == null) {
+			return java.util.Optional.empty();
+		}
+		return areas.findAllByOrderBySortOrderAscIdAsc().stream()
+				.filter(a -> a.isActive() && a.getName().equalsIgnoreCase(name.trim())).findFirst();
+	}
+
+	/** The area's own delivery fee, or null for the standard fee. */
+	private BigDecimal areaFee(String name) {
+		return area(name).map(et.tenapay.shop.catalog.Area::getDeliveryFee).orElse(null);
 	}
 
 	/**
@@ -113,7 +139,7 @@ public class CheckoutService {
 			discount = applied.amount();
 			order.setDiscountCode(applied.code());
 		}
-		List<Priced> priced = price(parcelPlan, discount);
+		List<Priced> priced = price(parcelPlan, discount, areaFee(delivery.area()));
 		BigDecimal items = subtotal.subtract(discount);
 		BigDecimal fee = priced.stream().map(Priced::deliveryFee).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
 		BigDecimal total = items.add(fee);
@@ -128,6 +154,8 @@ public class CheckoutService {
 		order.setTotal(total);
 		order.setDeliveryAddress(delivery.address().trim());
 		order.setDeliveryCity(delivery.city().trim());
+		order.setDeliveryArea(delivery.area() == null || delivery.area().isBlank() ? null
+				: area(delivery.area()).map(et.tenapay.shop.catalog.Area::getName).orElse(delivery.area().trim()));
 		order.setDeliveryNotes(delivery.notes() == null || delivery.notes().isBlank() ? null : delivery.notes().trim());
 		order.setCreatedAt(Instant.now());
 		orders.save(order);
@@ -173,6 +201,12 @@ public class CheckoutService {
 	/** What the cart would cost (with this code, if any), using server prices. Nothing is reserved or used. */
 	@Transactional(readOnly = true)
 	public Quote quote(List<Line> lines, String discountCode) {
+		return quote(lines, discountCode, null);
+	}
+
+	/** Same, with the delivery fee for this area of Sodo. */
+	@Transactional(readOnly = true)
+	public Quote quote(List<Line> lines, String discountCode, String area) {
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
@@ -185,7 +219,7 @@ public class CheckoutService {
 		DiscountService.Applied applied = discountCode == null || discountCode.isBlank()
 				? new DiscountService.Applied(null, null, BigDecimal.ZERO.setScale(2))
 				: discounts.quote(discountCode, subtotal);
-		List<Priced> priced = price(plan, applied.amount());
+		List<Priced> priced = price(plan, applied.amount(), areaFee(area));
 		BigDecimal fee = priced.stream().map(Priced::deliveryFee).reduce(BigDecimal.ZERO.setScale(2), BigDecimal::add);
 		List<ParcelQuote> parcelQuotes = priced.stream().map(p -> new ParcelQuote(p.parcel().sellerName(),
 				p.parcel().sellerSlug(), p.parcel().itemsTotal(), p.deliveryFee())).toList();
@@ -227,6 +261,11 @@ public class CheckoutService {
 
 	/** Spreads the discount over the parcels by value (the last takes the rounding rest) and prices each delivery. */
 	List<Priced> price(List<Parcel> plan, BigDecimal discount) {
+		return price(plan, discount, null);
+	}
+
+	/** {@code areaFee} null = the standard fee; otherwise each parcel pays it, unless it reaches the free-delivery amount. */
+	List<Priced> price(List<Parcel> plan, BigDecimal discount, BigDecimal areaFee) {
 		BigDecimal subtotal = plan.stream().map(Parcel::itemsTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
 		List<Priced> out = new ArrayList<>();
 		BigDecimal left = discount;
@@ -235,9 +274,18 @@ public class CheckoutService {
 			BigDecimal share = i == plan.size() - 1 || subtotal.signum() == 0 ? left
 					: discount.multiply(p.itemsTotal()).divide(subtotal, 2, RoundingMode.HALF_UP).min(left);
 			left = left.subtract(share);
-			out.add(new Priced(p, share, app.delivery().feeFor(p.itemsTotal().subtract(share))));
+			out.add(new Priced(p, share, fee(p.itemsTotal().subtract(share), areaFee)));
 		}
 		return out;
+	}
+
+	private BigDecimal fee(BigDecimal items, BigDecimal areaFee) {
+		if (areaFee == null) {
+			return app.delivery().feeFor(items);
+		}
+		BigDecimal freeOver = app.delivery() == null ? null : app.delivery().freeOver();
+		return freeOver != null && freeOver.signum() > 0 && items.compareTo(freeOver) >= 0 ? BigDecimal.ZERO.setScale(2)
+				: areaFee.setScale(2, RoundingMode.HALF_UP);
 	}
 
 	private String nextOrderNumber() {

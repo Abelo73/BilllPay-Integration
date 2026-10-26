@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, Clock, Home, Loader2, MapPin, Package, RotateCcw, ShoppingCart, Truck, XCircle } from 'lucide-react'
+import { AlertTriangle, Bike, CheckCircle2, Clock, Home, Loader2, MapPin, Package, Phone, RotateCcw, ShoppingCart, Truck, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -301,6 +301,23 @@ function ConfirmReceipt({ o, parcelNo, label }: { o: OrderStatusView; parcelNo: 
   )
 }
 
+/** The rider bringing a parcel (M21), with a call button. */
+function RiderCard({ rider }: { rider: { name: string; phone: string } }) {
+  const t = useT()
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2">
+      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-primary"><Bike className="size-4" /></span>
+      <span className="min-w-0 flex-1 text-sm">
+        <span className="block font-semibold">{t('{name} is bringing it', { name: rider.name })}</span>
+        <span className="block text-xs text-muted-foreground">{rider.phone}</span>
+      </span>
+      <a href={`tel:${rider.phone}`} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground">
+        <Phone className="size-4" /> {t('Call')}
+      </a>
+    </div>
+  )
+}
+
 /** Orders from several sellers: one line per parcel, each with its own progress. */
 function ParcelList({ o }: { o: OrderStatusView }) {
   const t = useT()
@@ -330,6 +347,7 @@ function ParcelList({ o }: { o: OrderStatusView }) {
             {p.trackingNote && p.fulfilmentStatus === 'SHIPPED' && (
               <p className="text-xs"><Truck className="mr-1 inline size-3.5" />{p.trackingNote}</p>
             )}
+            {p.rider && <RiderCard rider={p.rider} />}
             {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={t('I received the items from {seller}', { seller: p.seller ?? 'Sodo Gebeya' })} />}
           </li>
         )
@@ -387,6 +405,7 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       {!multi && o.delivery.trackingNote && status === 'SHIPPED' && (
         <p className="rounded-lg bg-background px-3 py-2 text-sm"><Truck className="mr-1.5 inline size-4" />{o.delivery.trackingNote}</p>
       )}
+      {!multi && o.parcels?.[0]?.rider && <RiderCard rider={o.parcels[0].rider} />}
       {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label={t('I received my items')} />}
       <OrderProblems o={o} />
     </div>

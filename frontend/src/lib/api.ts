@@ -64,7 +64,8 @@ export type Page<T> = {
   totalPages: number
 }
 
-export type DeliveryInput = { address: string; city: string; notes?: string }
+/** {@code area}: an area of Sodo from DeliveryQuote.areas; it can set its own delivery fee. */
+export type DeliveryInput = { address: string; city: string; notes?: string; area?: string }
 
 export type CheckoutRequest = {
   items: { productId: number; quantity: number }[]
@@ -75,7 +76,8 @@ export type CheckoutRequest = {
   discountCode?: string
 }
 
-export type DeliveryQuote = { flatFee: number; freeOver: number; currency: string }
+/** areas: where we deliver in Sodo; fee null = the standard flatFee. */
+export type DeliveryQuote = { flatFee: number; freeOver: number; currency: string; areas: { name: string; fee: number | null }[] }
 
 export type PriceQuote = {
   subtotal: number
@@ -105,6 +107,8 @@ export type ParcelView = {
   /** Sent and not confirmed yet: the buyer can tap "I received my items" */
   canConfirmReceipt: boolean
   receivedAt: string | null
+  /** Who brings it; set once the parcel is on its way and staff picked a rider */
+  rider: { name: string; phone: string } | null
 }
 
 export function deliveryFee(quote: DeliveryQuote | undefined, subtotal: number) {
@@ -263,10 +267,10 @@ export const api = {
     }),
   delivery: () => request<DeliveryQuote>('/delivery'),
   storeInfo: () => request<{ sandbox: boolean }>('/store-info'),
-  cartQuote: (items: { productId: number; quantity: number }[]) =>
-    request<PriceQuote>('/checkout/quote', { method: 'POST', body: JSON.stringify({ items }) }),
-  checkDiscount: (items: { productId: number; quantity: number }[], code: string) =>
-    request<PriceQuote>('/discounts/check', { method: 'POST', body: JSON.stringify({ items, code }) }),
+  cartQuote: (items: { productId: number; quantity: number }[], area?: string) =>
+    request<PriceQuote>('/checkout/quote', { method: 'POST', body: JSON.stringify({ items, area }) }),
+  checkDiscount: (items: { productId: number; quantity: number }[], code: string, area?: string) =>
+    request<PriceQuote>('/discounts/check', { method: 'POST', body: JSON.stringify({ items, code, area }) }),
 
   addresses: () => request<Address[]>('/me/addresses'),
   addAddress: (body: AddressInput) => request<Address[]>('/me/addresses', { method: 'POST', body: JSON.stringify(body) }),

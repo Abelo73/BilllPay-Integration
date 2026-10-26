@@ -202,4 +202,9 @@ export const orders: Record<string, string> = {
   open: 'ክፍት',
   'part refunded': 'በከፊል ተመላሽ ተደርጓል',
   'seller paid': 'ለሻጩ ተከፍሏል',
+  // delivery areas and riders (M21)
+  'Area of Sodo': 'የሶዶ አካባቢ',
+  'Choose your area (sets the delivery fee)': 'አካባቢዎን ይምረጡ (የማድረሻ ክፍያውን ይወስናል)',
+  'standard fee': 'መደበኛ ክፍያ',
+  '{name} is bringing it': '{name} እያመጣልዎት ነው',
 }

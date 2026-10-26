@@ -1,6 +1,7 @@
 import { useRoutes, type RouteObject } from 'react-router'
 
 import { AdminAreasPage } from './areas'
+import { AdminRidersPage } from './riders'
 import { AdminCategoriesPage } from './categories'
 import { AdminCategoryFieldsPage } from './category-fields'
 import { AdminChatReportsPage } from './chat-reports'
@@ -55,6 +56,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'verifications', element: <AdminVerificationsPage /> },
       { path: 'listing-reports', element: <AdminListingReportsPage /> },
       { path: 'areas', element: <AdminAreasPage /> },
+      { path: 'riders', element: <AdminRidersPage /> },
       { path: 'payouts', element: <AdminPayoutsPage /> },
       { path: 'problems', element: <AdminProblemsPage /> },
       { path: 'problems/:id', element: <AdminProblemPage /> },

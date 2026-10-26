@@ -85,6 +85,8 @@ function CheckoutForm() {
   const [errors, setErrors] = useState<Errors>({})
   const [saveAddress, setSaveAddress] = useState(true)
   const [chosen, setChosen] = useState<number | null>(null)
+  // Area of Sodo (M21): some areas have their own delivery fee
+  const [area, setArea] = useState('')
 
   const quote = useQuery({ queryKey: ['delivery'], queryFn: api.delivery, staleTime: 5 * 60_000 })
   const saved = useQuery({ queryKey: ['addresses'], queryFn: api.addresses, enabled: isCustomer })
@@ -96,13 +98,13 @@ function CheckoutForm() {
   const cartKey = JSON.stringify(cartItems)
   // Server price for the cart: one parcel per seller, each with its own delivery fee
   const cartQuote = useQuery({
-    queryKey: ['cart-quote', cartKey],
-    queryFn: () => api.cartQuote(cartItems),
+    queryKey: ['cart-quote', cartKey, area],
+    queryFn: () => api.cartQuote(cartItems, area || undefined),
     enabled: lines.length > 0,
     placeholderData: keepPreviousData,
   })
   const applyCode = useMutation({
-    mutationFn: (code: string) => api.checkDiscount(cartItems, code),
+    mutationFn: (code: string) => api.checkDiscount(cartItems, code, area || undefined),
     onSuccess: (q) => {
       setApplied(q)
       setCodeError('')
@@ -116,7 +118,7 @@ function CheckoutForm() {
   useEffect(() => {
     if (applied && lines.length > 0) applyCode.mutate(applied.discountCode)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartKey])
+  }, [cartKey, area])
 
   const discount = applied?.discount ?? 0
   const itemsAfterDiscount = subtotal - discount
@@ -217,7 +219,7 @@ function CheckoutForm() {
     checkout.mutate({
       items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
       customer: { name: d.name, phone: d.phone, email: d.email },
-      delivery: { address: d.address, city: d.city, notes: d.notes || undefined },
+      delivery: { address: d.address, city: d.city, notes: d.notes || undefined, area: area || undefined },
       saveAddress: isCustomer && chosen === null && saveAddress,
       discountCode: applied?.discountCode,
     })
@@ -296,6 +298,24 @@ function CheckoutForm() {
               )}
               {field('address', t('Street, area and house / building'), { autoComplete: 'street-address', placeholder: t('Arada, near the church, house 12') })}
               {field('city', t('City'), { autoComplete: 'address-level2', placeholder: 'Wolaita Sodo' })}
+              {!!quote.data?.areas?.length && (
+                <div className="space-y-2">
+                  <Label htmlFor="area">{t('Area of Sodo')}</Label>
+                  <select
+                    id="area"
+                    value={area}
+                    onChange={(e) => setArea(e.target.value)}
+                    className="h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">{t('Choose your area (sets the delivery fee)')}</option>
+                    {quote.data.areas.map((a) => (
+                      <option key={a.name} value={a.name}>
+                        {a.name} · {a.fee === null ? t('standard fee') : a.fee === 0 ? t('free delivery') : formatETB(a.fee)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="notes">{t('Notes for the rider')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span></Label>
                 <Textarea id="notes" rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder={t('Gate colour, landmark, best time to call…')} aria-invalid={!!errors.notes} />

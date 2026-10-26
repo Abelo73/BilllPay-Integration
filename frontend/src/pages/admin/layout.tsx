@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import {
+  Bike,
   ArrowLeftRight,
   BarChart3,
   Gauge,
@@ -85,6 +86,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/products', label: 'Products', icon: ShoppingBag },
       { to: '/admin/categories', label: 'Categories', icon: FolderTree },
       { to: '/admin/areas', label: 'Areas', icon: MapPin },
+      { to: '/admin/riders', label: 'Riders', icon: Bike },
     ],
   },
   {

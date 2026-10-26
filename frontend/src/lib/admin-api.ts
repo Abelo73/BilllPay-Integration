@@ -127,6 +127,8 @@ export type OrderRow = {
 
 export type DeliveryDetail = {
   address: string | null
+  /** Area of Sodo picked at checkout (M21) */
+  area?: string | null
   city: string | null
   notes: string | null
   subtotal: number
@@ -263,6 +265,9 @@ export type ParcelRow = {
   cancelledAt: string | null
   /** "2 × Leather shoes" */
   items: string[]
+  /** Rider on this parcel (M21) */
+  riderId: number | null
+  riderName: string | null
 }
 
 /** Moves one seller's parcel (staff can move any parcel). */

@@ -1,5 +1,6 @@
 package et.tenapay.shop.catalog;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 import jakarta.persistence.Column;
@@ -29,6 +30,9 @@ public class Area {
 	private int sortOrder;
 
 	private boolean active = true;
+
+	/** Delivery fee to this area; null = the standard fee, 0 = free. */
+	private BigDecimal deliveryFee;
 
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();

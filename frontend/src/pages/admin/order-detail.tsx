@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { adminApi, EMAIL_KIND_LABEL, fulfilParcel, isAdmin, type Attempt, type OrderDetail } from '@/lib/admin-api'
+import { adminApi, EMAIL_KIND_LABEL, fulfilParcel, isAdmin, type Attempt, type OrderDetail, type ParcelRow } from '@/lib/admin-api'
+import { deliveryAdminApi } from '@/lib/delivery-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { JsonBlock, PageHeader, StatusBadge } from './shared'
 
@@ -81,6 +82,44 @@ const STEP_LABEL: Record<string, string> = {
   CANCELLED: 'Cancel delivery',
 }
 
+/** Rider on one parcel (M21): pick from Admin → Riders. The buyer sees them once the parcel is on its way. */
+function RiderPicker({ orderNumber, parcel }: { orderNumber: string; parcel: ParcelRow }) {
+  const qc = useQueryClient()
+  const riders = useQuery({ queryKey: ['admin-riders'], queryFn: deliveryAdminApi.riders, staleTime: 60_000 })
+  const assign = useMutation({
+    mutationFn: (riderId: number | null) => deliveryAdminApi.assign(orderNumber, parcel.parcelNo, riderId),
+    onSuccess: (_, riderId) => {
+      toast.success(riderId ? 'Rider set. The buyer was told.' : 'Rider removed')
+      qc.invalidateQueries({ queryKey: ['admin-order', orderNumber] })
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const closed = parcel.fulfilmentStatus === 'DELIVERED' || parcel.fulfilmentStatus === 'CANCELLED'
+  const active = (riders.data ?? []).filter((r) => r.active || r.id === parcel.riderId)
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-muted-foreground">Rider:</span>
+      {parcel.riderName ? <span className="font-semibold">{parcel.riderName}</span> : <span className="text-muted-foreground">none yet</span>}
+      {isAdmin() && !closed && (
+        active.length === 0 ? (
+          <Link to="/admin/riders" className="text-primary hover:underline">Add riders</Link>
+        ) : (
+          <select
+            aria-label={`Rider for parcel ${parcel.parcelNo}`}
+            className="h-7 rounded-md border bg-background px-2"
+            value={parcel.riderId ?? ''}
+            disabled={assign.isPending}
+            onChange={(e) => assign.mutate(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">{parcel.riderId ? 'Remove rider' : 'Pick a rider…'}</option>
+            {active.map((r) => <option key={r.id} value={r.id}>{r.name}{r.note ? ` (${r.note})` : ''}</option>)}
+          </select>
+        )
+      )}
+    </div>
+  )
+}
+
 /** Orders from several sellers: each seller's parcel with its own delivery steps. */
 function ParcelsCard({ data }: { data: OrderDetail }) {
   const qc = useQueryClient()
@@ -116,6 +155,7 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
                 Items {formatETB(p.itemsTotal)}{p.discountShare > 0 && ` − ${formatETB(p.discountShare)} discount`} · delivery {p.deliveryFee > 0 ? formatETB(p.deliveryFee) : 'free'}
               </p>
               {p.trackingNote && <p className="text-xs text-muted-foreground">Tracking: {p.trackingNote}</p>}
+              <RiderPicker orderNumber={orderNumber} parcel={p} />
               {isAdmin() && (steps.length > 0 || p.nextSteps.includes('CANCELLED')) && (
                 <div className="space-y-2 pt-1">
                   {steps.includes('SHIPPED') && (
@@ -196,7 +236,9 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
           {d.discountAmount > 0 && <div className="flex justify-between text-success"><span>Discount ({d.discountCode})</span><span className="tabular-nums">−{formatETB(d.discountAmount)}</span></div>}
           <div className="flex justify-between"><span className="text-muted-foreground">Delivery fee</span><span className="tabular-nums">{d.deliveryFee > 0 ? formatETB(d.deliveryFee) : 'free'}</span></div>
         </div>
+        {d.area && <p className="pl-6 text-xs text-muted-foreground">Area: {d.area}</p>}
         {d.trackingNote && <p className="text-muted-foreground">Tracking: {d.trackingNote}</p>}
+        {data.parcels.length === 1 && <RiderPicker orderNumber={data.order.orderNumber} parcel={data.parcels[0]} />}
         {d.shippedAt && <p className="text-xs text-muted-foreground">Shipped {formatDate(d.shippedAt)}</p>}
         {d.deliveredAt && <p className="text-xs text-muted-foreground">Delivered {formatDate(d.deliveredAt)}</p>}
 

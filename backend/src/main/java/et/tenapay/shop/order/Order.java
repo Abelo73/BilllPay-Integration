@@ -64,6 +64,9 @@ public class Order {
 
 	private String deliveryCity;
 
+	/** Area of Sodo picked at checkout (M21); sets the delivery fee. */
+	private String deliveryArea;
+
 	private String deliveryNotes;
 
 	/** Included in {@link #total}; total = subtotal - discountAmount + deliveryFee. */
