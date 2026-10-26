@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { FulfilmentStatus } from '@/lib/api'
 import { formatDate, formatETB } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { sellerApi, type SellerOrderTab } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
 import { Pager } from '../admin/shared'
@@ -30,6 +31,7 @@ const TABS: { value: SellerOrderTab; label: string }[] = [
 ]
 
 export function SellerOrdersPage() {
+  const t = useT()
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as SellerOrderTab) ?? 'send'
   const q = params.get('q') ?? ''
@@ -43,8 +45,8 @@ export function SellerOrdersPage() {
     setParams(next, { replace: true })
   }
   useEffect(() => {
-    const t = setTimeout(() => search !== q && set('q', search || null), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => search !== q && set('q', search || null), 300)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search])
 
@@ -58,34 +60,34 @@ export function SellerOrdersPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Orders">
-          {TABS.map((t) => (
+        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label={t('Orders')}>
+          {TABS.map((tb) => (
             <button
-              key={t.value}
+              key={tb.value}
               type="button"
               role="tab"
-              aria-selected={tab === t.value}
-              onClick={() => set('tab', t.value === 'send' ? null : t.value)}
+              aria-selected={tab === tb.value}
+              onClick={() => set('tab', tb.value === 'send' ? null : tb.value)}
               className={cn(
                 'h-9 shrink-0 rounded-full border px-3.5 text-sm font-semibold',
-                tab === t.value ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground',
+                tab === tb.value ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground',
               )}
             >
-              {t.label}
+              {t(tb.label)}
             </button>
           ))}
         </div>
         <div className="relative sm:ml-auto sm:w-64">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Order number or buyer" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-8" placeholder={t('Order number or buyer')} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">Only paid orders with your items show here, and only your items in them.</p>
+      <p className="text-xs text-muted-foreground">{t('Only paid orders with your items show here, and only your items in them.')}</p>
       {isLoading ? (
         <Skeleton className="h-48 rounded-2xl" />
       ) : data?.content.length === 0 ? (
         <p className="rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {tab === 'send' ? 'Nothing to send right now.' : 'No orders here yet.'}
+          {tab === 'send' ? t('Nothing to send right now.') : t('No orders here yet.')}
         </p>
       ) : (
         <div className="divide-y overflow-hidden rounded-2xl border bg-card">
@@ -98,6 +100,7 @@ export function SellerOrdersPage() {
 }
 
 export function SellerOrderPage() {
+  const t = useT()
   const { orderNumber = '' } = useParams()
   const qc = useQueryClient()
   const [note, setNote] = useState('')
@@ -108,7 +111,7 @@ export function SellerOrderPage() {
       qc.setQueryData(['seller-order', orderNumber], d)
       qc.invalidateQueries({ queryKey: ['seller-orders'] })
       qc.invalidateQueries({ queryKey: ['seller-summary'] })
-      toast.success(`Order is now: ${FULFILMENT_LABEL[d.order.fulfilmentStatus!]}. The buyer was told.`)
+      toast.success(t('Order is now: {status}. The buyer was told.', { status: t(FULFILMENT_LABEL[d.order.fulfilmentStatus!]) }))
       if (d.order.fulfilmentStatus === 'SHIPPED') setNote('') // keep a note typed before "Packing it"
     },
     onError: (e) => toast.error(e.message),
@@ -116,13 +119,14 @@ export function SellerOrderPage() {
 
   const back = (
     <Button asChild variant="ghost" size="sm" className="-ml-2">
-      <Link to="/seller/orders"><ChevronLeft /> Orders</Link>
+      <Link to="/seller/orders"><ChevronLeft /> {t('Orders')}</Link>
     </Button>
   )
   if (error) return <div className="space-y-3">{back}<p className="text-sm text-destructive">{error.message}</p></div>
   if (isLoading || !data) return <Skeleton className="h-96 rounded-2xl" />
   const o = data.order
   const shipping = o.nextSteps.includes('SHIPPED')
+  const parcelText = t('You deliver only your parcel {parcel}; the others bring theirs.').split('{parcel}')
 
   return (
     <div className="space-y-4 pb-6">
@@ -130,13 +134,13 @@ export function SellerOrderPage() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-mono text-lg font-bold">{o.orderNumber}</h2>
         <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-          {o.fulfilmentStatus ? FULFILMENT_LABEL[o.fulfilmentStatus] : o.status}
+          {o.fulfilmentStatus ? t(FULFILMENT_LABEL[o.fulfilmentStatus]) : o.status}
         </span>
       </div>
-      <p className="text-sm text-muted-foreground">Paid {formatDate(o.paidAt)}</p>
+      <p className="text-sm text-muted-foreground">{t('Paid {date}', { date: formatDate(o.paidAt) })}</p>
 
       <section className="space-y-2 rounded-2xl border bg-card p-4">
-        <h3 className="flex items-center gap-2 text-sm font-bold"><Package className="size-4" /> Your items</h3>
+        <h3 className="flex items-center gap-2 text-sm font-bold"><Package className="size-4" /> {t('Your items')}</h3>
         <ul className="divide-y text-sm">
           {data.items.map((i) => (
             <li key={i.productId} className="flex justify-between gap-3 py-2">
@@ -146,21 +150,22 @@ export function SellerOrderPage() {
           ))}
         </ul>
         <p className="flex justify-between border-t pt-2 text-sm font-bold">
-          <span>Your share</span> <span className="tabular-nums">{formatETB(o.itemsTotal)}</span>
+          <span>{t('Your share')}</span> <span className="tabular-nums">{formatETB(o.itemsTotal)}</span>
         </p>
         <p className="flex justify-between text-xs text-muted-foreground">
-          <span>Delivery the buyer paid for this parcel</span>
-          <span className="tabular-nums">{o.deliveryFee === 0 ? 'Free' : formatETB(o.deliveryFee)}</span>
+          <span>{t('Delivery the buyer paid for this parcel')}</span>
+          <span className="tabular-nums">{o.deliveryFee === 0 ? t('Free') : formatETB(o.deliveryFee)}</span>
         </p>
       </section>
 
       {o.otherSellers && (
         <p className="rounded-2xl bg-muted p-4 text-sm">
-          The buyer also bought from other sellers in this order. You deliver only your parcel <span className="font-mono font-semibold">{o.parcelNumber}</span>; the others bring theirs.
+          {t('The buyer also bought from other sellers in this order.')}{' '}
+          {parcelText[0]}<span className="font-mono font-semibold">{o.parcelNumber}</span>{parcelText[1]}
         </p>
       )}
       <section className="space-y-2 rounded-2xl border bg-card p-4 text-sm">
-        <h3 className="flex items-center gap-2 font-bold"><Truck className="size-4" /> Deliver to</h3>
+        <h3 className="flex items-center gap-2 font-bold"><Truck className="size-4" /> {t('Deliver to')}</h3>
         <p className="font-semibold">{o.customerName}</p>
         {data.customerPhone && (
           <a href={`tel:${data.customerPhone}`} className="flex items-center gap-2 font-semibold text-primary">
@@ -168,16 +173,16 @@ export function SellerOrderPage() {
           </a>
         )}
         <p className="flex gap-2"><MapPin className="mt-0.5 size-4 shrink-0" /> {data.deliveryAddress}{o.deliveryCity && `, ${o.deliveryCity}`}</p>
-        {data.deliveryNotes && <p className="text-muted-foreground">Note: {data.deliveryNotes}</p>}
-        {data.trackingNote && <p className="text-muted-foreground">Sent with: {data.trackingNote}</p>}
+        {data.deliveryNotes && <p className="text-muted-foreground">{t('Note: {note}', { note: data.deliveryNotes })}</p>}
+        {data.trackingNote && <p className="text-muted-foreground">{t('Sent with: {note}', { note: data.trackingNote })}</p>}
       </section>
 
       {o.nextSteps.length > 0 && (
         <section className="space-y-3 rounded-2xl border bg-card p-4">
           {shipping && (
             <div className="space-y-2">
-              <Label htmlFor="ship-note">Who is bringing it? <span className="font-normal text-muted-foreground">(optional, the buyer sees this)</span></Label>
-              <Input id="ship-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Bajaj rider Dawit, 0916 000 111" />
+              <Label htmlFor="ship-note">{t('Who is bringing it?')} <span className="font-normal text-muted-foreground">{t('(optional, the buyer sees this)')}</span></Label>
+              <Input id="ship-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={t('e.g. Bajaj rider Dawit, 0916 000 111')} />
             </div>
           )}
           <div className="flex flex-wrap gap-2">
@@ -191,11 +196,11 @@ export function SellerOrderPage() {
                 onClick={() => advance.mutate(s)}
               >
                 {advance.isPending && advance.variables === s && <Loader2 className="animate-spin" />}
-                {STEP_ACTION[s] ?? s}
+                {STEP_ACTION[s] ? t(STEP_ACTION[s]) : s}
               </Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">Can't deliver it? Call Sodo Gebeya: only we can cancel a paid order, because the buyer gets a refund.</p>
+          <p className="text-xs text-muted-foreground">{t("Can't deliver it? Call Sodo Gebeya: only we can cancel a paid order, because the buyer gets a refund.")}</p>
         </section>
       )}
     </div>

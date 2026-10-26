@@ -67,24 +67,24 @@ export function SellerProductsPage() {
                 status === f.value ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground',
               )}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
         <div className="flex gap-2 sm:ml-auto">
           <div className="relative flex-1 sm:w-56">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input className="pl-8" placeholder="Search your products" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input className="pl-8" placeholder={t('Search your products')} value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
-          <Button asChild><Link to="/seller/products/new"><Plus /> Add</Link></Button>
+          <Button asChild><Link to="/seller/products/new"><Plus /> {t('Add')}</Link></Button>
         </div>
       </div>
       {isLoading ? (
         <Skeleton className="h-48 rounded-2xl" />
       ) : data?.content.length === 0 ? (
         <div className="space-y-3 rounded-2xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          <p>{q || status !== 'all' ? 'No products match.' : 'No products yet.'}</p>
-          <Button asChild><Link to="/seller/products/new"><Plus /> Add a product</Link></Button>
+          <p>{q || status !== 'all' ? t('No products match.') : t('No products yet.')}</p>
+          <Button asChild><Link to="/seller/products/new"><Plus /> {t('Add a product')}</Link></Button>
         </div>
       ) : (
         <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
@@ -95,7 +95,7 @@ export function SellerProductsPage() {
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="truncate text-sm font-bold">{p.name}</p>
                   <p className="text-xs text-muted-foreground tabular-nums">
-                    {formatETB(p.price)} · {p.available} available{p.reserved > 0 && ` · ${p.reserved} held`}
+                    {formatETB(p.price)} · {t('{n} available', { n: p.available })}{p.reserved > 0 && ` · ${t('{n} held', { n: p.reserved })}`}
                   </p>
                   <StockBadge p={p} />
                 </div>

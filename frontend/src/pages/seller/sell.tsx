@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { ApiError } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import { sellerApi } from '@/lib/seller-api'
 import { useSession } from '@/store/session'
 import { ShopForm } from './shop-form'
@@ -18,6 +19,7 @@ const STEPS = [
 ]
 
 function HowItWorks() {
+  const t = useT()
   return (
     <ol className="grid gap-3 sm:grid-cols-2">
       {STEPS.map((s, i) => (
@@ -26,8 +28,8 @@ function HowItWorks() {
             <s.icon className="size-5" />
           </span>
           <span>
-            <span className="block text-sm font-bold">{i + 1}. {s.title}</span>
-            <span className="block text-sm text-muted-foreground">{s.text}</span>
+            <span className="block text-sm font-bold">{i + 1}. {t(s.title)}</span>
+            <span className="block text-sm text-muted-foreground">{t(s.text)}</span>
           </span>
         </li>
       ))}
@@ -40,6 +42,7 @@ export function SellPage() {
   const session = useSession((s) => s.session)
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const t = useT()
   const signedIn = !!session && session.user.role === 'CUSTOMER'
   const shop = useQuery({
     queryKey: ['seller-shop'],
@@ -51,7 +54,7 @@ export function SellPage() {
     mutationFn: sellerApi.open,
     onSuccess: (s) => {
       qc.setQueryData(['seller-shop'], s)
-      toast.success('Shop opened. Add your first products while we check it.')
+      toast.success(t('Shop opened. Add your first products while we check it.'))
       navigate('/seller', { replace: true })
     },
     onError: (e) => toast.error(e.message),
@@ -63,33 +66,33 @@ export function SellPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6 sm:py-12">
       <div className="space-y-2">
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Sell on Sodo Gebeya</h1>
-        <p className="text-muted-foreground">Reach buyers across Wolaita Sodo without opening a second shop.</p>
+        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('Sell on Sodo Gebeya')}</h1>
+        <p className="text-muted-foreground">{t('Reach buyers across Wolaita Sodo without opening a second shop.')}</p>
       </div>
       <HowItWorks />
 
       {!session && (
         <Card>
           <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
-            <p className="flex-1 text-sm">Sign in or create a free account first. It takes a minute with your phone number.</p>
+            <p className="flex-1 text-sm">{t('Sign in or create a free account first. It takes a minute with your phone number.')}</p>
             <div className="flex gap-2">
-              <Button asChild variant="outline"><Link to="/login?next=/sell">Sign in</Link></Button>
-              <Button asChild><Link to="/register?next=/sell">Create account</Link></Button>
+              <Button asChild variant="outline"><Link to="/login?next=/sell">{t('Sign in')}</Link></Button>
+              <Button asChild><Link to="/register?next=/sell">{t('Create account')}</Link></Button>
             </div>
           </CardContent>
         </Card>
       )}
       {session && !signedIn && (
-        <p className="rounded-xl bg-muted p-4 text-sm">Staff accounts can't sell. Sign in with a customer account.</p>
+        <p className="rounded-xl bg-muted p-4 text-sm">{t("Staff accounts can't sell. Sign in with a customer account.")}</p>
       )}
       {signedIn && shop.isLoading && <Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" />}
       {signedIn && noShop && (
         <Card>
           <CardContent className="space-y-1 p-5 sm:p-6">
-            <h2 className="pb-3 text-lg font-bold">Your shop</h2>
+            <h2 className="pb-3 text-lg font-bold">{t('Your shop')}</h2>
             <ShopForm
               defaultPhone={session.user.phone}
-              submitLabel="Open my shop"
+              submitLabel={t('Open my shop')}
               pending={open.isPending}
               onSubmit={(input) => open.mutate(input)}
             />
@@ -97,7 +100,7 @@ export function SellPage() {
         </Card>
       )}
       {signedIn && shop.error && !noShop && (
-        <p className="text-sm text-destructive">Couldn't load your shop: {shop.error.message}</p>
+        <p className="text-sm text-destructive">{t("Couldn't load your shop: {error}", { error: shop.error.message })}</p>
       )}
     </div>
   )

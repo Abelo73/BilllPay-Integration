@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ShopKind } from '@/lib/api'
+import { useT } from '@/lib/i18n'
 import type { MyShop, ShopInput } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +31,7 @@ export function ShopForm({
   pending: boolean
   onSubmit: (input: ShopInput) => void
 }) {
+  const t = useT()
   const [form, setForm] = useState<ShopInput>({
     kind: shop?.kind ?? 'SHOP',
     name: shop?.name ?? '',
@@ -44,8 +46,8 @@ export function ShopForm({
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     const next: Record<string, string> = {}
-    if (form.name.trim().length < 2) next.name = form.kind === 'SHOP' ? 'Enter the shop name' : 'Enter the name buyers will see'
-    if (form.phone.replace(/\D/g, '').length < 9) next.phone = 'Enter a phone number buyers and we can call'
+    if (form.name.trim().length < 2) next.name = form.kind === 'SHOP' ? t('Enter the shop name') : t('Enter the name buyers will see')
+    if (form.phone.replace(/\D/g, '').length < 9) next.phone = t('Enter a phone number buyers and we can call')
     setErrors(next)
     if (Object.keys(next).length === 0) onSubmit(form)
   }
@@ -53,7 +55,7 @@ export function ShopForm({
   return (
     <form onSubmit={submit} className="space-y-5">
       <fieldset className="space-y-2">
-        <legend className="mb-2 text-sm font-medium">Who is selling?</legend>
+        <legend className="mb-2 text-sm font-medium">{t('Who is selling?')}</legend>
         <div className="grid grid-cols-2 gap-3">
           {KINDS.map((k) => (
             <label
@@ -72,30 +74,30 @@ export function ShopForm({
                 className="sr-only"
               />
               <k.icon className={cn('size-5', form.kind === k.value ? 'text-primary' : 'text-muted-foreground')} />
-              <span className="text-sm font-bold">{k.title}</span>
-              <span className="text-xs text-muted-foreground">{k.text}</span>
+              <span className="text-sm font-bold">{t(k.title)}</span>
+              <span className="text-xs text-muted-foreground">{t(k.text)}</span>
             </label>
           ))}
         </div>
       </fieldset>
 
       <div className="space-y-2">
-        <Label htmlFor="shop-name">{form.kind === 'SHOP' ? 'Shop name' : 'Seller name'}</Label>
+        <Label htmlFor="shop-name">{form.kind === 'SHOP' ? t('Shop name') : t('Seller name')}</Label>
         <Input
           id="shop-name"
           value={form.name}
           maxLength={120}
           onChange={(e) => set('name', e.target.value)}
-          placeholder={form.kind === 'SHOP' ? 'e.g. Marta Boutique' : 'e.g. Dawit K.'}
+          placeholder={form.kind === 'SHOP' ? t('e.g. Marta Boutique') : t('e.g. Dawit K.')}
           aria-invalid={!!errors.name}
         />
         {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
-        {shop && <p className="text-xs text-muted-foreground">Your shop's address stays /shops/{shop.slug}, so shared links keep working.</p>}
+        {shop && <p className="text-xs text-muted-foreground">{t("Your shop's address stays {path}, so shared links keep working.", { path: `/shops/${shop.slug}` })}</p>}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="shop-phone">Phone</Label>
+          <Label htmlFor="shop-phone">{t('Phone')}</Label>
           <Input
             id="shop-phone"
             type="tel"
@@ -109,12 +111,12 @@ export function ShopForm({
           {errors.phone ? (
             <p className="text-sm text-destructive">{errors.phone}</p>
           ) : (
-            <p className="text-xs text-muted-foreground">We text you here about approval and orders. Not shown to buyers.</p>
+            <p className="text-xs text-muted-foreground">{t('We text you here about approval and orders. Not shown to buyers.')}</p>
           )}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="shop-area">Area in Sodo</Label>
-          <Input id="shop-area" list="sodo-areas" value={form.area} maxLength={120} onChange={(e) => set('area', e.target.value)} placeholder="e.g. Arada" />
+          <Label htmlFor="shop-area">{t('Area in Sodo')}</Label>
+          <Input id="shop-area" list="sodo-areas" value={form.area} maxLength={120} onChange={(e) => set('area', e.target.value)} placeholder={t('e.g. Arada')} />
           <datalist id="sodo-areas">
             {SODO_AREAS.map((a) => <option key={a} value={a} />)}
           </datalist>
@@ -122,13 +124,13 @@ export function ShopForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="shop-address">Where buyers or riders can find you <span className="font-normal text-muted-foreground">(optional)</span></Label>
-        <Input id="shop-address" value={form.addressLine} maxLength={200} onChange={(e) => set('addressLine', e.target.value)} placeholder="e.g. Near Arada church, shop no. 12" />
+        <Label htmlFor="shop-address">{t('Where buyers or riders can find you')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span></Label>
+        <Input id="shop-address" value={form.addressLine} maxLength={200} onChange={(e) => set('addressLine', e.target.value)} placeholder={t('e.g. Near Arada church, shop no. 12')} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="shop-about">About {form.kind === 'SHOP' ? 'the shop' : 'you'} <span className="font-normal text-muted-foreground">(optional)</span></Label>
-        <Textarea id="shop-about" rows={3} maxLength={2000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="What you sell, opening hours, delivery…" />
+        <Label htmlFor="shop-about">{form.kind === 'SHOP' ? t('About the shop') : t('About you')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span></Label>
+        <Textarea id="shop-about" rows={3} maxLength={2000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder={t('What you sell, opening hours, delivery…')} />
       </div>
 
       <Button type="submit" size="lg" className="h-12 w-full text-base sm:w-auto" disabled={pending}>

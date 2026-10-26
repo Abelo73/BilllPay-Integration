@@ -7,6 +7,7 @@ import { VerifiedBadge } from '@/components/verified-badge'
 import { ApiError } from '@/lib/api'
 import { KIND_LABEL, SHOP_STATUS_LABEL, sellerApi, type MyShop } from '@/lib/seller-api'
 import { useFeatures } from '@/lib/features'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
@@ -33,6 +34,7 @@ export function ShopLogo({ shop, className }: { shop: Pick<MyShop, 'logoUrl' | '
 
 /** Explains why products aren't in the store yet (or anymore). */
 function StatusBanner({ shop }: { shop: MyShop }) {
+  const t = useT()
   if (shop.status === 'APPROVED') return null
   const tone =
     shop.status === 'PENDING'
@@ -44,8 +46,8 @@ function StatusBanner({ shop }: { shop: MyShop }) {
     <div className={cn('flex gap-3 rounded-2xl p-4 text-sm', tone.cls)} role="status">
       <tone.icon className="mt-0.5 size-4 shrink-0" />
       <div className="space-y-1">
-        <p>{tone.text}</p>
-        {shop.statusNote && <p className="font-semibold">Reason: {shop.statusNote}</p>}
+        <p>{t(tone.text)}</p>
+        {shop.statusNote && <p className="font-semibold">{t('Reason: {note}', { note: shop.statusNote })}</p>}
       </div>
     </div>
   )
@@ -58,6 +60,7 @@ export function SellerLayout() {
   const signedIn = !!session && session.user.role === 'CUSTOMER'
   const shop = useQuery({ queryKey: ['seller-shop'], queryFn: sellerApi.shop, enabled: signedIn, retry: false })
   const { payments } = useFeatures()
+  const t = useT()
 
   if (!session) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
   if (!signedIn || (shop.error instanceof ApiError && shop.error.code === 'NO_SHOP')) return <Navigate to="/sell" replace />
@@ -80,13 +83,13 @@ export function SellerLayout() {
             {s.verifiedAt && <VerifiedBadge compact />}
           </h1>
           <p className="truncate text-xs text-muted-foreground">
-            {KIND_LABEL[s.kind]}{s.area && ` · ${s.area}`} ·{' '}
-            <span className={cn('font-semibold', s.status === 'APPROVED' ? 'text-success' : 'text-amber-ink')}>{SHOP_STATUS_LABEL[s.status]}</span>
+            {t(KIND_LABEL[s.kind])}{s.area && ` · ${s.area}`} ·{' '}
+            <span className={cn('font-semibold', s.status === 'APPROVED' ? 'text-success' : 'text-amber-ink')}>{t(SHOP_STATUS_LABEL[s.status])}</span>
           </p>
         </div>
         {s.status === 'APPROVED' ? (
           <Button asChild variant="outline" size="sm" className="rounded-full">
-            <Link to={`/shops/${s.slug}`}><ExternalLink /> <span className="hidden sm:inline">View my shop</span><span className="sm:hidden">Shop</span></Link>
+            <Link to={`/shops/${s.slug}`}><ExternalLink /> <span className="hidden sm:inline">{t('View my shop')}</span><span className="sm:hidden">{t('My shop')}</span></Link>
           </Button>
         ) : (
           <Store className="size-5 text-muted-foreground" aria-hidden />
@@ -95,12 +98,12 @@ export function SellerLayout() {
 
       <StatusBanner shop={s} />
 
-      <nav aria-label="Seller" className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-        {TABS.filter((t) => payments || !['/seller/orders', '/seller/money', '/seller/problems'].includes(t.to)).map((t) => (
+      <nav aria-label={t('Seller')} className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+        {TABS.filter((tab) => payments || !['/seller/orders', '/seller/money', '/seller/problems'].includes(tab.to)).map((tab) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.end}
+            key={tab.to}
+            to={tab.to}
+            end={tab.end}
             className={({ isActive }) =>
               cn(
                 'flex h-10 shrink-0 items-center rounded-full border px-4 text-sm font-semibold transition-colors',
@@ -108,7 +111,7 @@ export function SellerLayout() {
               )
             }
           >
-            {t.label}
+            {t(tab.label)}
           </NavLink>
         ))}
       </nav>

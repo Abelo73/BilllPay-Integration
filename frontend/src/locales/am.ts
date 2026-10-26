@@ -1,8 +1,11 @@
 import { account } from './am/account'
 import { core } from './am/core'
+import { editor } from './am/editor'
 import { cv } from './am/cv'
 import { messages } from './am/messages'
 import { orders } from './am/orders'
+import { seller } from './am/seller'
+import { sellerops } from './am/sellerops'
 import { services } from './am/services'
 import { shop } from './am/shop'
 import { work } from './am/work'
@@ -12,4 +15,4 @@ import { work } from './am/work'
  * One file per area (./am/*) so several people can translate at once.
  * First draft: please have a native speaker review it before launch (docs/MARKETPLACE_ROADMAP.md, M18).
  */
-export const am: Record<string, string> = { ...core, ...account, ...messages, ...services, ...shop, ...orders, ...work, ...cv }
+export const am: Record<string, string> = { ...core, ...account, ...messages, ...services, ...shop, ...orders, ...work, ...cv, ...seller, ...sellerops, ...editor }

@@ -33,7 +33,7 @@ export function ShopPublicPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
       <Button asChild variant="ghost" size="sm" className="-ml-2 mb-4">
-        <Link to="/shop"><ChevronLeft /> All products</Link>
+        <Link to="/shop"><ChevronLeft /> {t('All products')}</Link>
       </Button>
       {!s ? (
         <Skeleton className="h-48 rounded-3xl" />
@@ -60,10 +60,10 @@ export function ShopPublicPage() {
               <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   {s.kind === 'SHOP' ? <Store className="size-4" /> : <UserRound className="size-4" />}
-                  {s.kind === 'SHOP' ? 'Shop' : 'Individual seller'}
+                  {s.kind === 'SHOP' ? t('A shop') : t('Individual seller')}
                 </span>
-                {s.area && <span className="flex items-center gap-1"><MapPin className="size-4" /> {s.area}, Wolaita Sodo</span>}
-                <span>On Sodo Gebeya since {since}</span>
+                {s.area && <span className="flex items-center gap-1"><MapPin className="size-4" /> {t('{area}, Wolaita Sodo', { area: s.area })}</span>}
+                <span>{t('On Sodo Gebeya since {date}', { date: since })}</span>
               </p>
             </div>
           </div>
@@ -72,16 +72,16 @@ export function ShopPublicPage() {
       )}
 
       <h2 className="mb-4 mt-8 text-lg font-bold">
-        Products {s && <span className="font-normal text-muted-foreground">· {s.productCount}</span>}
+        {t('Products')} {s && <span className="font-normal text-muted-foreground">· {s.productCount}</span>}
       </h2>
-      {products.data?.content.length === 0 && <p className="text-sm text-muted-foreground">No products in the store right now.</p>}
+      {products.data?.content.length === 0 && <p className="text-sm text-muted-foreground">{t('No products in the store right now.')}</p>}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
         {products.data?.content.map((p) => <ProductCard key={p.id} product={p} />)}
       </div>
       {products.data && products.data.totalPages > 1 && (
         <div className="mt-6 flex justify-center gap-2">
-          <Button variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</Button>
-          <Button variant="outline" disabled={page + 1 >= products.data.totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+          <Button variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>{t('Previous')}</Button>
+          <Button variant="outline" disabled={page + 1 >= products.data.totalPages} onClick={() => setPage(page + 1)}>{t('Next')}</Button>
         </div>
       )}
     </div>

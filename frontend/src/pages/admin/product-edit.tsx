@@ -35,6 +35,7 @@ import { categoryTree, type Specs } from '@/lib/specs-api'
 import type { ItemCondition, Page } from '@/lib/api'
 import { publicTrustApi, trustAdminApi } from '@/lib/trust-api'
 import { formatDate, formatETB } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { StockBadge } from './products'
 import { PageHeader } from './shared'
@@ -126,6 +127,7 @@ function initialForm(d?: ProductDetail): FormState {
 }
 
 function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d: ProductDetail) => void }) {
+  const t = useT()
   const { editable, client, keyPrefix, seller } = useEditor()
   const isNew = !detail
   const [form, setForm] = useState<FormState>(() => initialForm(detail))
@@ -174,47 +176,47 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Details</CardTitle>
-        <CardDescription>Shown on the store's product page. Old orders keep the name and price they were bought at.</CardDescription>
+        <CardTitle className="text-base">{t('Details')}</CardTitle>
+        <CardDescription>{t("Shown on the store's product page. Old orders keep the name and price they were bought at.")}</CardDescription>
       </CardHeader>
       <CardContent>
         <form id="product-form" onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
           <fieldset disabled={!editable} className="contents">
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t('Name')}</Label>
               <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} aria-invalid={!!errors.name} maxLength={200} />
-              {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+              {errors.name && <p className="text-sm text-destructive">{t(errors.name)}</p>}
             </div>
             {!seller && <div className="space-y-2">
-              <Label htmlFor="slug">URL slug</Label>
-              <Input id="slug" className="font-mono text-xs" placeholder="made from the name" value={form.slug} onChange={(e) => set('slug', e.target.value)} />
+              <Label htmlFor="slug">{t('URL slug')}</Label>
+              <Input id="slug" className="font-mono text-xs" placeholder={t('made from the name')} value={form.slug} onChange={(e) => set('slug', e.target.value)} />
               <p className="text-xs text-muted-foreground">/product/{form.slug || '…'}</p>
             </div>}
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{t('Category')}</Label>
               <Select value={form.categoryId} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v, specs: v === f.categoryId ? f.specs : {} }))} disabled={!editable}>
-                <SelectTrigger className="w-full" aria-invalid={!!errors.categoryId}><SelectValue placeholder="Choose…" /></SelectTrigger>
+                <SelectTrigger className="w-full" aria-invalid={!!errors.categoryId}><SelectValue placeholder={t('Choose…')} /></SelectTrigger>
                 <SelectContent>
                   {categoryTree(categories.data ?? []).map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.label}{c.active === false && ' (hidden)'}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{c.label}{c.active === false && ` ${t('(hidden)')}`}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.categoryId && <p className="text-sm text-destructive">{errors.categoryId}</p>}
+              {errors.categoryId && <p className="text-sm text-destructive">{t(errors.categoryId)}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="price">Price (ETB)</Label>
+              <Label htmlFor="price">{t('Price (ETB)')}</Label>
               <Input id="price" type="number" min="0.01" step="0.01" inputMode="decimal" value={form.price} onChange={(e) => set('price', e.target.value)} aria-invalid={!!errors.price} />
-              {errors.price && <p className="text-sm text-destructive">{errors.price}</p>}
+              {errors.price && <p className="text-sm text-destructive">{t(errors.price)}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="threshold">Low-stock alert at</Label>
+              <Label htmlFor="threshold">{t('Low-stock alert at')}</Label>
               <Input id="threshold" type="number" min="0" value={form.lowStockThreshold} onChange={(e) => set('lowStockThreshold', e.target.value)} />
-              <p className="text-xs text-muted-foreground">Store shows “only N left” at or below this.</p>
+              <p className="text-xs text-muted-foreground">{t('Store shows “only N left” at or below this.')}</p>
             </div>
             {isNew && (
               <div className="space-y-2">
-                <Label htmlFor="stock">Starting stock</Label>
+                <Label htmlFor="stock">{t('Starting stock')}</Label>
                 <Input id="stock" type="number" min="0" value={form.stock} onChange={(e) => set('stock', e.target.value)} />
               </div>
             )}
@@ -223,8 +225,8 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
                 onChange={(specs) => set('specs', specs)} errors={errors} disabled={!editable} />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <span className="text-sm font-medium">Condition</span>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Condition">
+              <span className="text-sm font-medium">{t('Condition')}</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label={t('Condition')}>
                 {([['', seller ? 'Not set' : 'New (shop stock)'], ['NEW', 'New'], ['LIKE_NEW', 'Like new'], ['USED', 'Used']] as const).map(([v, label]) => (
                   <button
                     key={v || 'none'}
@@ -234,38 +236,38 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
                     onClick={() => set('condition', v)}
                     className={cn('h-10 flex-1 rounded-lg border px-3 text-sm font-semibold', form.condition === v ? 'border-2 border-primary bg-primary/5 text-primary' : 'bg-card')}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 ))}
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="area">Where is it?</Label>
-              <Input id="area" list="area-list" maxLength={120} value={form.area} onChange={(e) => set('area', e.target.value)} placeholder="Leave empty for the shop's area" />
+              <Label htmlFor="area">{t('Where is it?')}</Label>
+              <Input id="area" list="area-list" maxLength={120} value={form.area} onChange={(e) => set('area', e.target.value)} placeholder={t("Leave empty for the shop's area")} />
               <datalist id="area-list">{areas.data?.map((a) => <option key={a} value={a} />)}</datalist>
             </div>
             <label className="flex items-center justify-between gap-3 rounded-lg border p-3 sm:self-end">
               <span>
-                <span className="block text-sm font-medium">Price negotiable</span>
-                <span className="block text-xs text-muted-foreground">Buyers may offer less</span>
+                <span className="block text-sm font-medium">{t('Price negotiable')}</span>
+                <span className="block text-xs text-muted-foreground">{t('Buyers may offer less')}</span>
               </span>
               <Switch checked={form.negotiable} onCheckedChange={(v) => set('negotiable', v)} disabled={!editable} />
             </label>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" rows={5} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="What it is, size, materials, care…" />
+              <Label htmlFor="description">{t('Description')}</Label>
+              <Textarea id="description" rows={5} maxLength={5000} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder={t('What it is, size, materials, care…')} />
             </div>
             <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <span>
-                <span className="block text-sm font-medium">Show in store</span>
-                <span className="block text-xs text-muted-foreground">Off = hidden, but kept for order history</span>
+                <span className="block text-sm font-medium">{t('Show in store')}</span>
+                <span className="block text-xs text-muted-foreground">{t('Off = hidden, but kept for order history')}</span>
               </span>
               <Switch checked={form.active} onCheckedChange={(v) => set('active', v)} disabled={!editable} />
             </label>
             {!seller && <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
               <span>
-                <span className="block text-sm font-medium">Featured</span>
-                <span className="block text-xs text-muted-foreground">Shown on the home page</span>
+                <span className="block text-sm font-medium">{t('Featured')}</span>
+                <span className="block text-xs text-muted-foreground">{t('Shown on the home page')}</span>
               </span>
               <Switch checked={form.featured} onCheckedChange={(v) => set('featured', v)} disabled={!editable} />
             </label>}
@@ -273,7 +275,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
           {editable && (
             <div className="sm:col-span-2">
               <Button type="submit" disabled={save.isPending}>
-                {save.isPending ? <Loader2 className="animate-spin" /> : <Save />} {isNew ? 'Create product' : 'Save changes'}
+                {save.isPending ? <Loader2 className="animate-spin" /> : <Save />} {isNew ? t('Create product') : t('Save changes')}
               </Button>
             </div>
           )}
@@ -284,6 +286,7 @@ function DetailsForm({ detail, onSaved }: { detail?: ProductDetail; onSaved: (d:
 }
 
 function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: ProductDetail) => void }) {
+  const t = useT()
   const { editable, client } = useEditor()
   const id = detail.product.id
   const input = useRef<HTMLInputElement>(null)
@@ -294,11 +297,11 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
 
   const upload = async (files: File[]) => {
     const list = files.slice(0, room)
-    if (files.length > room) toast.warning(`Only ${room} more photo${room === 1 ? '' : 's'} allowed (max ${detail.maxImages}).`)
+    if (files.length > room) toast.warning(t(room === 1 ? 'Only {n} more photo allowed (max {max}).' : 'Only {n} more photos allowed (max {max}).', { n: room, max: detail.maxImages }))
     for (const [i, f] of list.entries()) {
-      if (!TYPES.includes(f.type)) { toast.error(`${f.name}: use JPG, PNG or WebP.`); continue }
-      if (f.size > MAX_BYTES) { toast.error(`${f.name} is larger than 5 MB.`); continue }
-      setUploading(`Uploading ${i + 1} of ${list.length}: ${f.name}`)
+      if (!TYPES.includes(f.type)) { toast.error(t('{name}: use JPG, PNG or WebP.', { name: f.name })); continue }
+      if (f.size > MAX_BYTES) { toast.error(t('{name} is larger than 5 MB.', { name: f.name })); continue }
+      setUploading(t('Uploading {i} of {n}: {name}', { i: i + 1, n: list.length, name: f.name }))
       try {
         onChange(await client.uploadImage(id, f))
       } catch (e) {
@@ -325,14 +328,14 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between text-base">
-          Photos <span className="text-xs font-normal text-muted-foreground">{detail.images.length} / {detail.maxImages}</span>
+          {t('Photos')} <span className="text-xs font-normal text-muted-foreground">{detail.images.length} / {detail.maxImages}</span>
         </CardTitle>
-        <CardDescription>The first photo is the main one. Drag to reorder. JPG, PNG or WebP, up to 5 MB, at least 300×300.</CardDescription>
+        <CardDescription>{t('The first photo is the main one. Drag to reorder. JPG, PNG or WebP, up to 5 MB, at least 300×300.')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {detail.images.length === 0 && detail.product.imageUrl && (
           <p className="rounded-lg bg-muted p-3 text-xs text-muted-foreground">
-            Currently using a built-in photo. Upload one to replace it.
+            {t('Currently using a built-in photo. Upload one to replace it.')}
           </p>
         )}
         <div className="grid grid-cols-3 gap-3">
@@ -349,24 +352,24 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
               }}
               className={cn('group relative overflow-hidden rounded-xl border bg-muted', dragId === img.id && 'opacity-50')}
             >
-              <img src={img.thumbUrl} alt={`Photo ${i + 1}`} className="aspect-square w-full object-cover" />
-              {i === 0 && <Badge className="absolute left-1.5 top-1.5 gap-1 text-[10px]"><Star className="size-3" /> Main</Badge>}
+              <img src={img.thumbUrl} alt={t('Photo {n}', { n: i + 1 })} className="aspect-square w-full object-cover" />
+              {i === 0 && <Badge className="absolute left-1.5 top-1.5 gap-1 text-[10px]"><Star className="size-3" /> {t('Main')}</Badge>}
               {editable && (
                 <>
                   <GripVertical className="absolute right-1.5 top-1.5 size-4 text-white drop-shadow" />
                   <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent p-1.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
                     <span className="flex gap-1">
-                      <Button size="icon-xs" variant="secondary" aria-label="Move left" disabled={i === 0} onClick={() => move(i, i - 1)}><ArrowLeft /></Button>
-                      <Button size="icon-xs" variant="secondary" aria-label="Move right" disabled={i === detail.images.length - 1} onClick={() => move(i, i + 1)}><ArrowRight /></Button>
+                      <Button size="icon-xs" variant="secondary" aria-label={t('Move left')} disabled={i === 0} onClick={() => move(i, i - 1)}><ArrowLeft /></Button>
+                      <Button size="icon-xs" variant="secondary" aria-label={t('Move right')} disabled={i === detail.images.length - 1} onClick={() => move(i, i + 1)}><ArrowRight /></Button>
                     </span>
                     {i !== 0 && (
-                      <Button size="icon-xs" variant="secondary" aria-label="Make main photo" onClick={() => move(i, 0)}><Star /></Button>
+                      <Button size="icon-xs" variant="secondary" aria-label={t('Make main photo')} onClick={() => move(i, 0)}><Star /></Button>
                     )}
                     <Button
                       size="icon-xs"
                       variant="destructive"
-                      aria-label="Remove photo"
-                      onClick={() => confirm('Remove this photo?') && run.mutate(() => client.removeImage(id, img.id))}
+                      aria-label={t('Remove photo')}
+                      onClick={() => confirm(t('Remove this photo?')) && run.mutate(() => client.removeImage(id, img.id))}
                     >
                       <Trash2 />
                     </Button>
@@ -393,7 +396,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
               )}
             >
               {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
-              {uploading ? 'Uploading…' : 'Add photos'}
+              {uploading ? t('Uploading…') : t('Add photos')}
             </button>
           )}
         </div>
@@ -415,6 +418,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
 }
 
 function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: ProductDetail) => void }) {
+  const t = useT()
   const { editable, client } = useEditor()
   const p = detail.product
   const [amount, setAmount] = useState('')
@@ -424,7 +428,7 @@ function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: Prod
     onSuccess: (d) => {
       onChange(d)
       setAmount('')
-      toast.success(`Stock is now ${d.product.stock}`)
+      toast.success(t('Stock is now {n}', { n: d.product.stock }))
     },
     onError: (e) => toast.error(e.message),
   })
@@ -432,37 +436,37 @@ function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: Prod
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Stock</CardTitle>
-        <CardDescription>Units held by unpaid orders can't be removed.</CardDescription>
+        <CardTitle className="text-base">{t('Stock')}</CardTitle>
+        <CardDescription>{t("Units held by unpaid orders can't be removed.")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-3 gap-2 text-center">
           {[['In stock', p.stock], ['Held', p.reserved], ['Available', p.available]].map(([label, v]) => (
             <div key={label} className="rounded-lg bg-muted/60 p-2">
               <p className="text-lg font-semibold tabular-nums">{v}</p>
-              <p className="text-[11px] text-muted-foreground">{label}</p>
+              <p className="text-[11px] text-muted-foreground">{t(String(label))}</p>
             </div>
           ))}
         </div>
         {editable && (
           <div className="space-y-2">
             <div className="flex gap-2">
-              <Input type="number" min="1" placeholder="Quantity" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-28" />
+              <Input type="number" min="1" placeholder={t('Quantity')} value={amount} onChange={(e) => setAmount(e.target.value)} className="w-28" />
               <Select value={reason} onValueChange={setReason}>
                 <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {['Restock', 'Stock count correction', 'Damaged or lost', 'Returned by customer', 'Other'].map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                    <SelectItem key={r} value={r}>{t(r)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" disabled={!n || adjust.isPending} onClick={() => adjust.mutate(-n)}>
-                <Minus /> Remove {n || ''}
+                <Minus /> {t('Remove {n}', { n: n || '' })}
               </Button>
               <Button className="flex-1" disabled={!n || adjust.isPending} onClick={() => adjust.mutate(n)}>
-                <Plus /> Add {n || ''}
+                <Plus /> {t('Add {n}', { n: n || '' })}
               </Button>
             </div>
           </div>
@@ -473,21 +477,22 @@ function Stock({ detail, onChange }: { detail: ProductDetail; onChange: (d: Prod
 }
 
 function History({ id }: { id: number }) {
+  const t = useT()
   const { client, keyPrefix } = useEditor()
   const { data } = useQuery({ queryKey: [`${keyPrefix}-product-changes`, id], queryFn: () => client.changes(id) })
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">History</CardTitle>
+        <CardTitle className="text-base">{t('History')}</CardTitle>
       </CardHeader>
       <CardContent>
-        {data?.content.length === 0 && <p className="text-sm text-muted-foreground">No changes yet.</p>}
+        {data?.content.length === 0 && <p className="text-sm text-muted-foreground">{t('No changes yet.')}</p>}
         <ol className="space-y-3">
           {data?.content.map((c) => (
             <li key={c.id} className="text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className="text-[11px]">{ACTION_LABEL[c.action] ?? c.action}</Badge>
-                <span className="text-xs text-muted-foreground">{formatDate(c.createdAt)} · {c.userEmail ?? 'system'}</span>
+                <Badge variant="outline" className="text-[11px]">{ACTION_LABEL[c.action] ? t(ACTION_LABEL[c.action]) : c.action}</Badge>
+                <span className="text-xs text-muted-foreground">{formatDate(c.createdAt)} · {c.userEmail ?? t('system')}</span>
               </div>
               {c.detail && <p className="mt-0.5 break-words text-xs">{c.detail}</p>}
             </li>
@@ -512,6 +517,7 @@ export function ProductEditor(config: EditorConfig) {
 }
 
 function EditorPage() {
+  const t = useT()
   const { client, keyPrefix, basePath, editable, seller } = useEditor()
   const { productId = 'new' } = useParams()
   const isNew = productId === 'new'
@@ -527,12 +533,12 @@ function EditorPage() {
   }
   const toggle = useMutation({
     mutationFn: () => client.setVisible(id, !data!.product.active),
-    onSuccess: (d) => { refresh(d); toast.success(d.product.active ? 'Shown in the store' : 'Hidden from the store') },
+    onSuccess: (d) => { refresh(d); toast.success(d.product.active ? t('Shown in the store') : t('Hidden from the store')) },
     onError: (e) => toast.error(e.message),
   })
   const duplicate = useMutation({
     mutationFn: () => client.duplicate(id),
-    onSuccess: (d) => { refresh(d); toast.success('Copy created (hidden, no stock)'); navigate(`${basePath}/${d.product.id}`) },
+    onSuccess: (d) => { refresh(d); toast.success(t('Copy created (hidden, no stock)')); navigate(`${basePath}/${d.product.id}`) },
     onError: (e) => toast.error(e.message),
   })
 
@@ -542,25 +548,25 @@ function EditorPage() {
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
-        <Link to={basePath}><ChevronLeft /> Products</Link>
+        <Link to={basePath}><ChevronLeft /> {t('Products')}</Link>
       </Button>
       <PageHeader
-        title={isNew ? 'New product' : p!.name}
-        description={isNew ? 'Save the details first, then add photos.' : `${p!.categoryName} · ${formatETB(p!.price)}`}
+        title={isNew ? t('New product') : p!.name}
+        description={isNew ? t('Save the details first, then add photos.') : `${p!.categoryName} · ${formatETB(p!.price)}`}
         actions={
           !isNew && (
             <div className="flex flex-wrap items-center gap-2">
               <StockBadge p={p!} />
               {p!.inStore && (
                 <Button asChild variant="outline" size="sm">
-                  <a href={`/product/${p!.slug}`} target="_blank" rel="noreferrer"><ExternalLink /> View in store</a>
+                  <a href={`/product/${p!.slug}`} target="_blank" rel="noreferrer"><ExternalLink /> {t('View in store')}</a>
                 </Button>
               )}
               {editable && (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy /> Duplicate</Button>
+                  <Button variant="outline" size="sm" onClick={() => duplicate.mutate()} disabled={duplicate.isPending}><Copy /> {t('Duplicate')}</Button>
                   <Button variant="outline" size="sm" onClick={() => toggle.mutate()} disabled={toggle.isPending}>
-                    {p!.active ? <><EyeOff /> Hide</> : <><Eye /> Show</>}
+                    {p!.active ? <><EyeOff /> {t('Hide')}</> : <><Eye /> {t('Show')}</>}
                   </Button>
                 </>
               )}
@@ -571,7 +577,7 @@ function EditorPage() {
       {p?.blockedReason && <BlockedNote id={p.id} reason={p.blockedReason} seller={!!seller} />}
       {seller && p && p.active && !p.inStore && !p.blockedReason && (
         <p className="rounded-lg bg-amber-soft p-3 text-sm text-amber-ink">
-          Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.
+          {t("Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.")}
         </p>
       )}
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -581,7 +587,7 @@ function EditorPage() {
             detail={data}
             onSaved={(d) => {
               refresh(d)
-              toast.success(isNew ? 'Product created. Now add photos.' : 'Saved')
+              toast.success(isNew ? t('Product created. Now add photos.') : t('Saved'))
               if (isNew) navigate(`${basePath}/${d.product.id}`, { replace: true })
             }}
           />
@@ -602,25 +608,26 @@ const HOLD_PREFIX = 'Held for a check: '
 
 /** Why a listing is out of the store: held automatically (fraud rules) or taken down by staff after reports. */
 function BlockedNote({ id, reason, seller }: { id: number; reason: string; seller: boolean }) {
+  const t = useT()
   const qc = useQueryClient()
   const held = reason.startsWith(HOLD_PREFIX)
   const putBack = useMutation({
     mutationFn: () => trustAdminApi.unblockListing(id),
     onSuccess: () => {
       qc.invalidateQueries()
-      toast.success('Put back in the store')
+      toast.success(t('Put back in the store'))
     },
     onError: (e) => toast.error(e.message),
   })
   return (
     <div className={cn('flex flex-wrap items-center gap-3 rounded-lg p-3 text-sm', held ? 'bg-amber-soft text-amber-ink' : 'bg-destructive/10 text-destructive')}>
       <p className="min-w-0 flex-1">
-        <span className="font-semibold">{held ? 'Held for a quick check:' : 'Taken down by Sodo Gebeya after reports:'}</span>{' '}
+        <span className="font-semibold">{held ? t('Held for a quick check:') : t('Taken down by Sodo Gebeya after reports:')}</span>{' '}
         {held ? reason.slice(HOLD_PREFIX.length) : `${reason}.`}{' '}
-        {seller ? (held ? 'We usually check within a day; you can edit it meanwhile.' : 'Fix it, then call us to put it back.') : ''}
+        {seller ? (held ? t('We usually check within a day; you can edit it meanwhile.') : t('Fix it, then call us to put it back.')) : ''}
       </p>
       {!seller && isAdmin() && (
-        <Button size="sm" variant="outline" disabled={putBack.isPending} onClick={() => putBack.mutate()}>Put back in the store</Button>
+        <Button size="sm" variant="outline" disabled={putBack.isPending} onClick={() => putBack.mutate()}>{t('Put back in the store')}</Button>
       )}
     </div>
   )

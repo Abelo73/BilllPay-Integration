@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { ID_TYPE_LABEL, verificationApi, type IdType, type MyVerification, type VerificationPhoto } from '@/lib/trust-api'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ function PhotoSlot({ photo, label, has, editable, onUploaded }: {
   editable: boolean
   onUploaded: (v: MyVerification) => void
 }) {
+  const t = useT()
   const input = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [version, setVersion] = useState(0)
@@ -38,8 +40,8 @@ function PhotoSlot({ photo, label, has, editable, onUploaded }: {
   })
   const pick = (f?: File) => {
     if (!f) return
-    if (!TYPES.includes(f.type)) return toast.error('Use a JPG, PNG or WebP photo.')
-    if (f.size > MAX_BYTES) return toast.error('That photo is larger than 5 MB.')
+    if (!TYPES.includes(f.type)) return toast.error(t('Use a JPG, PNG or WebP photo.'))
+    if (f.size > MAX_BYTES) return toast.error(t('That photo is larger than 5 MB.'))
     upload.mutate(f)
   }
   return (
@@ -81,16 +83,17 @@ function Step({ n, done, title, text, children }: { n: number; done: boolean; ti
 /** /seller/verify: get the Verified badge (design S18). */
 export function SellerVerifyPage() {
   const qc = useQueryClient()
+  const t = useT()
   const { data: v, isLoading } = useQuery({ queryKey: ['seller-verification'], queryFn: verificationApi.get })
   const [details, setDetails] = useState<string | null>(null)
   const set = (next: MyVerification) => qc.setQueryData(['seller-verification'], next)
-  const saveType = useMutation({ mutationFn: (t: IdType) => verificationApi.details(t, details ?? v?.details ?? ''), onSuccess: set, onError: (e) => toast.error(e.message) })
+  const saveType = useMutation({ mutationFn: (idType: IdType) => verificationApi.details(idType, details ?? v?.details ?? ''), onSuccess: set, onError: (e) => toast.error(e.message) })
   const submit = useMutation({
     mutationFn: async () => {
       if (details !== null && details !== (v?.details ?? '')) await verificationApi.details(v!.idType, details)
       return verificationApi.submit()
     },
-    onSuccess: (next) => { set(next); toast.success('Sent. Our team checks it within a day; we\'ll text you.') },
+    onSuccess: (next) => { set(next); toast.success(t("Sent. Our team checks it within a day; we'll text you.")) },
     onError: (e) => toast.error(e.message),
   })
 
@@ -101,8 +104,8 @@ export function SellerVerifyPage() {
       <div className="flex gap-3 rounded-2xl bg-primary/10 p-5">
         <BadgeCheck className="size-8 shrink-0 text-primary" />
         <div>
-          <p className="font-bold">Your shop is verified</p>
-          <p className="text-sm text-muted-foreground">Since {formatDate(v.shopVerifiedAt)}. Buyers see the badge on your shop and products.</p>
+          <p className="font-bold">{t('Your shop is verified')}</p>
+          <p className="text-sm text-muted-foreground">{t('Since {date}. Buyers see the badge on your shop and products.', { date: formatDate(v.shopVerifiedAt) })}</p>
         </div>
       </div>
     )
@@ -112,8 +115,8 @@ export function SellerVerifyPage() {
       <div className="flex gap-3 rounded-2xl bg-amber-soft p-5 text-amber-ink">
         <Clock className="size-6 shrink-0" />
         <div>
-          <p className="font-bold">Our team is checking your documents</p>
-          <p className="text-sm">Sent {formatDate(v.submittedAt)}. We'll text you, usually within a day.</p>
+          <p className="font-bold">{t('Our team is checking your documents')}</p>
+          <p className="text-sm">{t("Sent {date}. We'll text you, usually within a day.", { date: formatDate(v.submittedAt) })}</p>
         </div>
       </div>
     )
@@ -128,54 +131,54 @@ export function SellerVerifyPage() {
       <div className="flex gap-3 rounded-2xl bg-primary/10 p-4">
         <ShieldCheck className="size-9 shrink-0 text-primary" />
         <div className="space-y-1">
-          <p className="text-sm font-bold">Buyers trust verified sellers more</p>
-          <p className="text-sm text-muted-foreground">Get the Verified badge on your shop and products. Your ID is never shown to buyers: only Sodo Gebeya staff see it.</p>
+          <p className="text-sm font-bold">{t('Buyers trust verified sellers more')}</p>
+          <p className="text-sm text-muted-foreground">{t('Get the Verified badge on your shop and products. Your ID is never shown to buyers: only Sodo Gebeya staff see it.')}</p>
         </div>
       </div>
       {(v.status === 'MORE_INFO' || v.status === 'REJECTED') && v.staffNote && (
         <p className="rounded-2xl bg-destructive/10 p-4 text-sm text-destructive">
-          <span className="font-bold">{v.status === 'MORE_INFO' ? 'Please fix: ' : 'Not verified: '}</span>{v.staffNote}
-          {v.status === 'REJECTED' && ' You can try again with new photos.'}
+          <span className="font-bold">{v.status === 'MORE_INFO' ? t('Please fix:') : t('Not verified:')}</span>{' '}{v.staffNote}
+          {v.status === 'REJECTED' && ` ${t('You can try again with new photos.')}`}
         </p>
       )}
       <ol className="space-y-3">
-        <Step n={1} done title="Phone number" text="Proven when you signed in" />
-        <Step n={2} done={v.idFront && (!twoSided || v.idBack)} title="ID card" text={twoSided ? 'Both sides, all four corners, readable' : 'The photo page'}>
+        <Step n={1} done title={t('Phone number')} text={t('Proven when you signed in')} />
+        <Step n={2} done={v.idFront && (!twoSided || v.idBack)} title={t('ID card')} text={twoSided ? t('Both sides, all four corners, readable') : t('The photo page')}>
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(ID_TYPE_LABEL) as IdType[]).map((t) => (
+            {(Object.keys(ID_TYPE_LABEL) as IdType[]).map((idType) => (
               <button
-                key={t}
+                key={idType}
                 type="button"
-                onClick={() => saveType.mutate(t)}
-                className={cn('h-9 rounded-full border px-3 text-xs font-semibold', v.idType === t ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground')}
+                onClick={() => saveType.mutate(idType)}
+                className={cn('h-9 rounded-full border px-3 text-xs font-semibold', v.idType === idType ? 'border-primary bg-primary/10 text-primary' : 'bg-card text-muted-foreground')}
               >
-                {ID_TYPE_LABEL[t]}
+                {t(ID_TYPE_LABEL[idType])}
               </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <PhotoSlot photo="id-front" label={twoSided ? 'Front side' : 'Photo page'} has={v.idFront} editable={editable} onUploaded={set} />
-            {twoSided && <PhotoSlot photo="id-back" label="Back side" has={v.idBack} editable={editable} onUploaded={set} />}
+            <PhotoSlot photo="id-front" label={twoSided ? t('Front side') : t('Photo page')} has={v.idFront} editable={editable} onUploaded={set} />
+            {twoSided && <PhotoSlot photo="id-back" label={t('Back side')} has={v.idBack} editable={editable} onUploaded={set} />}
           </div>
         </Step>
-        <Step n={3} done={v.selfie} title="Selfie holding your ID" text="So we know the ID is yours">
+        <Step n={3} done={v.selfie} title={t('Selfie holding your ID')} text={t('So we know the ID is yours')}>
           <div className="grid grid-cols-2 gap-2">
-            <PhotoSlot photo="selfie" label="Selfie" has={v.selfie} editable={editable} onUploaded={set} />
+            <PhotoSlot photo="selfie" label={t('Selfie')} has={v.selfie} editable={editable} onUploaded={set} />
           </div>
         </Step>
-        <Step n={4} done={!!(v.licence || v.details)} title="Shop details (optional)" text="Trade licence photo or number, or where your shop is">
+        <Step n={4} done={!!(v.licence || v.details)} title={t('Shop details (optional)')} text={t('Trade licence photo or number, or where your shop is')}>
           <div className="grid grid-cols-2 gap-2">
-            <PhotoSlot photo="licence" label="Trade licence" has={v.licence} editable={editable} onUploaded={set} />
+            <PhotoSlot photo="licence" label={t('Trade licence')} has={v.licence} editable={editable} onUploaded={set} />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="verify-details" className="text-xs">Anything that helps us check</Label>
-            <Textarea id="verify-details" rows={2} maxLength={1000} value={details ?? v.details ?? ''} onChange={(e) => setDetails(e.target.value)} placeholder="e.g. Licence no. 12/345, shop opposite Arada church" />
+            <Label htmlFor="verify-details" className="text-xs">{t('Anything that helps us check')}</Label>
+            <Textarea id="verify-details" rows={2} maxLength={1000} value={details ?? v.details ?? ''} onChange={(e) => setDetails(e.target.value)} placeholder={t('e.g. Licence no. 12/345, shop opposite Arada church')} />
           </div>
         </Step>
       </ol>
       <div className="fixed inset-x-0 bottom-16 z-30 border-t bg-card p-3 md:static md:border-0 md:bg-transparent md:p-0">
         <Button size="lg" className="h-12 w-full text-base md:w-auto" disabled={!ready || submit.isPending} onClick={() => submit.mutate()}>
-          {submit.isPending && <Loader2 className="animate-spin" />} {ready ? 'Send for checking' : 'Add the photos above first'}
+          {submit.isPending && <Loader2 className="animate-spin" />} {ready ? t('Send for checking') : t('Add the photos above first')}
         </Button>
       </div>
     </div>

@@ -9,6 +9,7 @@ import { promoApi, type Banner } from '@/lib/promo-api'
 /** Home page banners (M17), managed in Admin → Banners. Clicks are counted. */
 export function HomeBanners() {
   const { data } = useQuery({ queryKey: ['banners'], queryFn: promoApi.banners, staleTime: 5 * 60_000 })
+  const t = useT()
   const navigate = useNavigate()
   if (!data?.length) return null
   const open = async (b: Banner) => {
@@ -17,7 +18,7 @@ export function HomeBanners() {
     else window.open(to, '_blank', 'noopener')
   }
   return (
-    <section aria-label="Offers" className="mx-auto max-w-7xl px-4 pt-10 sm:px-6">
+    <section aria-label={t('Special offers')} className="mx-auto max-w-7xl px-4 pt-10 sm:px-6">
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {data.map((b) => (
           <button key={b.id} type="button" onClick={() => open(b)}
