@@ -13,6 +13,7 @@ import { formatDate, formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
 import { sellerApi, type SellerOrderTab } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
+import { SellerCancel } from '@/components/seller-cancel'
 import { Pager } from '../admin/shared'
 import { FULFILMENT_LABEL, OrderLine } from './shared'
 
@@ -200,7 +201,9 @@ export function SellerOrderPage() {
               </Button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">{t("Can't deliver it? Call Sodo Gebeya: only we can cancel a paid order, because the buyer gets a refund.")}</p>
+          {(o.fulfilmentStatus === 'UNFULFILLED' || o.fulfilmentStatus === 'PROCESSING') && (
+            <SellerCancel orderNumber={o.orderNumber} amount={o.itemsTotal + o.deliveryFee} />
+          )}
         </section>
       )}
     </div>

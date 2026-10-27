@@ -73,6 +73,11 @@ public class Dispute {
 
 	private Instant sellerRepliedAt;
 
+	/** A part refund the seller offered; the buyer accepts it (settled) or declines it (staff decide). */
+	private BigDecimal sellerOfferAmount;
+
+	private Instant sellerOfferAt;
+
 	@Column(updatable = false, insertable = false)
 	private Instant createdAt;
 

@@ -127,6 +127,36 @@ public class DisputeController {
 				.map(views::row).toList());
 	}
 
+	public record SellerRefundRequest(
+			/** null = refund in full now; a number = offer that much back (the buyer accepts or declines) */
+			@jakarta.validation.constraints.DecimalMin("0.01") @jakarta.validation.constraints.Digits(integer = 10, fraction = 2) java.math.BigDecimal amount,
+			@Size(max = 1000) String note) {
+	}
+
+	/** The seller settles without staff: refund in full at once, or offer part of the money back. */
+	@PostMapping("/api/seller/disputes/{id}/refund")
+	public DisputeViews.DisputeView sellerRefund(@PathVariable Long id, @Valid @RequestBody SellerRefundRequest r) {
+		Shop shop = shops.requireMine();
+		if (r.amount() == null) {
+			service.sellerRefundInFull(id, shop.getId(), shop.getName(), r.note());
+		} else {
+			service.sellerOfferPart(id, shop.getId(), shop.getName(), r.amount(), r.note());
+		}
+		return read(() -> views.view(disputes.findById(id).orElseThrow(), DisputeService.Viewer.SELLER));
+	}
+
+	@PostMapping("/api/disputes/{id}/offer/accept")
+	public DisputeViews.DisputeView acceptOffer(@PathVariable Long id) {
+		service.buyerAcceptOffer(customer(), id);
+		return get(id);
+	}
+
+	@PostMapping("/api/disputes/{id}/offer/decline")
+	public DisputeViews.DisputeView declineOffer(@PathVariable Long id) {
+		service.buyerDeclineOffer(customer(), id);
+		return get(id);
+	}
+
 	// ---------- helpers ----------
 
 	private DisputeService.Viewer viewer(Dispute d, UUID me) {

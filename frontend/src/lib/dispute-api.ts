@@ -52,7 +52,16 @@ export type Problem = ProblemRow & {
   canWrite: boolean
   canWithdraw: boolean
   canAddPhotos: boolean
+  /** a part refund the seller offered, waiting for the buyer */
+  sellerOffer: number | null
+  /** seller: may refund in full or offer part back */
+  canRefund: boolean
+  /** buyer: may accept or decline the seller's offer */
+  canAnswerOffer: boolean
 }
+
+/** Result of cancelling a paid parcel before it was sent. */
+export type CancelRefund = { orderNumber: string; parcelNo: number; refunded: number; refundStatus: string }
 
 const send = (method: string, body?: unknown) => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
 
@@ -82,6 +91,17 @@ export const problemApi = {
   addPhoto: (id: number, file: File) => upload<Problem>(`/disputes/${id}/photos`, file, sessionToken()),
   photo: (id: number, photoId: number) => photoUrl(`/disputes/${id}/photos/${photoId}`, sessionToken()),
   forMyShop: () => request<ProblemRow[]>('/seller/disputes'),
+  /** Seller: no amount = refund in full now; an amount = offer that much back (the buyer accepts or declines). */
+  sellerRefund: (id: number, amount?: number, note?: string) =>
+    request<Problem>(`/seller/disputes/${id}/refund`, send('POST', { amount, note })),
+  acceptOffer: (id: number) => request<Problem>(`/disputes/${id}/offer/accept`, send('POST', {})),
+  declineOffer: (id: number) => request<Problem>(`/disputes/${id}/offer/decline`, send('POST', {})),
+  /** Buyer: cancel a paid parcel before the seller starts packing; the money goes back through BillPay. */
+  cancelParcel: (orderNumber: string, parcelNo: number, reason?: string) =>
+    request<CancelRefund>(`/orders/${encodeURIComponent(orderNumber)}/parcels/${parcelNo}/cancel`, send('POST', { reason })),
+  /** Seller: cancel my parcel of this order before it ships (out of stock, can't deliver); the buyer is refunded. */
+  sellerCancel: (orderNumber: string, reason: string) =>
+    request<CancelRefund>(`/seller/orders/${encodeURIComponent(orderNumber)}/cancel`, send('POST', { reason })),
 }
 
 async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {

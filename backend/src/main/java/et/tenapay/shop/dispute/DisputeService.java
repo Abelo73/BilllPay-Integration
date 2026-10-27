@@ -175,6 +175,89 @@ public class DisputeService {
 	 * PART_REFUND: the buyer gets {@code amount}; the seller is paid the rest. PAY_SELLER: no refund, the money is released.
 	 */
 	public Dispute decide(Long disputeId, Outcome outcome, BigDecimal amount, String note, String by) {
+		return settle(disputeId, outcome, amount, note, by, DisputeMessage.Author.STAFF, "Sodo Gebeya");
+	}
+
+	// ---------- settled without staff ----------
+
+	/** The seller agrees: the buyer gets the whole parcel back at once (the seller's held money is cancelled). */
+	public Dispute sellerRefundInFull(Long disputeId, Long shopId, String shopName, String note) {
+		Dispute d = sellersOpen(disputeId, shopId);
+		String text = note == null || note.isBlank() ? "We refunded you in full." : note.trim();
+		return settle(d.getId(), Outcome.REFUND, null, text, "seller " + shopName, DisputeMessage.Author.SELLER, shopName);
+	}
+
+	/** The seller offers part of the money back; nothing moves until the buyer accepts. */
+	public Dispute sellerOfferPart(Long disputeId, Long shopId, String shopName, BigDecimal amount, String note) {
+		Dispute d = sellersOpen(disputeId, shopId);
+		BigDecimal max = parcelPaid(parcels.findById(d.getParcelId()).orElseThrow());
+		if (amount == null || amount.signum() <= 0 || amount.compareTo(max) >= 0) {
+			throw bad("AMOUNT_INVALID", "Offer more than 0 and less than " + max + " birr (the parcel's total); for everything, refund in full.");
+		}
+		BigDecimal offer = amount.setScale(2, RoundingMode.HALF_UP);
+		Dispute saved = tx.execute(s -> {
+			Dispute x = disputes.findById(d.getId()).orElseThrow();
+			x.setSellerOfferAmount(offer);
+			x.setSellerOfferAt(Instant.now());
+			if (x.getSellerRepliedAt() == null) {
+				x.setSellerRepliedAt(Instant.now());
+			}
+			addMessage(x, DisputeMessage.Author.SELLER, shopName, "Offer: " + offer + " birr back to you; you keep the items."
+					+ (note == null || note.isBlank() ? "" : " " + note.trim()));
+			return x;
+		});
+		buyerPhone(d).ifPresent(phone -> sms.send(SmsService.Kind.ORDER, phone, "Sodo Gebeya: the seller offers " + offer
+				+ " birr back for your problem with order " + orderRef(d) + ". Open My orders to accept or decline.", null, null));
+		log.info("Dispute #{}: seller offered {} ETB", d.getId(), offer);
+		return saved;
+	}
+
+	/** The buyer takes the seller's offer: part refund, the seller is paid the rest. */
+	public Dispute buyerAcceptOffer(UUID buyerId, Long disputeId) {
+		Dispute d = disputes.findById(disputeId).filter(x -> buyerId.equals(x.getBuyerId())).orElseThrow(() -> ApiException.notFound("Problem"));
+		if (!d.getStatus().open()) {
+			throw closed();
+		}
+		if (d.getSellerOfferAmount() == null) {
+			throw new ApiException(HttpStatus.CONFLICT, "NO_OFFER", "The seller hasn't offered anything (or withdrew it).");
+		}
+		BigDecimal offer = d.getSellerOfferAmount();
+		return settle(d.getId(), Outcome.PART_REFUND, offer, "I accepted the seller's offer of " + offer + " birr.",
+				"buyer (accepted the seller's offer)", DisputeMessage.Author.BUYER, "Buyer");
+	}
+
+	/** The buyer says no to the offer; the problem stays open for staff to decide. */
+	public Dispute buyerDeclineOffer(UUID buyerId, Long disputeId) {
+		Dispute declined = tx.execute(s -> {
+			Dispute x = disputes.findById(disputeId).filter(y -> buyerId.equals(y.getBuyerId())).orElseThrow(() -> ApiException.notFound("Problem"));
+			if (!x.getStatus().open()) {
+				throw closed();
+			}
+			if (x.getSellerOfferAmount() == null) {
+				throw new ApiException(HttpStatus.CONFLICT, "NO_OFFER", "There's no offer to decline.");
+			}
+			addMessage(x, DisputeMessage.Author.BUYER, "Buyer", "I declined the offer of " + x.getSellerOfferAmount()
+					+ " birr. Sodo Gebeya, please decide.");
+			x.setSellerOfferAmount(null);
+			x.setSellerOfferAt(null);
+			return x;
+		});
+		sellerPhone(declined).ifPresent(phone -> sms.send(SmsService.Kind.ORDER, phone, "Sodo Gebeya: the buyer declined your offer for order "
+				+ orderRef(declined) + ". Our team will decide; you can still refund in full in Seller > Orders > Problems.", null, null));
+		return declined;
+	}
+
+	private Dispute sellersOpen(Long disputeId, Long shopId) {
+		Dispute d = disputes.findById(disputeId).filter(x -> shopId != null && shopId.equals(x.getShopId()))
+				.orElseThrow(() -> ApiException.notFound("Problem"));
+		if (!d.getStatus().open()) {
+			throw closed();
+		}
+		return d;
+	}
+
+	private Dispute settle(Long disputeId, Outcome outcome, BigDecimal amount, String note, String by,
+			DisputeMessage.Author author, String authorName) {
 		if (outcome == null) {
 			throw bad("OUTCOME_REQUIRED", "Choose refund, part refund or pay the seller.");
 		}
@@ -214,6 +297,8 @@ public class DisputeService {
 			x.setDecisionNote(cut(note, 1000));
 			x.setDecidedBy(by);
 			x.setResolvedAt(Instant.now());
+			x.setSellerOfferAmount(null);
+			x.setSellerOfferAt(null);
 			if (outcome == Outcome.REFUND) {
 				PayoutService.cancel(p);
 			} else {
@@ -222,7 +307,8 @@ public class DisputeService {
 				}
 				payouts.release(p, "problem #" + x.getId() + " settled");
 			}
-			addMessage(x, DisputeMessage.Author.STAFF, "Sodo Gebeya", "Decision: " + describe(outcome, refund) + ". " + note.trim());
+			addMessage(x, author, authorName, (author == DisputeMessage.Author.STAFF ? "Decision: " : "Settled: ")
+					+ describe(outcome, refund) + ". " + note.trim());
 			return x;
 		});
 		metrics.shopEvent("dispute_" + outcome.name().toLowerCase());

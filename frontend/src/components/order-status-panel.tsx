@@ -12,6 +12,7 @@ import { api, ApiError, type FulfilmentStatus, type OrderStatus, type OrderStatu
 import { formatDate, formatETB, reasonMessage } from '@/lib/format'
 import { t as tr, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import { CancelParcel } from './cancel-parcel'
 import { OrderProblems } from './order-problems'
 import { useCart } from '@/store/cart'
 
@@ -349,6 +350,9 @@ function ParcelList({ o }: { o: OrderStatusView }) {
             )}
             {p.rider && <RiderCard rider={p.rider} />}
             {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={t('I received the items from {seller}', { seller: p.seller ?? 'Sodo Gebeya' })} />}
+            {p.fulfilmentStatus === 'UNFULFILLED' && (
+              <CancelParcel orderNumber={o.orderNumber} parcelNo={p.parcelNo} amount={p.itemsTotal + p.deliveryFee} seller={p.seller ?? 'Sodo Gebeya'} />
+            )}
           </li>
         )
       })}
@@ -407,6 +411,9 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       )}
       {!multi && o.parcels?.[0]?.rider && <RiderCard rider={o.parcels[0].rider} />}
       {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label={t('I received my items')} />}
+      {!multi && o.parcels?.[0]?.fulfilmentStatus === 'UNFULFILLED' && (
+        <CancelParcel orderNumber={o.orderNumber} parcelNo={o.parcels[0].parcelNo} amount={o.total} />
+      )}
       <OrderProblems o={o} />
     </div>
   )

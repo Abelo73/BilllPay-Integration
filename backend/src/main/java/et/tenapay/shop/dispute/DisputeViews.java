@@ -36,7 +36,13 @@ public class DisputeViews {
 			String buyerPhone, String reason, String details, String status, BigDecimal parcelTotal, BigDecimal refundAmount,
 			String decisionNote, String decidedBy, Instant createdAt, Instant resolvedAt, Instant sellerRepliedAt,
 			List<ItemLine> items, List<MessageView> messages, List<Long> photoIds, String viewer, boolean canWrite,
-			boolean canWithdraw, boolean canAddPhotos) {
+			boolean canWithdraw, boolean canAddPhotos,
+			/** a part refund the seller offered, waiting for the buyer; null when none */
+			BigDecimal sellerOffer,
+			/** the seller may refund in full or offer part back */
+			boolean canRefund,
+			/** the buyer may accept or decline the seller's offer */
+			boolean canAnswerOffer) {
 	}
 
 	/** A row in a list (no thread). */
@@ -61,7 +67,10 @@ public class DisputeViews {
 				service.thread(d).stream().map(m -> new MessageView(m.getId(), m.getAuthor().name(), m.getAuthorName(), m.getBody(), m.getCreatedAt()))
 						.toList(),
 				photoIds, viewer.name(), open, open && viewer == DisputeService.Viewer.BUYER,
-				open && viewer == DisputeService.Viewer.BUYER && photoIds.size() < DisputeService.MAX_PHOTOS);
+				open && viewer == DisputeService.Viewer.BUYER && photoIds.size() < DisputeService.MAX_PHOTOS,
+				open ? d.getSellerOfferAmount() : null,
+				open && viewer == DisputeService.Viewer.SELLER,
+				open && viewer == DisputeService.Viewer.BUYER && d.getSellerOfferAmount() != null);
 	}
 
 	public DisputeRow row(Dispute d) {

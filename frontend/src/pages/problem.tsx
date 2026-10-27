@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { ProblemSettle } from '@/components/problem-settle'
 import { ProblemThread } from '@/components/problem-thread'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -38,9 +39,10 @@ export function ProblemPage() {
         <>
           {p.viewer === 'SELLER' && p.status === 'OPEN' && (
             <p className="rounded-xl bg-market/10 p-3 text-sm">
-              {t("The money for this order stays held until it's settled. Answer the buyer here: offer a swap, a repair or a refund. If you can't agree, Sodo Gebeya decides.")}
+              {t("The money for this order stays held until it's settled. Answer the buyer here, or settle it yourself below: refund in full or offer part back. If you can't agree, Sodo Gebeya decides.")}
             </p>
           )}
+          <ProblemSettle p={p} onChange={set} />
           <ProblemThread p={p} loadPhoto={(photoId) => problemApi.photo(id, photoId)} onSend={(b) => send.mutate(b)} sending={send.isPending} />
           <div className="flex flex-wrap gap-2">
             {p.canAddPhotos && (

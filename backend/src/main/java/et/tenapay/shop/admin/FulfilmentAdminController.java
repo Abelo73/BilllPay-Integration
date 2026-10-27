@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 public class FulfilmentAdminController {
 
 	private final FulfilmentService fulfilment;
+	private final et.tenapay.shop.order.ParcelCancelService parcelCancel;
 
 	public record FulfilmentRequest(@NotNull FulfilmentStatus status, @Size(max = 300) String note) {
 	}
@@ -33,6 +34,11 @@ public class FulfilmentAdminController {
 
 	@PostMapping("/fulfilment")
 	public Map<String, Object> advance(@PathVariable String orderNumber, @Valid @RequestBody FulfilmentRequest req) {
+		if (req.status() == FulfilmentStatus.CANCELLED) {
+			// a paid order: each parcel not yet sent is refunded through BillPay, then cancelled
+			var done = parcelCancel.orderByStaff(orderNumber, req.note(), staff());
+			return Map.of("orderNumber", orderNumber, "fulfilmentStatus", FulfilmentStatus.CANCELLED.name(), "refunds", done);
+		}
 		Order o = fulfilment.advance(orderNumber, req.status(), req.note(), staff());
 		return Map.of("orderNumber", o.getOrderNumber(), "fulfilmentStatus", o.getFulfilmentStatus().name());
 	}
@@ -41,6 +47,12 @@ public class FulfilmentAdminController {
 	@PostMapping("/parcels/{parcelNo}/fulfilment")
 	public Map<String, Object> advanceParcel(@PathVariable String orderNumber, @PathVariable int parcelNo,
 			@Valid @RequestBody FulfilmentRequest req) {
+		if (req.status() == FulfilmentStatus.CANCELLED) {
+			// refunded through BillPay first, then cancelled (it used to cancel without giving the money back)
+			var r = parcelCancel.byStaff(orderNumber, parcelNo, req.note(), staff());
+			return Map.of("orderNumber", orderNumber, "parcelNo", parcelNo, "fulfilmentStatus", FulfilmentStatus.CANCELLED.name(),
+					"refunded", r.refunded(), "refundStatus", r.refundStatus());
+		}
 		var p = fulfilment.advanceParcel(orderNumber, parcelNo, req.status(), req.note(), staff(), null);
 		return Map.of("orderNumber", orderNumber, "parcelNo", p.getParcelNo(), "fulfilmentStatus", p.getFulfilmentStatus().name());
 	}

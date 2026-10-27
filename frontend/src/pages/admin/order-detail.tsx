@@ -126,9 +126,12 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
   const orderNumber = data.order.orderNumber
   const [notes, setNotes] = useState<Record<number, string>>({})
   const step = useMutation({
-    mutationFn: ({ parcelNo, to }: { parcelNo: number; to: string }) => fulfilParcel(orderNumber, parcelNo, to, notes[parcelNo]?.trim() || undefined),
+    mutationFn: ({ parcelNo, to, reason }: { parcelNo: number; to: string; reason?: string }) =>
+      fulfilParcel(orderNumber, parcelNo, to, reason ?? (notes[parcelNo]?.trim() || undefined)),
     onSuccess: (r) => {
-      toast.success(`Parcel ${r.parcelNo}: ${r.fulfilmentStatus.toLowerCase()}`)
+      toast.success(r.fulfilmentStatus === 'CANCELLED'
+        ? `Parcel ${r.parcelNo} cancelled; the buyer is refunded through BillPay`
+        : `Parcel ${r.parcelNo}: ${r.fulfilmentStatus.toLowerCase()}`)
       setNotes((n) => ({ ...n, [r.parcelNo]: '' }))
       qc.invalidateQueries({ queryKey: ['admin-order', orderNumber] })
       qc.invalidateQueries({ queryKey: ['admin-orders'] })
@@ -170,7 +173,10 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
                     ))}
                     {p.nextSteps.includes('CANCELLED') && (
                       <Button size="xs" variant="ghost" className="text-destructive hover:text-destructive" disabled={step.isPending}
-                        onClick={() => confirm(`Cancel parcel ${p.number}? Refund the buyer for it from the Payments tab.`) && step.mutate({ parcelNo: p.parcelNo, to: 'CANCELLED' })}>
+                        onClick={() => {
+                          const reason = window.prompt(`Cancel parcel ${p.number}? The buyer is refunded for it through BillPay. Why? (the buyer sees this)`)
+                          if (reason?.trim()) step.mutate({ parcelNo: p.parcelNo, to: 'CANCELLED', reason: reason.trim() })
+                        }}>
                         Cancel parcel
                       </Button>
                     )}
@@ -253,13 +259,17 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
                 </Button>
               ))}
               {canCancelDelivery && (
-                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={fulfil.isPending} onClick={() => fulfil.mutate({ to: 'CANCELLED', note })}>
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={fulfil.isPending}
+                  onClick={() => {
+                    const reason = note.trim() || window.prompt('Cancel delivery? Every parcel not yet sent is refunded through BillPay. Why? (the buyer sees this)')?.trim()
+                    if (reason) fulfil.mutate({ to: 'CANCELLED', note: reason })
+                  }}>
                   {STEP_LABEL.CANCELLED}
                 </Button>
               )}
             </div>
             {data.parcels.length > 1 && <p className="text-xs text-muted-foreground">These buttons move every parcel that can take the step. To move one seller's parcel, use Parcels below.</p>}
-            {canCancelDelivery && <p className="text-xs text-muted-foreground">Cancelling a paid order doesn’t refund it; issue the refund from the Payments tab.</p>}
+            {canCancelDelivery && <p className="text-xs text-muted-foreground">Cancelling refunds the buyer through BillPay for every parcel not yet sent. If BillPay refuses (for example its refund limit), nothing is cancelled.</p>}
           </div>
         )}
         {!d.fulfilmentStatus && !unpaid && data.order.status !== 'CANCELLED' && (
