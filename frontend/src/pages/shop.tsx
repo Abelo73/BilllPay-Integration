@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { publicTrustApi } from '@/lib/trust-api'
 import { useT } from '@/lib/i18n'
 import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,9 @@ export function ShopPage() {
   const page = Number(params.get('page') ?? 0)
   const minPrice = params.get('minPrice') ?? ''
   const maxPrice = params.get('maxPrice') ?? ''
+  const area = params.get('area') ?? ''
+  const [near, setNear] = useMyArea()
+  const areas = useQuery({ queryKey: ['areas'], queryFn: publicTrustApi.areas, staleTime: 10 * 60_000 })
   const [search, setSearch] = useState(q)
 
   const update = (changes: Record<string, string | null>) => {
@@ -57,8 +61,8 @@ export function ShopPage() {
     staleTime: 60_000,
   })
   const products = useQuery({
-    queryKey: ['products', category, q, sort, page, filterKey, minPrice, maxPrice],
-    queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, ...specFilters }),
+    queryKey: ['products', category, q, sort, page, filterKey, minPrice, maxPrice, area, near],
+    queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, area, near, ...specFilters }),
     placeholderData: keepPreviousData,
   })
   /** Picking another category clears the detail filters (they belong to the old one). */
@@ -114,6 +118,22 @@ export function ShopPage() {
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <PriceRange min={minPrice} max={maxPrice} onChange={(a, b) => update({ minPrice: a || null, maxPrice: b || null })} />
+        <label className="space-y-1 text-xs font-medium text-muted-foreground">
+          {t('Area')}
+          <select value={area} onChange={(e) => update({ area: e.target.value || null })}
+            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', area && 'border-primary')}>
+            <option value="">{t('Anywhere in Sodo')}</option>
+            {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1 text-xs font-medium text-muted-foreground" title={t('Listings from your area come first')}>
+          {t('I am in (near me first)')}
+          <select value={near} onChange={(e) => setNear(e.target.value)}
+            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', near && 'border-primary')}>
+            <option value="">{t('Not set')}</option>
+            {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </label>
         <SaveSearchButton
           className="ml-auto"
           input={{
@@ -221,4 +241,27 @@ function SubChip({ active, onClick, children }: { active: boolean; onClick: () =
       {children}
     </button>
   )
+}
+
+const MY_AREA = 'sodo-my-area'
+
+/** The shopper's own area, remembered on this device: listings from there come first. */
+function useMyArea(): [string, (v: string) => void] {
+  const [v, setV] = useState(() => {
+    try {
+      return localStorage.getItem(MY_AREA) ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const set = (next: string) => {
+    setV(next)
+    try {
+      if (next) localStorage.setItem(MY_AREA, next)
+      else localStorage.removeItem(MY_AREA)
+    } catch {
+      /* private mode */
+    }
+  }
+  return [v, set]
 }

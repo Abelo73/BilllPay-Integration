@@ -36,11 +36,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and (:minPrice is null or p.price >= :minPrice)
 			  and (:maxPrice is null or p.price <= :maxPrice)
 			  and p.id > :afterId
-			order by case when p.boostedUntil > current_timestamp then 0 else 1 end
+			  and (:area is null or lower(coalesce(p.area, s.area)) = lower(cast(:area as string)))
+			order by case when p.boostedUntil > current_timestamp then 0 else 1 end,
+			  case when lower(coalesce(p.area, s.area)) = lower(coalesce(cast(:near as string), '')) then 0 else 1 end
 			""")
 	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
 			@Param("specs") String specs, @Param("minPrice") java.math.BigDecimal minPrice, @Param("maxPrice") java.math.BigDecimal maxPrice,
-			@Param("afterId") long afterId, Pageable pageable);
+			@Param("afterId") long afterId, @Param("area") String area, @Param("near") String near, Pageable pageable);
+
+	/** Without the area filter and "near me first" (saved-search alerts). */
+	default Page<Product> search(String category, String q, Long shopId, String specs, java.math.BigDecimal minPrice,
+			java.math.BigDecimal maxPrice, long afterId, Pageable pageable) {
+		return search(category, q, shopId, specs, minPrice, maxPrice, afterId, null, null, pageable);
+	}
 
 	/** Store listing with detail filters (no price range). */
 	default Page<Product> search(String category, String q, Long shopId, String specs, Pageable pageable) {
@@ -60,6 +68,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
 			""")
 	Optional<Product> findVisibleBySlug(@Param("slug") String slug);
+
+	/** Same visibility rules, by id (favourites). */
+	@EntityGraph(attributePaths = { "category", "shop" })
+	@Query("""
+			select p from Product p left join p.shop s
+			where p.id = :id and p.active = true and p.category.active = true
+			  and p.blockedReason is null and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			""")
+	Optional<Product> findVisibleById(@Param("id") Long id);
 
 	@EntityGraph(attributePaths = { "category", "shop" })
 	@Query("""

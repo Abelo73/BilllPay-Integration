@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { Link } from 'react-router'
 
+import { HeartButton } from '@/components/heart-button'
 import { ProductVisual } from '@/components/product-visual'
 import { Button } from '@/components/ui/button'
 import { VerifiedBadge } from '@/components/verified-badge'
@@ -58,6 +59,7 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <span className="text-base font-extrabold tabular-nums">{formatETB(product.price)}</span>
+          <HeartButton productId={product.id} className="ml-auto size-9" />
           {payments && <Button
             size="icon"
             variant={soldOut ? 'outline' : 'default'}

@@ -37,6 +37,7 @@ public class CatalogAdminService {
 	private final MediaStorage storage;
 	private final MediaProperties media;
 	private final TransactionTemplate tx;
+	private final org.springframework.context.ApplicationEventPublisher events;
 
 	/** {@code condition}, {@code negotiable}, {@code area}: listing details (M4); null leaves them as they are. */
 	public record ProductForm(String name, String slug, String description, Long categoryId, BigDecimal price,
@@ -116,6 +117,9 @@ public class CatalogAdminService {
 			if (f.price() != null && money(f.price()).compareTo(p.getPrice()) != 0) {
 				BigDecimal price = money(f.price());
 				diff.add("price " + p.getPrice() + " → " + price);
+				if (price.compareTo(p.getPrice()) < 0) {
+					events.publishEvent(new PriceDropped(p.getId(), p.getPrice(), price));
+				}
 				p.setPrice(price);
 			}
 			if (f.lowStockThreshold() != null && f.lowStockThreshold() != p.getLowStockThreshold()) {

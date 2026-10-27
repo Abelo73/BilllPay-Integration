@@ -7,6 +7,8 @@ import { ChatWithSeller } from '@/components/chat-with-seller'
 import { ContactSeller, SafetyTips } from '@/components/contact-seller'
 import { ProductVisual } from '@/components/product-visual'
 import { ReportListing } from '@/components/report-listing'
+import { HeartButton } from '@/components/heart-button'
+import { ShareButton } from '@/components/share-button'
 import { ReviewsSection } from '@/components/reviews'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,6 +86,10 @@ export function ProductPage() {
               </Link>
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{p.name}</h1>
               <p className="text-2xl font-semibold">{formatETB(p.price)}</p>
+              <div className="flex flex-wrap gap-2">
+                <HeartButton productId={p.id} withLabel />
+                <ShareButton slug={p.slug} title={`${p.name} · ${formatETB(p.price)}`} />
+              </div>
               {p.available > 0 ? (
                 <Badge variant="secondary" className={p.lowStock ? 'bg-warning/90 text-foreground' : ''}>
                   {p.lowStock ? t('Only {n} left', { n: p.available }) : t('In stock')}
