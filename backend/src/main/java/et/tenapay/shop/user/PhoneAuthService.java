@@ -132,7 +132,10 @@ public class PhoneAuthService {
 					"We couldn't send the SMS right now. Please try again in a minute.");
 		}
 		metrics.phoneSignIn("sent");
-		boolean showCode = !sms.delivers() && sms.properties().devCodesInResponse() && billPayMode.isSandbox();
+		// on screen only on a developer's computer (SMS_DEV_CODES_IN_RESPONSE=true) and only while no SMS really goes out:
+		// test mode with BillPay sandbox, or real SMS switched off by staff to save credit
+		boolean showCode = !sms.delivers() && sms.properties().devCodesInResponse()
+				&& (billPayMode.isSandbox() || sms.switchedOff());
 		return new CodeSent(phone, mask(phone), CODE_TTL.toSeconds(), RESEND_AFTER.toSeconds(), !sms.delivers(),
 				showCode ? code : null);
 	}

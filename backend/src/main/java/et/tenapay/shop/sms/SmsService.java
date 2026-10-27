@@ -3,13 +3,15 @@ package et.tenapay.shop.sms;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import et.tenapay.shop.config.Features;
 import et.tenapay.shop.monitoring.ShopMetrics;
 import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * Sends text messages and keeps a record of each in {@code sms_messages}. Uses AfroMessage when {@code sms.afromessage.token}
- * is set, otherwise test mode (logged, never sent). Never throws: a failed SMS is recorded as FAILED.
+ * is set, otherwise test mode (logged, never sent). Staff can also switch real sending off in Admin → Features
+ * ({@link Features#SMS_SENDING}) to save AfroMessage credit while testing. Never throws: a failed SMS is recorded as FAILED.
  */
 @Slf4j
 @Service
@@ -24,7 +26,26 @@ public class SmsService {
 	private final SmsMessageRepository messages;
 	private final SmsProperties props;
 	private final ShopMetrics metrics;
+	/** The configured provider (AfroMessage, or the log in test mode). */
 	private SmsGateway gateway;
+	/** Used instead of AfroMessage while staff have switched real SMS off. */
+	private final SmsGateway offline = new LogGateway();
+	private Features features;
+
+	@Autowired(required = false)
+	void setFeatures(Features features) {
+		this.features = features;
+	}
+
+	/** True while a real provider is set up but staff switched sending off (Admin → Features). */
+	public boolean switchedOff() {
+		return gateway.delivers() && features != null && !features.on(Features.SMS_SENDING);
+	}
+
+	/** The gateway to use right now. */
+	private SmsGateway active() {
+		return switchedOff() ? offline : gateway;
+	}
 
 	public SmsService(SmsMessageRepository messages, SmsProperties props, ShopMetrics metrics, ObjectMapper json) {
 		this.messages = messages;
@@ -48,11 +69,11 @@ public class SmsService {
 	}
 
 	public boolean delivers() {
-		return gateway.delivers();
+		return active().delivers();
 	}
 
 	public String providerName() {
-		return gateway.name();
+		return active().name();
 	}
 
 	public SmsProperties properties() {
@@ -64,15 +85,16 @@ public class SmsService {
 	 * null stores the text as sent.
 	 */
 	public Sent send(Kind kind, String to, String text, String storedText, String orderNumber) {
-		SmsGateway.Result result = gateway.send(to, text);
+		SmsGateway g = active();
+		SmsGateway.Result result = g.send(to, text);
 		SmsMessage m = new SmsMessage();
 		m.setKind(kind.name());
 		m.setRecipient(to);
 		String stored = storedText != null ? storedText : text;
 		m.setBody(stored.length() > 480 ? stored.substring(0, 480) : stored);
-		m.setProvider(gateway.name());
+		m.setProvider(g.name());
 		m.setOrderNumber(orderNumber);
-		return finish(m, result);
+		return finish(m, result, g);
 	}
 
 	/**
@@ -84,7 +106,8 @@ public class SmsService {
 		m.setKind(kind.name());
 		m.setRecipient(to);
 		m.setBody(text.length() > 480 ? text.substring(0, 480) : text);
-		m.setProvider(gateway.name());
+		SmsGateway g = active();
+		m.setProvider(g.name());
 		m.setOrderNumber(orderNumber);
 		m.setDedupeKey(dedupeKey);
 		m.setStatus(SmsMessage.Status.SENDING);
@@ -94,16 +117,16 @@ public class SmsService {
 			log.debug("SMS {} already handled", dedupeKey);
 			return null;
 		}
-		return finish(m, gateway.send(to, text));
+		return finish(m, g.send(to, text), g);
 	}
 
-	private Sent finish(SmsMessage m, SmsGateway.Result result) {
+	private Sent finish(SmsMessage m, SmsGateway.Result result, SmsGateway g) {
 		String to = m.getRecipient();
 		Kind kind = Kind.valueOf(m.getKind());
 		m.setProviderRef(result.providerRef());
 		m.setError(result.error());
 		m.setStatus(!result.sent() ? SmsMessage.Status.FAILED
-				: gateway.delivers() ? SmsMessage.Status.SENT : SmsMessage.Status.LOGGED);
+				: g.delivers() ? SmsMessage.Status.SENT : SmsMessage.Status.LOGGED);
 		try {
 			messages.save(m);
 		} catch (RuntimeException e) {

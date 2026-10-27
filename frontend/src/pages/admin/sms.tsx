@@ -49,14 +49,16 @@ export function AdminSmsPage() {
             )}
             <div className="space-y-1">
               <p className="font-semibold">
-                {setup.delivering ? `Sending through AfroMessage${setup.sender ? ` as “${setup.sender}”` : ''}` : 'Test mode: nothing reaches phones'}
+                {setup.delivering ? `Sending through AfroMessage${setup.sender ? ` as “${setup.sender}”` : ''}` : setup.switchedOff ? 'SMS switched off: nothing reaches phones, no credit used' : 'Test mode: nothing reaches phones'}
               </p>
               <p className="text-muted-foreground">
                 {setup.delivering
                   ? setup.identifierSet
                     ? 'Identifier set. Failed messages show the reason AfroMessage gave.'
                     : 'No identifier id set, so AfroMessage uses the account default sender.'
-                  : 'Add AFROMESSAGE_TOKEN (and AFROMESSAGE_IDENTIFIER_ID, AFROMESSAGE_SENDER) to .env and restart the backend to send real SMS. Until then messages are written to the backend log and listed here as “logged”.'}
+                  : setup.switchedOff
+                    ? 'AfroMessage is set up, but sending is switched off in Admin → Features → Messages. Texts are saved here as “logged”. Turn it back on before real customers use the site.'
+                    : 'Add AFROMESSAGE_TOKEN (and AFROMESSAGE_IDENTIFIER_ID, AFROMESSAGE_SENDER) to .env and restart the backend to send real SMS. Until then messages are written to the backend log and listed here as “logged”.'}
               </p>
             </div>
           </CardContent>

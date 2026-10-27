@@ -66,6 +66,7 @@ public class Features {
 	public static final String PRO_COMMISSION_OFF = "pro_commission_off";
 	public static final String BANNERS = "banners";
 	public static final String STAFF_TWO_STEP = "staff_two_step";
+	public static final String SMS_SENDING = "sms_sending";
 	public static final String AUTO_HOLD_REPORTS = "auto_hold_reports";
 	public static final String AUTO_HOLD_LOW_PRICE = "auto_hold_low_price";
 	public static final String AUTO_HOLD_SCAM_WORDS = "auto_hold_scam_words";
@@ -121,6 +122,8 @@ public class Features {
 			new Def(PRO_COMMISSION_OFF, Type.NUMBER, "2", "Selling", "Pro shops pay less commission (points)",
 					"Taken off the commission percent, e.g. 5% becomes 3%.", true),
 			new Def(BANNERS, Type.SWITCH, "true", "Selling", "Home page banners", "Banners from Admin → Banners.", true),
+			new Def(SMS_SENDING, Type.SWITCH, "true", "Messages", "Send real SMS (AfroMessage)",
+					"Off: nothing goes to phones and no AfroMessage credit is used; every text is only saved in Admin → SMS as logged. For testing. On a computer with SMS_DEV_CODES_IN_RESPONSE=true, phone sign-in codes are then shown on screen. Turn it back on before real customers use the site.", false),
 			new Def(STAFF_TWO_STEP, Type.SWITCH, "false", "Security", "2-step sign-in for staff",
 					"After the password, staff type a code sent by SMS and email. Check that SMS or email works first.", false),
 			new Def(AUTO_HOLD_REPORTS, Type.NUMBER, "3", "Safety", "Hold a listing after this many reports",

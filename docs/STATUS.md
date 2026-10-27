@@ -34,7 +34,7 @@ One page: what works, what's being built, what's left, and **what you do next**.
 | Cash on delivery | 🟡 Built (M7), tests not run yet |
 | Protected payments, commission, seller balance, payouts | ✅ |
 | Problems/disputes; refunds by buyer, seller or staff | ✅ |
-| Notifications (bell), SMS choices, order SMS | ✅ |
+| Notifications (bell), SMS choices, order SMS | ✅ Real SMS can be switched off in Admin → Features → Messages to save credit |
 | Reviews and ratings | ✅ |
 | Hire a pro: profiles, job requests, quotes | ✅ |
 | Jobs & CVs: profiles, free CV, job board, CV service | ✅ |

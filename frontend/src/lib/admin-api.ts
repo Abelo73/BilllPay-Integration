@@ -235,7 +235,8 @@ export type SmsRow = {
 }
 
 /** delivering=false: test mode (no AfroMessage token), messages are only logged. */
-export type SmsSetup = { provider: string; delivering: boolean; sender: string | null; identifierSet: boolean }
+/** switchedOff: AfroMessage is set up but staff turned real sending off (Admin → Features) */
+export type SmsSetup = { provider: string; delivering: boolean; sender: string | null; identifierSet: boolean; switchedOff?: boolean }
 
 export type OrderDetail = {
   order: OrderRow

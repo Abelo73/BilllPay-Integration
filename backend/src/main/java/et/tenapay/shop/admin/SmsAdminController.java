@@ -34,7 +34,8 @@ public class SmsAdminController {
 	}
 
 	/** {@code delivering}: false means test mode (no AfroMessage token): messages are only logged. */
-	public record SmsSetup(String provider, boolean delivering, String sender, boolean identifierSet) {
+	/** {@code switchedOff}: AfroMessage is set up but staff turned real sending off (Admin → Features). */
+	public record SmsSetup(String provider, boolean delivering, String sender, boolean identifierSet, boolean switchedOff) {
 	}
 
 	public record SmsView(SmsSetup setup, PageDto<SmsRow> page) {
@@ -47,7 +48,7 @@ public class SmsAdminController {
 		SmsMessage.Status st = status == null || status.isBlank() ? null : SmsMessage.Status.valueOf(status);
 		var afro = sms.properties().afromessage();
 		SmsSetup setup = new SmsSetup(sms.providerName(), sms.delivers(), afro == null ? null : blankToNull(afro.sender()),
-				afro != null && blankToNull(afro.identifierId()) != null);
+				afro != null && blankToNull(afro.identifierId()) != null, sms.switchedOff());
 		return new SmsView(setup, PageDto.of(messages.search(st, q == null || q.isBlank() ? null : q.trim(),
 				PageRequest.of(page, Math.min(size, 100))).map(SmsRow::of)));
 	}
