@@ -42,7 +42,8 @@ export type SellerOrderRow = {
   orderNumber: string
   status: OrderStatus
   fulfilmentStatus: FulfilmentStatus | null
-  paidAt: string
+  /** null for cash orders until the cash is collected */
+  paidAt: string | null
   customerName: string
   deliveryCity: string | null
   units: number
@@ -54,6 +55,12 @@ export type SellerOrderRow = {
   /** The buyer also bought from other sellers in the same checkout; they deliver their own parcels */
   otherSellers: boolean
   nextSteps: FulfilmentStatus[]
+  /** cash on delivery: the buyer pays this seller in cash at the door */
+  cash: boolean
+  /** cash orders: what to collect for this parcel */
+  collect: number | null
+  /** cash orders: when "cash received" was tapped */
+  cashCollectedAt: string | null
 }
 
 export type SellerOrderDetail = {
@@ -122,6 +129,10 @@ export const sellerApi = {
   order: (orderNumber: string) => request<SellerOrderDetail>(`/seller/orders/${encodeURIComponent(orderNumber)}`),
   advance: (orderNumber: string, status: FulfilmentStatus, note?: string) =>
     request<SellerOrderDetail>(`/seller/orders/${encodeURIComponent(orderNumber)}/fulfilment`, json('POST', { status, note })),
+  /** Cash on delivery: the buyer paid me at the door (marks it delivered; our commission goes on my balance). */
+  cashReceived: (orderNumber: string) =>
+    request<{ orderNumber: string; parcelNo: number; collected: number; commission: number; orderPaid: boolean }>(
+      `/seller/orders/${encodeURIComponent(orderNumber)}/cash-received`, json('POST', {})),
 
   products: (p: { q?: string; status?: string; page?: number }) =>
     request<Page<ProductRow>>(`/seller/products?${qs(p)}`),

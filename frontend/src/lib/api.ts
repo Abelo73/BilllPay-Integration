@@ -74,7 +74,12 @@ export type CheckoutRequest = {
   /** Signed-in customers: also keep this address in the address book. */
   saveAddress?: boolean
   discountCode?: string
+  /** BILLPAY (default) or CASH on delivery */
+  paymentMethod?: PaymentMethod
 }
+
+/** How the buyer pays: online through BillPay before delivery, or in cash to the seller at the door. */
+export type PaymentMethod = 'BILLPAY' | 'CASH'
 
 /** areas: where we deliver in Sodo; fee null = the standard flatFee. */
 export type DeliveryQuote = { flatFee: number; freeOver: number; currency: string; areas: { name: string; fee: number | null }[] }
@@ -131,7 +136,8 @@ export type Address = {
 
 export type AddressInput = Omit<Address, 'id' | 'isDefault' | 'notes'> & { notes?: string; makeDefault?: boolean }
 
-export type CheckoutResponse = { orderNumber: string; checkoutUrl: string }
+/** checkoutUrl is null for cash on delivery: no BillPay page, go to the order page. */
+export type CheckoutResponse = { orderNumber: string; checkoutUrl: string | null; paymentMethod?: PaymentMethod }
 
 export type OrderStatus =
   | 'PENDING_PAYMENT'
@@ -142,6 +148,8 @@ export type OrderStatus =
   | 'EXPIRED'
   | 'CANCELLED'
   | 'REVIEW_REQUIRED'
+  /** cash on delivery: delivery under way, the buyer pays the seller at the door */
+  | 'CASH_ON_DELIVERY'
 
 export type OrderStatusView = {
   orderNumber: string
@@ -173,6 +181,7 @@ export type OrderStatusView = {
   payBy: string | null
   /** One per seller */
   parcels: ParcelView[]
+  paymentMethod: PaymentMethod
 }
 
 /** Reply to "text me a code". devCode is only filled in local test mode (no SMS provider). */
@@ -235,7 +244,7 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
 
 export const api = {
   /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
-  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; [spec: `spec.${string}`]: string }) => {
+  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; area?: string; near?: string; [spec: `spec.${string}`]: string }) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     return request<Page<Product>>(`/products?${qs}`)

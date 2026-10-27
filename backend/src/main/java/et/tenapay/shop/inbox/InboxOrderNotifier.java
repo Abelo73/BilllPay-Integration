@@ -74,6 +74,14 @@ public class InboxOrderNotifier {
 					inbox.notify(owner, InboxItem.Kind.SHOP, "New order to pack", "Order " + number + " is paid. Pack it and mark it ready.", "/seller", key + ":" + owner);
 				}
 			}
+			case "order.cash.ordered" -> {
+				inbox.notify(o.buyer(), InboxItem.Kind.ORDER, "Order placed: pay cash on delivery",
+						"Order " + number + " is on its way to being packed. Pay the seller in cash when it arrives.", link, key);
+				for (UUID owner : o.shopOwners()) {
+					inbox.notify(owner, InboxItem.Kind.SHOP, "New cash order to pack", "Order " + number
+							+ ": the buyer pays you in cash at the door. Tap Cash received when you get it.", "/seller", key + ":" + owner);
+				}
+			}
 			case "order.payment.failed" -> inbox.notify(o.buyer(), InboxItem.Kind.PAYMENT, "Payment didn't go through",
 					"Your items are still held. Try again with another number or method.", link, key);
 			case "order.payment.reminder" -> inbox.notify(o.buyer(), InboxItem.Kind.PAYMENT, "Finish paying",

@@ -22,13 +22,13 @@ public interface OrderParcelRepository extends JpaRepository<OrderParcel, Long> 
 	/** A seller's parcels of paid orders (current BillPay environment), by delivery status, optional search. */
 	@Query(value = """
 			select p from OrderParcel p, Order o
-			where o.id = p.orderId and p.shopId = :shopId and o.paidAt is not null and o.environment = :environment
+			where o.id = p.orderId and p.shopId = :shopId and (o.paidAt is not null or o.paymentMethod = et.tenapay.shop.order.PaymentMethod.CASH) and o.environment = :environment
 			  and p.fulfilmentStatus in :fulfilment
 			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
 			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%')))
 			""", countQuery = """
 			select count(p) from OrderParcel p, Order o
-			where o.id = p.orderId and p.shopId = :shopId and o.paidAt is not null and o.environment = :environment
+			where o.id = p.orderId and p.shopId = :shopId and (o.paidAt is not null or o.paymentMethod = et.tenapay.shop.order.PaymentMethod.CASH) and o.environment = :environment
 			  and p.fulfilmentStatus in :fulfilment
 			  and (:q is null or o.orderNumber like concat('%', cast(:q as string), '%')
 			       or lower(o.customerName) like lower(concat('%', cast(:q as string), '%')))
@@ -40,7 +40,7 @@ public interface OrderParcelRepository extends JpaRepository<OrderParcel, Long> 
 
 	@Query("""
 			select count(p) from OrderParcel p, Order o
-			where o.id = p.orderId and p.shopId = :shopId and o.paidAt is not null and o.environment = :environment
+			where o.id = p.orderId and p.shopId = :shopId and (o.paidAt is not null or o.paymentMethod = et.tenapay.shop.order.PaymentMethod.CASH) and o.environment = :environment
 			  and p.fulfilmentStatus in :fulfilment
 			""")
 	long countForShop(@Param("shopId") Long shopId,

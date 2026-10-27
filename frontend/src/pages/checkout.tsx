@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
-import { Loader2, Lock, MapPin, ShoppingBag, Tag, Truck, UserRound, X } from 'lucide-react'
+import { Banknote, Loader2, Lock, MapPin, ShoppingBag, Tag, Truck, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
 import { toast } from 'sonner'
@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useFeatures } from '@/lib/features'
 import { t as tr, useT } from '@/lib/i18n'
-import { api, ApiError, deliveryFee, type Address, type PriceQuote } from '@/lib/api'
+import { api, ApiError, deliveryFee, type Address, type PaymentMethod, type PriceQuote } from '@/lib/api'
 import { formatETB, orderContact } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
@@ -68,6 +68,8 @@ export function CheckoutPage() {
 
 function CheckoutForm() {
   const t = useT()
+  const pay = useFeatures()
+  const [method, setMethod] = useState<PaymentMethod>('BILLPAY')
   const { lines, clear } = useCart()
   const { subtotal } = cartTotals(lines)
   const navigate = useNavigate()
@@ -144,7 +146,9 @@ function CheckoutForm() {
     onSuccess: (res, vars) => {
       orderContact.save(res.orderNumber, vars.customer.phone)
       clear()
-      window.location.assign(res.checkoutUrl)
+      // cash on delivery has no BillPay page: straight to the order
+      if (res.checkoutUrl) window.location.assign(res.checkoutUrl)
+      else navigate(`/checkout/return?order=${res.orderNumber}`)
     },
     onError: (err, vars) => {
       if (err instanceof ApiError && err.code === 'PAYMENT_PROVIDER_ERROR' && typeof err.body.orderNumber === 'string') {
@@ -163,6 +167,10 @@ function CheckoutForm() {
       }
       if (err instanceof ApiError && err.code === 'VALIDATION_FAILED') {
         setErrors(fieldErrors((err.body.errors as Record<string, string>) ?? {}))
+      }
+      if (err instanceof ApiError && err.code?.startsWith('CASH_') && pay.online) {
+        // cash isn't allowed for this order (seller not verified, over the limit, switched off): offer online payment
+        setMethod('BILLPAY')
       }
       if (err instanceof ApiError && err.code === 'DISCOUNT_INVALID') {
         // e.g. the last use was taken while the shopper was filling in the form
@@ -222,6 +230,7 @@ function CheckoutForm() {
       delivery: { address: d.address, city: d.city, notes: d.notes || undefined, area: area || undefined },
       saveAddress: isCustomer && chosen === null && saveAddress,
       discountCode: applied?.discountCode,
+      paymentMethod: payWith,
     })
   }
 
@@ -247,6 +256,11 @@ function CheckoutForm() {
 
   const busy = checkout.isPending || checkout.isSuccess
   const total = itemsAfterDiscount + fee
+  // only the ways that are switched on; cash also has a limit per order
+  const cashTooBig = pay.cashLimit > 0 && total > pay.cashLimit
+  const cashOk = pay.cash && !cashTooBig
+  const payWith: PaymentMethod = !pay.online ? 'CASH' : !cashOk ? 'BILLPAY' : method
+  const cantPay = !pay.online && !cashOk
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -415,15 +429,59 @@ function CheckoutForm() {
               <span>{t('Total')}</span>
               <span className="tabular-nums">{formatETB(total)}</span>
             </div>
-            <Button type="submit" form="checkout-form" size="lg" className="h-11 w-full text-base" disabled={busy || quote.isLoading}>
-              {busy ? <><Loader2 className="animate-spin" /> {t('Redirecting to BillPay…')}</> : <><Lock /> {t('Pay {amount} with BillPay', { amount: formatETB(total) })}</>}
+            {pay.cash && (
+              <PayWith method={payWith} onChange={setMethod} online={pay.online} cashOk={cashOk} cashLimit={pay.cashLimit} />
+            )}
+            <Button type="submit" form="checkout-form" size="lg" className="h-11 w-full text-base" disabled={busy || quote.isLoading || cantPay}>
+              {payWith === 'CASH'
+                ? busy ? <><Loader2 className="animate-spin" /> {t('Placing your order…')}</> : <><Banknote /> {t('Place order: pay {amount} in cash', { amount: formatETB(total) })}</>
+                : busy ? <><Loader2 className="animate-spin" /> {t('Redirecting to BillPay…')}</> : <><Lock /> {t('Pay {amount} with BillPay', { amount: formatETB(total) })}</>}
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              {t('You’ll finish paying on BillPay’s secure page with Wallet, Bank or Card.')}
+              {cantPay
+                ? t('Cash on delivery is for orders up to {limit}. Remove something to pay in cash.', { limit: formatETB(pay.cashLimit) })
+                : payWith === 'CASH'
+                  ? t('Pay the seller in cash when your items arrive, or when you pick them up. Only verified sellers take cash.')
+                  : t('You’ll finish paying on BillPay’s secure page with Wallet, Bank or Card.')}
             </p>
           </CardContent>
         </Card>
       </div>
     </div>
+  )
+}
+
+/** How to pay: online through BillPay, or cash to the seller at the door (shown when cash on delivery is switched on). */
+function PayWith({ method, onChange, online, cashOk, cashLimit }: {
+  method: PaymentMethod
+  onChange: (m: PaymentMethod) => void
+  online: boolean
+  cashOk: boolean
+  cashLimit: number
+}) {
+  const t = useT()
+  const option = (m: PaymentMethod, title: string, hint: string, Icon: typeof Lock, disabled: boolean) => (
+    <label
+      className={cn(
+        'flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors',
+        method === m ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'hover:border-brand/50',
+        disabled && 'cursor-not-allowed opacity-50 hover:border-border',
+      )}
+    >
+      <input type="radio" name="pay-with" className="mt-1 accent-[var(--brand)]" checked={method === m} disabled={disabled} onChange={() => onChange(m)} />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 font-semibold"><Icon className="size-4" /> {title}</span>
+        <span className="block text-xs text-muted-foreground">{hint}</span>
+      </span>
+    </label>
+  )
+  return (
+    <fieldset className="space-y-2">
+      <legend className="mb-1 text-sm font-semibold">{t('How do you want to pay?')}</legend>
+      {online && option('BILLPAY', t('Pay online now'), t('BillPay: Wallet, Bank or Card. The money is held until you receive your items.'), Lock, false)}
+      {option('CASH', t('Cash on delivery'),
+        cashOk ? t('Pay the seller in cash when it arrives.') : t('Only for orders up to {limit}.', { limit: formatETB(cashLimit) }),
+        Banknote, !cashOk)}
+    </fieldset>
   )
 }

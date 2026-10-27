@@ -13,6 +13,7 @@ import { formatDate, formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
 import { sellerApi, type SellerOrderTab } from '@/lib/seller-api'
 import { cn } from '@/lib/utils'
+import { CashReceived } from '@/components/cash-received'
 import { SellerCancel } from '@/components/seller-cancel'
 import { Pager } from '../admin/shared'
 import { FULFILMENT_LABEL, OrderLine } from './shared'
@@ -138,7 +139,14 @@ export function SellerOrderPage() {
           {o.fulfilmentStatus ? t(FULFILMENT_LABEL[o.fulfilmentStatus]) : o.status}
         </span>
       </div>
-      <p className="text-sm text-muted-foreground">{t('Paid {date}', { date: formatDate(o.paidAt) })}</p>
+      <p className="text-sm text-muted-foreground">
+        {o.cash
+          ? o.cashCollectedAt ? t('Cash received {date}', { date: formatDate(o.cashCollectedAt) }) : t('Cash on delivery: not paid yet')
+          : t('Paid {date}', { date: formatDate(o.paidAt) })}
+      </p>
+      {o.cash && !o.cashCollectedAt && o.fulfilmentStatus !== 'CANCELLED' && (
+        <CashReceived orderNumber={o.orderNumber} amount={o.collect ?? o.itemsTotal + o.deliveryFee} />
+      )}
 
       <section className="space-y-2 rounded-2xl border bg-card p-4">
         <h3 className="flex items-center gap-2 text-sm font-bold"><Package className="size-4" /> {t('Your items')}</h3>
@@ -202,7 +210,7 @@ export function SellerOrderPage() {
             ))}
           </div>
           {(o.fulfilmentStatus === 'UNFULFILLED' || o.fulfilmentStatus === 'PROCESSING') && (
-            <SellerCancel orderNumber={o.orderNumber} amount={o.itemsTotal + o.deliveryFee} />
+            <SellerCancel orderNumber={o.orderNumber} amount={o.itemsTotal + o.deliveryFee} cash={o.cash && !o.cashCollectedAt} />
           )}
         </section>
       )}

@@ -37,6 +37,8 @@ public class CheckoutService {
 	private final DiscountService discounts;
 	private final et.tenapay.shop.payment.billpay.BillPayMode billPayMode;
 	private final OrderParcelRepository parcels;
+	private final et.tenapay.shop.config.Features features;
+	private final et.tenapay.shop.seller.ShopRepository shops;
 
 	public record Line(Long productId, int quantity) {
 	}
@@ -79,6 +81,18 @@ public class CheckoutService {
 	@Transactional
 	public Order createOrder(List<Line> lines, CustomerInfo customer, DeliveryInfo delivery, UUID userId,
 			String discountCode) {
+		return createOrder(lines, customer, delivery, userId, discountCode, PaymentMethod.BILLPAY);
+	}
+
+	/**
+	 * {@code CASH} (M7): only when cash on delivery is switched on, every seller in the order is verified and the total
+	 * is within the cash limit. The order then takes the stock at once, delivery starts, and it waits in
+	 * CASH_ON_DELIVERY until the sellers mark "cash received" (no BillPay, no expiry).
+	 */
+	@Transactional
+	public Order createOrder(List<Line> lines, CustomerInfo customer, DeliveryInfo delivery, UUID userId,
+			String discountCode, PaymentMethod method) {
+		boolean cash = method == PaymentMethod.CASH;
 		Map<Long, Integer> qtyByProduct = new LinkedHashMap<>();
 		for (Line line : lines) {
 			qtyByProduct.merge(line.productId(), line.quantity(), Integer::sum);
@@ -148,6 +162,10 @@ public class CheckoutService {
 					"This discount would make the order free; BillPay needs at least ETB 1.00 to charge.",
 					Map.of("reason", "TOTAL_TOO_LOW"));
 		}
+		if (cash) {
+			requireCashAllowed(priced, total);
+			order.setPaymentMethod(PaymentMethod.CASH);
+		}
 		order.setSubtotal(subtotal);
 		order.setDiscountAmount(discount);
 		order.setDeliveryFee(fee);
@@ -173,7 +191,9 @@ public class CheckoutService {
 				+ (priced.size() > 1 ? " from " + priced.size() + " sellers" : "") + ", subtotal " + subtotal
 				+ (discount.signum() > 0 ? " - " + discount + " (" + order.getDiscountCode() + ")" : "")
 				+ " + delivery " + fee + " = " + order.getTotal() + " ETB");
-		publisher.publish(order, "order.placed", Map.of());
+		if (!cash) {
+			publisher.publish(order, "order.placed", Map.of()); // cash orders announce themselves as order.cash.ordered below
+		}
 
 		// Last step: reserve the stock. Ascending ids so two checkouts never wait on each other in a circle.
 		// Someone may have bought the last units since we read them; then nothing is kept (the whole order rolls back).
@@ -187,7 +207,36 @@ public class CheckoutService {
 			throw new ApiException(HttpStatus.CONFLICT, "CART_INVALID", "Some items in your cart just sold out.",
 					Map.of("items", soldOut));
 		}
+		if (cash) {
+			// the sale is agreed now: take the stock, let the sellers start packing, wait for the cash at the door
+			orderService.commitStock(order);
+			orderService.startCashDelivery(order);
+			orderService.transition(order, OrderStatus.CASH_ON_DELIVERY, "CASH_ORDERED",
+					"cash on delivery: the buyer pays " + order.getTotal() + " ETB at the door");
+		}
 		return order;
+	}
+
+	/** Cash on delivery is switched on, every seller in the order is verified, and the total is within the limit. */
+	private void requireCashAllowed(List<Priced> priced, BigDecimal total) {
+		if (!features.on(et.tenapay.shop.config.Features.CASH_ON_DELIVERY)) {
+			throw new ApiException(HttpStatus.CONFLICT, "CASH_OFF", "Cash on delivery isn't available right now. Please pay online.");
+		}
+		BigDecimal limit = features.number(et.tenapay.shop.config.Features.CASH_LIMIT);
+		if (limit.signum() > 0 && total.compareTo(limit) > 0) {
+			throw new ApiException(HttpStatus.CONFLICT, "CASH_OVER_LIMIT",
+					"Cash on delivery is for orders up to " + limit.stripTrailingZeros().toPlainString() + " birr. Please pay online.",
+					Map.of("limit", limit));
+		}
+		for (Priced pr : priced) {
+			Long shopId = pr.parcel().shopId();
+			if (shopId != null && shops.findById(shopId).map(s -> s.getVerifiedAt() == null).orElse(true)) {
+				throw new ApiException(HttpStatus.CONFLICT, "CASH_UNVERIFIED_SELLER",
+						"Cash on delivery is only for verified sellers, and "
+								+ shops.findById(shopId).map(et.tenapay.shop.seller.Shop::getName).orElse("one seller")
+								+ " isn't verified yet. Please pay online.");
+			}
+		}
 	}
 
 	/** One seller's part of a quote; {@code seller} null = Sodo Gebeya. */

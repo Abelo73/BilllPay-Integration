@@ -91,14 +91,21 @@ public class CheckoutController {
 			@NotNull @Valid DeliveryRequest delivery,
 			/** Signed-in customers: also save this address to their address book. */
 			Boolean saveAddress,
-			@Size(max = 40) String discountCode) {
+			@Size(max = 40) String discountCode,
+			/** BILLPAY (default) or CASH on delivery (M7) */
+			PaymentMethod paymentMethod) {
 	}
 
 	public record QuoteRequest(@NotEmpty @Size(max = 30) List<@Valid CheckoutItem> items,
 			@NotBlank @Size(max = 40) String code, @Size(max = 120) String area) {
 	}
 
-	public record CheckoutResponse(String orderNumber, String checkoutUrl) {
+	/** {@code checkoutUrl} null for cash on delivery: there is no BillPay page, the buyer goes to the order page. */
+	public record CheckoutResponse(String orderNumber, String checkoutUrl, String paymentMethod) {
+
+		public CheckoutResponse(String orderNumber, String checkoutUrl) {
+			this(orderNumber, checkoutUrl, PaymentMethod.BILLPAY.name());
+		}
 	}
 
 	public record PayRequest(String phone) {
@@ -162,12 +169,14 @@ public class CheckoutController {
 			/** When an unpaid order's items are released (null once it's paid or closed). */
 			Instant payBy,
 			/** One per seller; items carry their parcelNo. */
-			List<ParcelView> parcels) {
+			List<ParcelView> parcels,
+			/** BILLPAY or CASH (pay the seller at the door) */
+			String paymentMethod) {
 	}
 
 	private static final java.util.Set<String> CUSTOMER_STEPS = java.util.Set.of("ORDER_CREATED", "PAID", "EXPIRED",
 			"CANCELLED", "PAYMENT_FAILED", "FULFILMENT_PROCESSING", "FULFILMENT_SHIPPED", "FULFILMENT_DELIVERED",
-			"FULFILMENT_CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED");
+			"FULFILMENT_CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "CASH_ORDERED", "CASH_COLLECTED");
 
 	public record StoreInfo(boolean sandbox) {
 	}
@@ -205,16 +214,22 @@ public class CheckoutController {
 
 	@PostMapping("/checkout")
 	public CheckoutResponse checkout(@Valid @RequestBody CheckoutRequest req) {
-		requireOnlinePayments();
+		PaymentMethod method = req.paymentMethod() == null ? PaymentMethod.BILLPAY : req.paymentMethod();
+		if (method == PaymentMethod.BILLPAY) {
+			requireOnlinePayments(); // cash has its own switch, checked when the order is made
+		}
 		java.util.UUID customerId = CurrentUser.customerId().orElse(null);
 		Order order = checkout.createOrder(
 				req.items().stream().map(i -> new CheckoutService.Line(i.productId(), i.quantity())).toList(),
 				new CheckoutService.CustomerInfo(req.customer().name(), req.customer().phone(), req.customer().email()),
 				new CheckoutService.DeliveryInfo(req.delivery().address(), req.delivery().city(), req.delivery().notes(),
 						req.delivery().area()),
-				customerId, req.discountCode());
+				customerId, req.discountCode(), method);
 		if (customerId != null && Boolean.TRUE.equals(req.saveAddress())) {
 			saveAddress(customerId, req);
+		}
+		if (order.cash()) {
+			return new CheckoutResponse(order.getOrderNumber(), null, PaymentMethod.CASH.name());
 		}
 		return new CheckoutResponse(order.getOrderNumber(), startPayment(order));
 	}
@@ -317,7 +332,7 @@ public class CheckoutController {
 				payment, order.getStatus().awaitingPayment(), order.getStatus().awaitingPayment(), delivery, timeline,
 				order.getCreatedAt(), order.getPaidAt(),
 				order.getStatus().awaitingPayment() ? order.getCreatedAt().plus(app.paymentExpiry()) : null,
-				parcels(order));
+				parcels(order), order.getPaymentMethod().name());
 	}
 
 	private List<ParcelView> parcels(Order order) {

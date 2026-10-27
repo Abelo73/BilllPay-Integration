@@ -31,6 +31,8 @@ public class Features {
 
 	// Marketplace
 	public static final String ONLINE_PAYMENTS = "online_payments";
+	public static final String CASH_ON_DELIVERY = "cash_on_delivery";
+	public static final String CASH_LIMIT = "cash_limit";
 	public static final String SHOW_SELLER_PHONE = "show_seller_phone";
 	public static final String SUPPORT_PHONE = "support_phone";
 	// Jobs and CVs (J1–J7)
@@ -72,6 +74,10 @@ public class Features {
 	public static final List<Def> DEFS = List.of(
 			new Def(ONLINE_PAYMENTS, Type.SWITCH, "false", "Marketplace", "Online payment (BillPay)",
 					"On: buyers add to cart and pay online, the money is held until delivery. Off: like Jiji, buyers contact the seller (chat or call) and agree on payment and pickup themselves.", true),
+			new Def(CASH_ON_DELIVERY, Type.SWITCH, "false", "Marketplace", "Cash on delivery",
+					"On: at checkout buyers can choose to pay the seller in cash at the door. Only when every seller in the order is verified and the total is under the cash limit. The seller taps \"Cash received\" and our commission is charged to their balance.", true),
+			new Def(CASH_LIMIT, Type.NUMBER, "5000", "Marketplace", "Cash on delivery limit (birr)",
+					"Largest order total that may be paid in cash; bigger orders must pay online. 0 = no limit.", true),
 			new Def(SHOW_SELLER_PHONE, Type.SWITCH, "true", "Marketplace", "Show the seller's phone",
 					"Signed-in buyers can reveal a seller's phone number to call or message them.", true),
 			new Def(SUPPORT_PHONE, Type.TEXT, "", "Marketplace", "Sodo Gebeya phone",

@@ -47,6 +47,7 @@ public class ParcelCancelService {
 	private final FulfilmentService fulfilment;
 	private final JdbcTemplate jdbc;
 	private final TransactionTemplate tx;
+	private final OrderService orderService;
 
 	/** The buyer cancels one parcel of their own order before the seller starts preparing it. */
 	public Result byBuyer(UUID buyerId, String orderNumber, int parcelNo, String reason) {
@@ -77,7 +78,8 @@ public class ParcelCancelService {
 		Order order = order(orderNumber);
 		List<Result> done = new ArrayList<>();
 		for (OrderParcel p : parcels.findByOrderIdOrderByParcelNoAsc(order.getId())) {
-			if (p.getPayoutStatus() == EarningStatus.HELD && cancellable(p.getFulfilmentStatus())) {
+			boolean open = order.cash() ? p.getCashCollectedAt() == null : p.getPayoutStatus() == EarningStatus.HELD;
+			if (open && cancellable(p.getFulfilmentStatus())) {
 				done.add(cancel(order, p, reason, Who.STAFF, staff));
 			}
 		}
@@ -105,7 +107,11 @@ public class ParcelCancelService {
 			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_SENT",
 					"It's already on its way or delivered. Once it arrives, report a problem instead.");
 		}
-		if (p.getPayoutStatus() != EarningStatus.HELD) {
+		boolean cash = order.cash(); // M7: nothing was paid yet, so there is nothing to refund
+		if (cash && p.getCashCollectedAt() != null) {
+			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_SENT", "The cash for this was already collected.");
+		}
+		if (!cash && p.getPayoutStatus() != EarningStatus.HELD) {
 			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_PAID_OUT",
 					"The seller has already been paid for this. Contact Sodo Gebeya support.");
 		}
@@ -120,9 +126,9 @@ public class ParcelCancelService {
 					"There's an open problem about this; settle it there (refund or part refund) instead.");
 		}
 
-		BigDecimal amount = DisputeService.parcelPaid(p);
+		BigDecimal amount = cash ? BigDecimal.ZERO : DisputeService.parcelPaid(p);
 		String number = p.number(order.getOrderNumber());
-		String status = "NOTHING_TO_REFUND";
+		String status = cash ? "CASH_NOT_COLLECTED" : "NOTHING_TO_REFUND";
 		if (amount.signum() > 0) {
 			// BillPay first: if it fails, nothing changes and they can try again
 			Refund r = refunds.create(order.getOrderNumber(), amount,
@@ -141,9 +147,12 @@ public class ParcelCancelService {
 			status = r.getStatus().name();
 		}
 		// the money is on its way back: cancel the parcel (its held earning is cancelled, the buyer is told)
-		String note = "Refund of " + amount + " birr" + (why != null ? ". " + why : "");
+		String note = (cash ? "Cash order cancelled before payment" : "Refund of " + amount + " birr") + (why != null ? ". " + why : "");
 		fulfilment.advanceParcel(order.getOrderNumber(), p.getParcelNo(), FulfilmentStatus.CANCELLED, note, by, null);
 		restock(order.getId(), p.getParcelNo());
+		if (cash) {
+			closeCashOrderIfAllCancelled(order.getId(), by);
+		}
 		log.info("Parcel {} cancelled by {} before sending; refund {} ETB ({})", number, by, amount, status);
 		return new Result(order.getOrderNumber(), p.getParcelNo(), amount, status);
 	}
@@ -157,6 +166,20 @@ public class ParcelCancelService {
 					jdbc.update("update products set stock = stock + ?, version = version + 1 where id = ?", i.getQuantity(),
 							i.getProductId());
 				}
+			}
+		});
+	}
+
+	/** A cash order whose every parcel is cancelled is itself cancelled (no refund: nothing was paid). */
+	private void closeCashOrderIfAllCancelled(UUID orderId, String by) {
+		tx.executeWithoutResult(s -> {
+			Order o = orders.lockById(orderId).orElseThrow();
+			boolean allCancelled = parcels.findByOrderIdOrderByParcelNoAsc(orderId).stream()
+					.allMatch(x -> x.getFulfilmentStatus() == FulfilmentStatus.CANCELLED);
+			if (allCancelled && o.getStatus() == OrderStatus.CASH_ON_DELIVERY) {
+				orderService.releaseDiscount(o);
+				o.setCancelledAt(java.time.Instant.now());
+				orderService.transition(o, OrderStatus.CANCELLED, "CANCELLED", "cash order cancelled by " + by + " before delivery");
 			}
 		});
 	}

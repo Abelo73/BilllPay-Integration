@@ -20,7 +20,12 @@ export function useFeatures() {
     on: (key: string) => all[key] === 'true',
     number: (key: string) => Number(all[key] ?? 0),
     text: (key: string) => all[key] ?? '',
-    /** Cart, checkout and online payment (BillPay). Off: buyers contact the seller instead (Jiji-style). */
-    payments: all.online_payments === 'true',
+    /** Cart and checkout: on when buyers can pay online (BillPay) or in cash on delivery. Off: buyers contact the seller instead (Jiji-style). */
+    payments: all.online_payments === 'true' || all.cash_on_delivery === 'true',
+    /** Online payment through BillPay */
+    online: all.online_payments === 'true',
+    /** Cash on delivery (M7): verified sellers only, orders up to {@link cashLimit} birr (0 = no limit) */
+    cash: all.cash_on_delivery === 'true',
+    cashLimit: Number(all.cash_limit ?? 0),
   }
 }

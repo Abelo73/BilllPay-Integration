@@ -113,6 +113,10 @@ public class FulfilmentService {
 			throw new ApiException(HttpStatus.FORBIDDEN, "SELLER_CANNOT_CANCEL",
 					"A paid order can only be cancelled by Sodo Gebeya, because the buyer gets a refund. Call us.");
 		}
+		if (sellerShopId != null && to == FulfilmentStatus.DELIVERED && order.cash() && parcel.getCashCollectedAt() == null) {
+			throw new ApiException(HttpStatus.CONFLICT, "USE_CASH_RECEIVED",
+					"This is a cash order: tap \"Cash received\" when the buyer pays you; that also marks it delivered.");
+		}
 		if (!from.next().contains(to)) {
 			throw new ApiException(HttpStatus.CONFLICT, "INVALID_FULFILMENT_STEP",
 					"Can't go from " + label(from) + " to " + label(to) + ".",

@@ -82,6 +82,9 @@ public class OrderParcel {
 
 	private Instant releasedAt;
 
+	/** Cash orders (M7): when the seller marked "cash received" for this parcel. */
+	private Instant cashCollectedAt;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

@@ -38,6 +38,7 @@ public class NotificationService {
 	/** Kafka event type → email. Events not listed here send nothing. */
 	private static final Map<String, Kind> KINDS = Map.ofEntries(
 			Map.entry("order.placed", Kind.ORDER_PLACED),
+			Map.entry("order.cash.ordered", Kind.CASH_ORDERED),
 			Map.entry("order.payment.reminder", Kind.PAYMENT_REMINDER),
 			Map.entry("order.paid", Kind.PAYMENT_CONFIRMED),
 			Map.entry("order.review.resolved", Kind.PAYMENT_CONFIRMED),

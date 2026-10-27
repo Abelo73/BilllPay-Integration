@@ -149,7 +149,13 @@ public class SellerController {
 	 */
 	public record OrderRow(String orderNumber, String parcelNumber, String status, String fulfilmentStatus,
 			Instant paidAt, String customerName, String deliveryCity, int units, BigDecimal itemsTotal,
-			BigDecimal deliveryFee, boolean otherSellers, List<String> nextSteps) {
+			BigDecimal deliveryFee, boolean otherSellers, List<String> nextSteps,
+			/** M7: the buyer pays this seller in cash at the door */
+			boolean cash,
+			/** cash orders: what to collect for this parcel (its items after discount, plus delivery) */
+			BigDecimal collect,
+			/** cash orders: when the seller marked "cash received"; null until then */
+			Instant cashCollectedAt) {
 	}
 
 	public record OrderDetail(OrderRow order, String customerPhone, String deliveryAddress, String deliveryNotes,
@@ -376,7 +382,7 @@ public class SellerController {
 	/** A paid order (current BillPay environment); 404 otherwise. Pair it with {@link #ownParcel}. */
 	private Order ownOrder(String orderNumber) {
 		return orders.findByOrderNumber(orderNumber)
-				.filter(o -> o.getPaidAt() != null && o.getEnvironment() == billPayMode.current())
+				.filter(o -> (o.getPaidAt() != null || o.cash()) && o.getEnvironment() == billPayMode.current())
 				.orElseThrow(() -> ApiException.notFound("Order"));
 	}
 
@@ -412,13 +418,16 @@ public class SellerController {
 	private OrderRow row(Order o, OrderParcel p) {
 		List<OrderItem> mine = mine(o, p);
 		boolean others = parcels.findByOrderIdOrderByParcelNoAsc(o.getId()).size() > 1;
+		// cash orders end with "Cash received" (which also marks it delivered), not with the plain Delivered step
 		List<String> next = p.getFulfilmentStatus() == null ? List.of()
-				: p.getFulfilmentStatus().next().stream().filter(st -> st != FulfilmentStatus.CANCELLED).sorted()
+				: p.getFulfilmentStatus().next().stream().filter(st -> st != FulfilmentStatus.CANCELLED)
+						.filter(st -> !(o.cash() && st == FulfilmentStatus.DELIVERED)).sorted()
 						.map(Enum::name).toList();
 		return new OrderRow(o.getOrderNumber(), p.number(o.getOrderNumber()), o.getStatus().name(),
 				p.getFulfilmentStatus() == null ? null : p.getFulfilmentStatus().name(), o.getPaidAt(),
 				firstName(o.getCustomerName()), o.getDeliveryCity(), mine.stream().mapToInt(OrderItem::getQuantity).sum(),
-				p.getItemsTotal(), p.getDeliveryFee(), others, next);
+				p.getItemsTotal(), p.getDeliveryFee(), others, next, o.cash(),
+				o.cash() ? et.tenapay.shop.dispute.DisputeService.parcelPaid(p) : null, p.getCashCollectedAt());
 	}
 
 	/** The seller delivers their own parcel, so they get the buyer's full name, phone and address. */
@@ -428,7 +437,8 @@ public class SellerController {
 				.toList();
 		OrderRow r = row(o, p);
 		return new OrderDetail(new OrderRow(r.orderNumber(), r.parcelNumber(), r.status(), r.fulfilmentStatus(), r.paidAt(),
-				o.getCustomerName(), r.deliveryCity(), r.units(), r.itemsTotal(), r.deliveryFee(), r.otherSellers(), r.nextSteps()),
+				o.getCustomerName(), r.deliveryCity(), r.units(), r.itemsTotal(), r.deliveryFee(), r.otherSellers(), r.nextSteps(), r.cash(),
+				r.collect(), r.cashCollectedAt()),
 				o.getCustomerPhone(), o.getDeliveryAddress(), o.getDeliveryNotes(), p.getTrackingNote(), p.getShippedAt(),
 				p.getDeliveredAt(), lines);
 	}

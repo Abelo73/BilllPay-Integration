@@ -28,6 +28,7 @@ const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   EXPIRED: 'expired',
   CANCELLED: 'cancelled',
   REVIEW_REQUIRED: 'review required',
+  CASH_ON_DELIVERY: 'cash on delivery',
 }
 
 /** The payment hasn't settled yet, so keep asking the backend (which asks BillPay when needed). */
@@ -54,7 +55,10 @@ export function OrderStatusPanel({
 
   const pay = useMutation({
     mutationFn: () => api.pay(orderNumber, phone),
-    onSuccess: (res) => window.location.assign(res.checkoutUrl),
+    onSuccess: (res) => {
+      if (res.checkoutUrl) window.location.assign(res.checkoutUrl)
+      else query.refetch()
+    },
     onError: (err) => {
       toast.error(err.message)
       query.refetch()
@@ -351,7 +355,7 @@ function ParcelList({ o }: { o: OrderStatusView }) {
             {p.rider && <RiderCard rider={p.rider} />}
             {p.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={p.parcelNo} label={t('I received the items from {seller}', { seller: p.seller ?? 'Sodo Gebeya' })} />}
             {p.fulfilmentStatus === 'UNFULFILLED' && (
-              <CancelParcel orderNumber={o.orderNumber} parcelNo={p.parcelNo} amount={p.itemsTotal + p.deliveryFee} seller={p.seller ?? 'Sodo Gebeya'} />
+              <CancelParcel orderNumber={o.orderNumber} parcelNo={p.parcelNo} amount={p.itemsTotal + p.deliveryFee} seller={p.seller ?? 'Sodo Gebeya'} cash={o.paymentMethod === 'CASH'} />
             )}
           </li>
         )
@@ -412,7 +416,7 @@ function DeliveryBlock({ o }: { o: OrderStatusView }) {
       {!multi && o.parcels?.[0]?.rider && <RiderCard rider={o.parcels[0].rider} />}
       {!multi && o.parcels?.[0]?.canConfirmReceipt && <ConfirmReceipt o={o} parcelNo={o.parcels[0].parcelNo} label={t('I received my items')} />}
       {!multi && o.parcels?.[0]?.fulfilmentStatus === 'UNFULFILLED' && (
-        <CancelParcel orderNumber={o.orderNumber} parcelNo={o.parcels[0].parcelNo} amount={o.total} />
+        <CancelParcel orderNumber={o.orderNumber} parcelNo={o.parcels[0].parcelNo} amount={o.total} cash={o.paymentMethod === 'CASH'} />
       )}
       <OrderProblems o={o} />
     </div>
@@ -440,6 +444,10 @@ function describe(o: OrderStatusView, cancelled: boolean) {
         default:
           return { icon: CheckCircle2, iconClass: 'text-success', tone: 'bg-success/10', title: 'Payment confirmed', text: tr('Thank you, {name}! BillPay confirmed your payment and your order is being prepared.', { name: first }) }
       }
+    case 'CASH_ON_DELIVERY':
+      return o.delivery?.fulfilmentStatus === 'SHIPPED'
+        ? { icon: Truck, iconClass: 'text-brand', tone: 'bg-accent', title: 'On the way: have the cash ready', text: tr('Pay {amount} in cash to the seller or rider when it arrives.', { amount: formatETB(o.total) }) }
+        : { icon: Package, iconClass: 'text-brand', tone: 'bg-accent', title: 'Order placed: pay cash on delivery', text: tr('Thank you, {name}! The seller is preparing your order. Pay {amount} in cash when it arrives or when you pick it up.', { name: first, amount: formatETB(o.total) }) }
     case 'PAYMENT_FAILED':
       return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Payment didn’t go through', text: `${reason} ${tr('Your items are still reserved — you can try again.')}` }
     case 'EXPIRED':

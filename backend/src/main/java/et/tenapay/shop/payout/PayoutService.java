@@ -84,26 +84,53 @@ public class PayoutService {
 	/** Called in the transaction that marks the order paid: locks commission and earnings, held until delivery. */
 	public void lockEarnings(Order order) {
 		List<OrderParcel> list = parcels.findByOrderIdOrderByParcelNoAsc(order.getId());
-		Map<Long, Long> categoryOf = new HashMap<>();
-		products.findAllById(order.getItems().stream().map(OrderItem::getProductId).toList())
-				.forEach(p -> categoryOf.put(p.getId(), p.getCategory().getId()));
+		Map<Long, Long> categoryOf = categories(order);
 		for (OrderParcel p : list) {
 			if (p.getShopId() == null || p.getPayoutStatus() != null) {
 				continue; // Sodo Gebeya's own parcel, or already locked
 			}
-			BigDecimal commission = BigDecimal.ZERO;
-			for (OrderItem i : order.getItems()) {
-				if (Objects.equals(i.getParcelNo(), p.getParcelNo())) {
-					BigDecimal pct = percentFor(p.getShopId(), categoryOf.get(i.getProductId()));
-					commission = commission.add(i.getLineTotal().multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
-				}
-			}
-			p.setCommissionAmount(commission);
-			p.setCommissionPercent(p.getItemsTotal().signum() == 0 ? BigDecimal.ZERO
-					: commission.multiply(HUNDRED).divide(p.getItemsTotal(), 2, RoundingMode.HALF_UP));
+			BigDecimal commission = bookCommission(order, p, categoryOf);
 			p.setSellerAmount(p.getItemsTotal().add(p.getDeliveryFee()).subtract(commission));
 			p.setPayoutStatus(EarningStatus.HELD);
 		}
+	}
+
+	/**
+	 * Cash on delivery (M7): the seller took the buyer's money at the door, so nothing is held for them; instead our
+	 * commission becomes a charge on their balance (a released line with a negative amount). Returns the commission.
+	 */
+	public BigDecimal chargeCashCommission(Order order, OrderParcel p) {
+		if (p.getShopId() == null || p.getPayoutStatus() != null) {
+			return BigDecimal.ZERO; // Sodo Gebeya's own parcel, or already booked
+		}
+		BigDecimal commission = bookCommission(order, p, categories(order));
+		p.setSellerAmount(commission.negate());
+		p.setPayoutStatus(EarningStatus.RELEASED);
+		p.setReleasedAt(Instant.now());
+		log.info("Parcel #{} cash collected: commission {} ETB charged to the seller", p.getId(), commission);
+		return commission;
+	}
+
+	private Map<Long, Long> categories(Order order) {
+		Map<Long, Long> categoryOf = new HashMap<>();
+		products.findAllById(order.getItems().stream().map(OrderItem::getProductId).toList())
+				.forEach(p -> categoryOf.put(p.getId(), p.getCategory().getId()));
+		return categoryOf;
+	}
+
+	/** Works out and stores the parcel's commission (amount and effective percent). */
+	private BigDecimal bookCommission(Order order, OrderParcel p, Map<Long, Long> categoryOf) {
+		BigDecimal commission = BigDecimal.ZERO;
+		for (OrderItem i : order.getItems()) {
+			if (Objects.equals(i.getParcelNo(), p.getParcelNo())) {
+				BigDecimal pct = percentFor(p.getShopId(), categoryOf.get(i.getProductId()));
+				commission = commission.add(i.getLineTotal().multiply(pct).divide(HUNDRED, 2, RoundingMode.HALF_UP));
+			}
+		}
+		p.setCommissionAmount(commission);
+		p.setCommissionPercent(p.getItemsTotal().signum() == 0 ? BigDecimal.ZERO
+				: commission.multiply(HUNDRED).divide(p.getItemsTotal(), 2, RoundingMode.HALF_UP));
+		return commission;
 	}
 
 	// ---------- release ----------

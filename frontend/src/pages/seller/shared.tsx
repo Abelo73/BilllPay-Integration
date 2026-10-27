@@ -23,7 +23,9 @@ export function OrderLine({ o }: { o: SellerOrderRow }) {
           {o.otherSellers ? o.parcelNumber : o.orderNumber} · {t(o.units === 1 ? '{n} item' : '{n} items', { n: o.units })}
         </p>
         <p className="truncate text-xs text-muted-foreground">
-          {o.customerName}{o.deliveryCity && ` · ${o.deliveryCity}`} · {t('paid {date}', { date: formatDate(o.paidAt) })}
+          {o.customerName}{o.deliveryCity && ` · ${o.deliveryCity}`} · {o.cash && !o.cashCollectedAt
+            ? <span className="font-semibold text-market-deep">{t('cash: collect {amount}', { amount: formatETB(o.collect ?? 0) })}</span>
+            : t('paid {date}', { date: formatDate(o.paidAt ?? o.cashCollectedAt) })}
           {o.otherSellers && ` · ${t('part of a bigger order')}`}
         </p>
       </div>

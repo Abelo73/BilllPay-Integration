@@ -60,6 +60,14 @@ public class Order {
 
 	private Instant paidAt;
 
+	/** BillPay (online, before delivery) or cash to the seller at the door (M7). */
+	@Enumerated(EnumType.STRING)
+	private PaymentMethod paymentMethod = PaymentMethod.BILLPAY;
+
+	public boolean cash() {
+		return paymentMethod == PaymentMethod.CASH;
+	}
+
 	private String deliveryAddress;
 
 	private String deliveryCity;

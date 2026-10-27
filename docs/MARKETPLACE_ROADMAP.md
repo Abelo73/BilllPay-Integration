@@ -121,6 +121,8 @@ Result: each parcel's earnings are held when fulfilment starts, released when th
 - Seller marks "cash received"; commission for cash orders is charged to the seller's balance
 - **Done when:** a cash order completes and the commission shows on the seller's statement
 
+🟡 Built 2026-10-27 (V36), end-to-end tests written but not run yet (WSL was down): Admin → Features **Cash on delivery** (off by default) and **Cash on delivery limit** (5,000 birr; 0 = none). Checkout offers "Pay online now" / "Cash on delivery" (only the ways switched on; cash greyed out over the limit); cash only when every seller in the order is verified. A cash order skips BillPay, takes the stock at once, starts delivery and waits in **CASH_ON_DELIVERY** (no expiry, no payment reminders). The seller sees "cash: collect X" and taps **Cash received**: the parcel is delivered and our commission is booked as a negative line on their balance (they already hold the money); when every parcel is collected the order is PAID. Staff can mark it too (`POST /api/admin/orders/{n}/parcels/{p}/cash-received`, no admin button yet). Cancelling a cash order refunds nothing and puts the items back; all parcels cancelled = order CANCELLED. Problems on cash orders still need staff (no held money to settle from). Test: `CashOnDeliveryIntegrationTest`.
+
 ### M8. Disputes v1 (1 week) ✅ Done 2026-10-25
 - "Problem with this order?" with reason and photos (**S6**)
 - Admin dispute queue with deadline (**S21**): refund (full or partial through BillPay), release to seller, or split

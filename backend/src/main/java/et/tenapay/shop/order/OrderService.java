@@ -48,6 +48,11 @@ public class OrderService {
 		forEachProduct(order, products::releaseReserved);
 	}
 
+	/** A cancelled cash order (M7) gives its discount-code use back; its stock is returned per parcel when cancelled. */
+	public void releaseDiscount(Order order) {
+		discounts.release(order.getDiscountCode());
+	}
+
 	public void commitStock(Order order) {
 		forEachProduct(order, products::commitReserved);
 	}
@@ -59,6 +64,17 @@ public class OrderService {
 			p.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
 		}
 		payouts.lockEarnings(order);
+	}
+
+	/**
+	 * Cash on delivery (M7): the parcels are ready to pack straight away. No earnings are held: the seller collects the
+	 * money at the door, and our commission is charged to their balance when they mark "cash received".
+	 */
+	public void startCashDelivery(Order order) {
+		order.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
+		for (OrderParcel p : parcels.findByOrderIdOrderByParcelNoAsc(order.getId())) {
+			p.setFulfilmentStatus(FulfilmentStatus.UNFULFILLED);
+		}
 	}
 
 	/** Fully refunded: money still held for sellers goes back to the buyer instead. */

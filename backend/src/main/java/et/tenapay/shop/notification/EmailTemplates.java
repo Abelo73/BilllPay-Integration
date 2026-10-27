@@ -18,7 +18,7 @@ final class EmailTemplates {
 	}
 
 	enum Kind {
-		ORDER_PLACED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
+		ORDER_PLACED, CASH_ORDERED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
 		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE
 	}
 
@@ -44,6 +44,9 @@ final class EmailTemplates {
 			case ORDER_PLACED -> build("We got your order " + o.orderNumber(), "Thanks for your order, " + first + "!",
 					"Your order is saved. Finish paying on BillPay to confirm it; the items are held for you for 30 minutes.",
 					o, "Complete payment");
+			case CASH_ORDERED -> build("We got your order " + o.orderNumber() + ": pay cash on delivery", "Thanks for your order, " + first + "!",
+					"You chose cash on delivery: pay " + o.total() + " birr in cash when your items arrive, or when you pick them up. The seller confirms the cash, and we email you when it's delivered.",
+					o, "Track your order");
 			case PAYMENT_REMINDER -> build("Your order " + o.orderNumber() + " is waiting: pay by " + o.payBy(),
 					"Your items are still waiting, " + first,
 					"You started checkout but we haven't received a payment yet. We're holding your items until "
