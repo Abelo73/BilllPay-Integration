@@ -43,9 +43,15 @@ public class RefundService {
 	private final TransactionTemplate tx;
 	private final et.tenapay.shop.monitoring.ShopMetrics metrics;
 
-	/** Body for POST /api/v1/checkout/payments/{id}/refunds; the payment id goes in the path. */
-	record RefundRequest(String merchantReference, BigDecimal amount, String currency, String reason) {
+	/**
+	 * Body for POST /api/v1/checkout/payments/{id}/refunds; the payment id goes in the path. BillPay reads only these
+	 * two fields: anything else (merchantReference, currency) makes it answer 400 "Malformed or unreadable request
+	 * body" (found 2026-10-27 against the sandbox). Our own reference stays on our side; BillPay's refund id links them.
+	 */
+	record RefundRequest(BigDecimal amount, String reason) {
 	}
+
+	static final String DEFAULT_REASON = "Refund";
 
 	/** Amount of a successful payment that is not yet refunded or being refunded. */
 	public BigDecimal refundable(PaymentAttempt attempt) {
@@ -110,8 +116,8 @@ public class RefundService {
 		refund.setCurrency(attempt.getCurrency());
 		refund.setReason(reason);
 		refund.setStatus(RefundStatus.REQUESTED);
-		refund.setRequestPayload(billPay.toJson(new RefundRequest(refund.getMerchantReference(), amount,
-				attempt.getCurrency(), reason)));
+		refund.setRequestPayload(billPay.toJson(new RefundRequest(amount,
+				reason == null || reason.isBlank() ? DEFAULT_REASON : reason.trim())));
 		refunds.save(refund);
 		orderService.note(order, "REFUND_REQUESTED", refund.getMerchantReference() + " " + amount + " " + refund.getCurrency()
 				+ (reason != null ? " (" + reason + ")" : ""));

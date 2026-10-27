@@ -28,7 +28,9 @@ public enum RefundStatus {
 			case "SUCCEEDED", "SUCCESS", "SUCCESSFUL", "COMPLETED", "REFUNDED", "PARTIALLY_REFUNDED", "PROCESSED",
 					"PAID" -> SUCCEEDED;
 			case "REFUSED", "FAILED", "DECLINED", "REJECTED", "REFUND_REFUSED" -> REFUSED;
-			case "PENDING", "PROCESSING", "CREATED", "INITIATED", "REQUESTED" -> PENDING;
+			// UNDER_REVIEW: what BillPay answers when it accepts a refund (2026-10-27)
+			case "PENDING", "PROCESSING", "CREATED", "INITIATED", "REQUESTED", "UNDER_REVIEW", "IN_REVIEW",
+					"APPROVED" -> PENDING;
 			default -> null;
 		};
 	}

@@ -262,4 +262,21 @@ class PaymentFlowIntegrationTest extends IntegrationTest {
 		assertThat(refund.text("status")).isEqualTo("REFUSED");
 		assertThat(refund.text("error")).contains("refund limit");
 	}
+
+	/** BillPay reads only {"amount", "reason"} (sandbox, 2026-10-27): extra fields got 400 "Malformed request body". */
+	@Test
+	void refundSendsOnlyAmountAndReason_andUnderReviewIsPending() {
+		String paymentId = UUID.randomUUID().toString();
+		BillPayFake.acceptsPayments(billPay, paymentId);
+		String orderNumber = checkout(1).text("orderNumber");
+		sendWebhook(BillPayFake.capturedWebhook(paymentId, orderNumber + "-A1", TOTAL_ONE));
+		awaitOrderStatus(orderNumber, "PAID");
+		BillPayFake.acceptsRefunds(billPay);
+
+		Res refund = post("/api/admin/orders/" + orderNumber + "/refunds", Map.of("amount", "100.00"), admin);
+		assertThat(refund.status()).as(refund.raw()).isEqualTo(200);
+		assertThat(refund.text("status")).as(refund.raw()).isEqualTo("PENDING");
+		billPay.verify(1, postRequestedFor(urlMatching(".*/payments/" + paymentId + "/refunds"))
+				.withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.equalToJson("{\"amount\":100.00,\"reason\":\"Refund\"}")));
+	}
 }

@@ -88,15 +88,30 @@ public final class BillPayFake {
 						""".formatted(paymentId, reference, status, amount.toPlainString(), attempts))));
 	}
 
-	/** POST /payments/{id}/refunds → 201, accepted and still processing (any payment, any amount). */
+	/**
+	 * POST /payments/{id}/refunds → 202, accepted and under review, as the real sandbox answers (2026-10-27). BillPay
+	 * reads only {"amount", "reason"}: any other field makes it answer 400 "Malformed or unreadable request body", so
+	 * the fake refuses those too.
+	 */
 	public static void acceptsRefunds(WireMockServer billPay) {
-		billPay.stubFor(post(com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds")).willReturn(aResponse()
-				.withStatus(201).withHeader("Content-Type", "application/json").withTransformers("response-template")
+		billPay.stubFor(post(com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds"))
+				.atPriority(1)
+				.withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath("$.merchantReference"))
+				.willReturn(aResponse().withStatus(400).withHeader("Content-Type", "application/json")
+						.withBody("{\"statusCode\":400,\"message\":\"Malformed or unreadable request body\"}")));
+		billPay.stubFor(post(com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds"))
+				.atPriority(1)
+				.withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath("$.currency"))
+				.willReturn(aResponse().withStatus(400).withHeader("Content-Type", "application/json")
+						.withBody("{\"statusCode\":400,\"message\":\"Malformed or unreadable request body\"}")));
+		billPay.stubFor(post(com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds")).atPriority(5)
+				.willReturn(aResponse()
+				.withStatus(202).withHeader("Content-Type", "application/json").withTransformers("response-template")
 				.withBody("""
-						{"statusCode":201,"message":"Refund created","body":{
-						 "refundId":"rf-{{randomValue length=8 type='ALPHANUMERIC'}}","status":"PENDING",
-						 "merchantReference":"{{jsonPath request.body '$.merchantReference'}}",
-						 "amount":{"amount":{{jsonPath request.body '$.amount'}},"currency":"ETB"}}}
+						{"statusCode":202,"message":"Refund requested successfully","body":{
+						 "id":"{{randomValue type='UUID'}}","paymentId":"{{request.pathSegments.[4]}}","status":"UNDER_REVIEW",
+						 "amount":{"amount":{{jsonPath request.body '$.amount'}},"currency":"ETB"},
+						 "feeReturned":{"amount":0.0000,"currency":"ETB"},"vatReturned":{"amount":0.0000,"currency":"ETB"}}}
 						""")));
 	}
 

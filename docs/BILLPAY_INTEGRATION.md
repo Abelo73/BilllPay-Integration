@@ -113,7 +113,7 @@ Get these from the docs or the integration team before building the affected par
 | Q3 | ✅ **Answered 2026-10-23:** `X-Billpay-Signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`, secret `whsec_…` per endpoint (Test and Live separate). Verified live: real delivery matched, forged one got 401. Still open: BillPay's timestamp tolerance (we don't enforce one yet). | FR-WH-2 |
 | Q4 | Webhook retry policy: how many retries, backoff, which response codes count as success | FR-WH-5 |
 | Q5 | ✅ **Answered 2026-10-23:** `GET /api/v1/checkout/payments/{id}` (UUID) works with `x-api-key`. Statuses seen: `CREATED` → `PROCESSING`. Per-try details live in `attempts[]` (`instrument`, `payerReference`, `status`, `failureCode`, `failureReason`). Lookup by merchantReference still unknown. | FR-REC |
-| Q6 | Refund endpoint and body (we assume `POST /api/v1/refunds` with paymentId, merchantReference, amount, currency, reason; configurable as `billpay.refund-path`), and partial refunds. Refund **webhooks** are confirmed ("refunded" events). | FR-REF |
+| Q6 | ✅ **Answered 2026-10-27** (sandbox probe): `POST /api/v1/checkout/payments/{paymentId}/refunds` with body **`{"amount": 10.00, "reason": "…"}` only**. Any other field (`merchantReference`, `currency`) gets 400 "Malformed or unreadable request body". Reply: **202** "Refund requested successfully", `body.id` (refund UUID), `paymentId`, `status` = **`UNDER_REVIEW`**, money objects `amount`, `feeReturned`, `vatReturned`, `feeCharged`, `feeVat`. Partial refunds work. Still open: when UNDER_REVIEW ends, and the refund webhook body. | FR-REF |
 | Q7 | How long a pending checkout lives before it expires | FR-REC-2 |
 | Q8 | Must `merchantReference` be unique per payment or per order? Can it be reused after failure? | FR-PAY-6 |
 | Q9 | Idempotency-Key retention window, and the response when a key is replayed with a different body | FR-PAY-3 |
@@ -138,4 +138,5 @@ Get these from the docs or the integration team before building the affected par
 |------|--------|
 | 2026-10-22 | Initial notes from dashboard screenshots (Developers page, sandbox table) |
 | 2026-10-22 | Webhooks page: signed events (captured/failed/refunded/settled), secret shown once, test deliveries, delivery log |
+| 2026-10-27 | Refund format found: only `amount` + `reason`; answer 202 UNDER_REVIEW. All earlier refunds failed with 400 because we also sent merchantReference/currency. |
 | 2026-10-23 | First real sandbox payment end to end (TS-20261023-00003, ETB 1,450, TEST_WALLET): create 201 → checkout → PaymentCaptured webhook (signature verified) → order PAID. Q1, Q2, Q3, Q5 answered. |
