@@ -4,6 +4,8 @@
 #   scripts/dev.sh            restart the backend so it runs your latest code (even one started in another
 #                             terminal), start anything else that is down, then run all checks (default)
 #   scripts/dev.sh restart    same as the default
+#   scripts/dev.sh quick      restart the backend WITHOUT rebuilding, for .env-only changes (a new key, a flag):
+#                             about 1-2 min faster; does a normal restart by itself when Java code changed
 #   scripts/dev.sh up         start only what is down; a running backend is left alone (faster, keeps old code)
 #   scripts/dev.sh check      only run the checks
 #   scripts/dev.sh test       checks + a quick end-to-end smoke test (catalog, sign-up, sign-in, admin)
@@ -325,7 +327,40 @@ perf_up() {
 }
 perf_backend_up() { [ "$(http_code http://localhost:8282/actuator/health)" = 200 ]; }
 
+# Restarts the backend WITHOUT rebuilding: for changes to .env or settings only (a new key, a port, a flag).
+# Runs the last build straight with java, skipping the copy, the compile and Maven's own start-up (about 1-2 min
+# saved). Returns 1 (caller does a full restart) when there is no earlier build or Java code changed since it.
+quick_backend() {
+  step "Backend quick restart (no rebuild: picks up .env changes, not code changes)"
+  use_java21 || { bad "Java 21 missing"; return 1; }
+  local work="${TENASHOP_DEV_DIR:-$HOME/.cache/tenashop-dev}"
+  local b="$work/backend" cp="$work/classpath.txt" built changed
+  if [ ! -d "$b/target/classes/et" ]; then
+    warn "no earlier build" "doing a normal restart instead"; return 1
+  fi
+  # newest compiled file vs newest source/resource in the repo: code edited since the last build → full rebuild
+  built=$(find "$b/target/classes" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
+  changed=$(find "$ROOT/backend/src/main" "$ROOT/backend/pom.xml" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
+  if [ -n "$changed" ] && [ "${changed%.*}" -gt "${built%.*}" ]; then
+    warn "code changed since the last build" "doing a normal restart instead"; return 1
+  fi
+  if [ ! -s "$cp" ] || [ "$ROOT/backend/pom.xml" -nt "$cp" ]; then
+    printf "  … listing libraries (once, or after pom.xml changes)\r"
+    (cd "$b" && ./mvnw -q dependency:build-classpath -Dmdep.outputFile="$cp" >/dev/null 2>&1) \
+      || { warn "could not list libraries" "doing a normal restart instead"; return 1; }
+    printf "\033[K"
+  fi
+  stop_backend_any
+  ln -sfn "$ROOT/.env" "$work/.env"
+  launch backend "$b" java -XX:TieredStopAtLevel=1 -cp "target/classes:$(cat "$cp")" et.tenapay.shop.TenashopApplication
+  if wait_for "backend (no build, about 1-2 min)" 300 backend_up "$RUN/backend.log"; then ok "started" "log: .run/backend.log"
+  else bad "did not start" "log: .run/backend.log"; grep -E 'Caused by|APPLICATION FAILED' "$RUN/backend.log" | tail -3 | sed 's/^/      /'; fi
+  return 0
+}
+
 case "${1:-restart}" in
+  quick)    if ! quick_backend; then step "Stopping backend"; stop_backend_any; start_backend; fi
+            start_frontend; start_ngrok; checks; summary ;;
   perf)      perf_up ;;
   perf-down) step "Stopping the load-test environment"; (cd "$ROOT" && docker compose --profile perf stop perf-runner perf-backend perf-billpay perf-kafka >/dev/null 2>&1) && ok "stopped" "data kept; scripts/dev.sh perf starts it again" ;;
   up|start) prereqs; start_infra; start_backend; start_frontend; start_ngrok; checks; summary ;;
@@ -336,6 +371,6 @@ case "${1:-restart}" in
   logs)     f="$RUN/${2:-backend}.log"; [ -f "$f" ] && tail -f "$f" || echo "no log at $f (was it started by this script?)" ;;
   stop)     step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend ;;
   stop-all) step "Stopping"; stop_one ngrok; stop_one frontend; stop_one backend; (cd "$ROOT" && docker compose stop) ;;
-  *)        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  *)        sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
 [ "$FAILS" -eq 0 ]
