@@ -125,9 +125,24 @@ start_backend() {
     bad "port $BACKEND_PORT busy" "something else is listening but not healthy"; fix "free the port or stop the old backend"; return
   fi
   use_java21 || { bad "Java 21 missing"; return; }
-  launch backend "$ROOT/backend" ./mvnw -q spring-boot:run
-  # On /mnt/c (Windows files) compile + startup can take 4-6 min, so wait up to 8.
-  if wait_for "backend (compiles first; slow on /mnt/c, up to 8 min)" 480 backend_up "$RUN/backend.log"; then ok "started" "log: .run/backend.log"
+  # Reading thousands of small files from the Windows drive (/mnt/c) through WSL is 10-20x slower than from
+  # Linux, so compiling and starting from there took 7-10 min. Instead, copy the backend to the Linux side and
+  # build and run it there (about 2 min). Only the copy changes: you keep editing the files in the repo as before,
+  # and the backend still reads the repo's .env (linked next to the copy).
+  local dir="$ROOT/backend"
+  if [[ "$ROOT" == /mnt/* ]] && command -v rsync >/dev/null 2>&1; then
+    local work="${TENASHOP_DEV_DIR:-$HOME/.cache/tenashop-dev}"
+    mkdir -p "$work/backend"
+    if rsync -a --delete --exclude target --exclude '*.log' "$ROOT/backend/" "$work/backend/"; then
+      ln -sfn "$ROOT/.env" "$work/.env"
+      chmod +x "$work/backend/mvnw"
+      dir="$work/backend"
+    else
+      warn "fast build" "could not copy the backend to $work; building on /mnt/c (slow)"
+    fi
+  fi
+  launch backend "$dir" ./mvnw -q spring-boot:run
+  if wait_for "backend (builds first, about 2 min)" 480 backend_up "$RUN/backend.log"; then ok "started" "log: .run/backend.log"
   elif grep -qE 'APPLICATION FAILED|Application run failed|BUILD FAILURE|COMPILATION ERROR' "$RUN/backend.log"; then
     bad "did not start" "log: .run/backend.log"
     grep -E 'Caused by|APPLICATION FAILED|ERROR' "$RUN/backend.log" | tail -3 | sed 's/^/      /'
@@ -285,7 +300,8 @@ stop_backend_any() {
   local pid ppid i
   pid=$(ss -ltnp 2>/dev/null | grep ":$BACKEND_PORT " | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)
   [ -z "$pid" ] && return
-  if ! tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q "$ROOT/backend"; then
+  # this repo's backend, or the Linux-side copy that start_backend builds and runs
+  if ! tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -qE "$ROOT/backend|${TENASHOP_DEV_DIR:-$HOME/.cache/tenashop-dev}/backend"; then
     bad "port $BACKEND_PORT" "held by something that isn't this project's backend (pid $pid); left alone"; return
   fi
   ppid=$(ps -o ppid= -p "$pid" | tr -d ' ')
