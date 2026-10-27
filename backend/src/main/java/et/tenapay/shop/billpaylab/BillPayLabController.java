@@ -32,7 +32,8 @@ public class BillPayLabController {
 
 	public record CreateRequest(@NotNull BillPayEnvironment environment, @NotNull BigDecimal amount,
 			@Size(max = 200) String description, @Size(max = 120) String customerName, @Size(max = 20) String customerPhone,
-			boolean confirmLive) {
+			/** Required (true) for LIVE; may be left out for SANDBOX */
+			Boolean confirmLive) {
 	}
 
 	public record RefundRequest(BigDecimal amount, @Size(max = 200) String reason) {
@@ -51,7 +52,7 @@ public class BillPayLabController {
 	@PostMapping("/api/admin/billpay-lab")
 	public BillPayLabService.RunDetail create(@Valid @RequestBody CreateRequest req) {
 		return lab.create(req.environment(), req.amount(), req.description(), req.customerName(), req.customerPhone(),
-				req.confirmLive(), CurrentUser.get().map(CurrentUser::email).orElse(null));
+				Boolean.TRUE.equals(req.confirmLive()), CurrentUser.get().map(CurrentUser::email).orElse(null));
 	}
 
 	@PostMapping("/api/admin/billpay-lab/{id}/refresh")

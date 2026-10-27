@@ -9,7 +9,7 @@ One page: what works, what's being built, what's left, and **what you do next**.
 
 | # | What | Why | How |
 |---|------|-----|-----|
-| 1 | **Restart WSL** | It stopped answering; backend and frontend are down | PowerShell: `wsl --shutdown`, open WSL, `scripts/dev.sh` (about 2 min) |
+| 1 | **Start the shop** | WSL works again after the restart | Open WSL, `scripts/dev.sh` (about 2 min) |
 | 2 | **Try the BillPay lab** | New today; see exactly how BillPay behaves | Admin → **BillPay lab** → Sandbox, 10 ETB → Create → Open checkout → pay → watch calls and webhooks |
 | 3 | **Refund the live test orders** | Real money (TS-20261027-00065: 1,600 ETB, TS-20261027-00067: 6,900 ETB) | Admin → order → Payments → Refund. It shows **Pending · BillPay: under review** |
 | 4 | **Ask the BillPay team** | Refunds stay "under review" | Who approves refunds and how long; what the refund webhook looks like (see §5) |
@@ -52,7 +52,7 @@ One page: what works, what's being built, what's left, and **what you do next**.
 | Status check when a webhook is missing, reminder before the 30-min expiry | ✅ |
 | Sandbox / live switch in Admin | ✅ |
 | Refunds | ✅ fixed 27 Oct: body is `{amount, reason}` only; BillPay answers `UNDER_REVIEW` |
-| **BillPay lab** (Admin) | 🟡 new 27 Oct; type-checked, backend test written but not run (WSL was down) |
+| **BillPay lab** (Admin) | ✅ new 27 Oct; tested (`BillPayLabIntegrationTest`) |
 | Monitoring: Grafana dashboards, alerts, uptime | ✅ |
 
 **Dev setup**: `scripts/dev.sh` builds the backend on the Linux side (≈2 min instead of 7–10);
