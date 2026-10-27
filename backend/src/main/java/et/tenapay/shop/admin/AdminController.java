@@ -133,13 +133,25 @@ public class AdminController {
 
 	public record RefundView(UUID id, String orderNumber, String merchantReference, String billpayRefundId,
 			BigDecimal amount, String currency, String reason, String status, String reasonCode, boolean external,
-			String error, String requestPayload, String responsePayload, Instant createdAt, Instant updatedAt) {
+			String error, String requestPayload, String responsePayload, Instant createdAt, Instant updatedAt,
+			/** BillPay's own word for the refund in its last answer, e.g. UNDER_REVIEW (ours is PENDING) */
+			String billpayStatus) {
+
+		private static final java.util.regex.Pattern BILLPAY_STATUS = java.util.regex.Pattern.compile("\"status\"\\s*:\\s*\"([A-Za-z_]+)\"");
 
 		static RefundView from(Refund r, String orderNumber) {
 			return new RefundView(r.getId(), orderNumber, r.getMerchantReference(), r.getBillpayRefundId(),
 					r.getAmount(), r.getCurrency(), r.getReason(), r.getStatus().name(), r.getReasonCode(),
 					r.isExternal(), r.getError(), r.getRequestPayload(), r.getResponsePayload(), r.getCreatedAt(),
-					r.getUpdatedAt());
+					r.getUpdatedAt(), billpayStatus(r.getResponsePayload()));
+		}
+
+		private static String billpayStatus(String body) {
+			if (body == null) {
+				return null;
+			}
+			java.util.regex.Matcher m = BILLPAY_STATUS.matcher(body);
+			return m.find() ? m.group(1).toUpperCase(java.util.Locale.ROOT) : null;
 		}
 	}
 

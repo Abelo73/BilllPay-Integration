@@ -29,7 +29,9 @@ function RefundDialog({ order, attempt, onClose }: { order: OrderDetail; attempt
       }),
     onSuccess: (r) => {
       toast[r.status === 'REFUSED' || r.status === 'ERROR' ? 'error' : 'success'](
-        `Refund ${r.merchantReference}: ${r.status}${r.reasonCode ? ` (${r.reasonCode})` : ''}`,
+        r.status === 'PENDING'
+          ? `Refund ${r.merchantReference} sent. BillPay says ${(r.billpayStatus ?? 'pending').replaceAll('_', ' ').toLowerCase()}; it updates when BillPay finishes.`
+          : `Refund ${r.merchantReference}: ${r.status}${r.reasonCode ? ` (${r.reasonCode})` : ''}`,
       )
       qc.invalidateQueries({ queryKey: ['admin-order', order.order.orderNumber] })
       onClose()
@@ -443,6 +445,7 @@ export function AdminOrderDetailPage() {
                 <CardHeader className="flex flex-row flex-wrap items-center gap-3 space-y-0">
                   <CardTitle className="font-mono text-sm">{r.merchantReference}</CardTitle>
                   <StatusBadge status={r.status} />
+                  {r.status === 'PENDING' && r.billpayStatus && <span className="text-[11px] text-muted-foreground">BillPay: {r.billpayStatus.replaceAll('_', ' ').toLowerCase()}</span>}
                   {r.reasonCode && <span className="font-mono text-xs text-destructive">{r.reasonCode}</span>}
                   {r.external && <span className="text-xs text-muted-foreground">issued outside Sodo Gebeya</span>}
                   <span className="ml-auto font-medium tabular-nums">{formatETB(r.amount)}</span>

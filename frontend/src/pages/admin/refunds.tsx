@@ -43,6 +43,7 @@ export function AdminRefundsPage() {
                   <TableCell>
                     <div className="flex flex-col items-start gap-1">
                       <StatusBadge status={r.status} />
+                      {r.status === 'PENDING' && r.billpayStatus && <span className="text-[11px] text-muted-foreground">BillPay: {r.billpayStatus.replaceAll('_', ' ').toLowerCase()}</span>}
                       {r.reasonCode && <span className="font-mono text-[11px] text-destructive">{r.reasonCode}</span>}
                     </div>
                   </TableCell>

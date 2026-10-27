@@ -30,6 +30,7 @@ import { AdminRefundsPage } from './refunds'
 import { AdminReportsPage } from './reports'
 import { AdminReviewsPage } from './reviews'
 import { AdminSetupPage } from './setup'
+import { AdminBillPayLabPage } from './billpay-lab'
 import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
 import { AdminVerificationsPage } from './verifications'
@@ -75,6 +76,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'reports', element: <AdminReportsPage /> },
       { path: 'load-tests', element: <AdminLoadTestsPage /> },
       { path: 'setup', element: <AdminSetupPage /> },
+      { path: 'billpay-lab', element: <AdminBillPayLabPage /> },
       { path: 'users', element: <AdminUsersPage /> },
       { path: 'login-history', element: <AdminLoginHistoryPage /> },
       { path: 'account', element: <AdminMyAccountPage /> },

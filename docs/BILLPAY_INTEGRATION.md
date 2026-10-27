@@ -124,6 +124,13 @@ Get these from the docs or the integration team before building the affected par
 | Q14 | Rate limits | Client config |
 | Q15 | Live base URL and go-live (UAT) checklist | Go-live |
 
+## 6a. BillPay lab (Admin → BillPay lab)
+
+Makes test payments straight against BillPay (sandbox, or live up to 1,000 ETB with a confirm), with no order or stock.
+Keeps every API call (what we sent, BillPay's answer, HTTP status, milliseconds), shows the webhooks for the payment
+(signature check, seconds after creating) and can refund. Return links come back through `/api/billpay/lab-return`.
+Tables `billpay_lab_runs` and `billpay_lab_calls` (V37).
+
 ## 7. Dashboard areas worth checking
 
 - **Developers → Webhooks**: register `APP_WEBHOOK_PUBLIC_URL` and get the secret (answers Q2/Q3)

@@ -112,6 +112,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
     label: 'Integration',
     items: [
       { to: '/admin/setup', label: 'BillPay setup', icon: Settings2 },
+      { to: '/admin/billpay-lab', label: 'BillPay lab', icon: FlaskConical },
       { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook, badge: 'webhooks' },
       { to: '/admin/emails', label: 'Emails', icon: Mail },
       { to: '/admin/sms', label: 'SMS', icon: MessageSquareText },

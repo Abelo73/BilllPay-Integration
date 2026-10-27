@@ -195,6 +195,8 @@ export type Refund = {
   error: string | null
   requestPayload: string | null
   responsePayload: string | null
+  /** BillPay's own status in its last answer, e.g. UNDER_REVIEW */
+  billpayStatus?: string | null
   createdAt: string
   updatedAt: string
 }
