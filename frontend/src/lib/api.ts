@@ -162,7 +162,14 @@ export type OrderStatusView = {
   currency: string
   customerName: string
   items: { productId: number; productSlug: string | null; productName: string; unitPrice: number; quantity: number; lineTotal: number; parcelNo: number | null }[]
-  payment: { attemptNo: number; status: string; reasonCode: string | null; paymentMethod: string | null } | null
+  payment: {
+    attemptNo: number
+    status: string
+    reasonCode: string | null
+    paymentMethod: string | null
+    /** Why BillPay never opened this payment; null once it did */
+    problem: 'UNREACHABLE' | 'BUSY' | 'KEY_REJECTED' | 'REFUSED' | null
+  } | null
   canRetry: boolean
   canCancel: boolean
   delivery: {

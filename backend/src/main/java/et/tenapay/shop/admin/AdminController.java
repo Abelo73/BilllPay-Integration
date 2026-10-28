@@ -78,13 +78,15 @@ public class AdminController {
 
 	public record OrderRow(UUID id, String orderNumber, String status, String fulfilmentStatus, BigDecimal total,
 			String currency, String customerName, String customerPhone, String deliveryCity, Instant createdAt,
-			Instant paidAt, String environment) {
+			Instant paidAt, String environment,
+			/** BILLPAY or CASH (paid to the seller at the door) */
+			String paymentMethod) {
 
 		static OrderRow from(Order o) {
 			return new OrderRow(o.getId(), o.getOrderNumber(), o.getStatus().name(),
 					o.getFulfilmentStatus() == null ? null : o.getFulfilmentStatus().name(), o.getTotal(),
 					o.getCurrency(), o.getCustomerName(), o.getCustomerPhone(), o.getDeliveryCity(), o.getCreatedAt(),
-					o.getPaidAt(), o.getEnvironment().name());
+					o.getPaidAt(), o.getEnvironment().name(), o.cash() ? "CASH" : "BILLPAY");
 		}
 	}
 
@@ -172,7 +174,9 @@ public class AdminController {
 			BigDecimal discountShare, BigDecimal deliveryFee, String fulfilmentStatus, List<String> nextSteps,
 			String trackingNote, Instant shippedAt, Instant deliveredAt, Instant cancelledAt, List<String> items,
 			/** Rider on this parcel (M21), null = none yet */
-			Long riderId, String riderName) {
+			Long riderId, String riderName,
+			/** Cash orders: what the buyer pays at the door for this parcel (null = paid online) */
+			BigDecimal cashToCollect, Instant cashCollectedAt) {
 	}
 
 	public record RefundRequest(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -284,7 +288,8 @@ public class AdminController {
 				o.getItems().stream().filter(i -> i.getParcelNo() != null && i.getParcelNo() == p.getParcelNo())
 						.map(i -> i.getQuantity() + " × " + i.getProductName()).toList(),
 				p.getRiderId(), p.getRiderId() == null ? null
-						: riderRepo.findById(p.getRiderId()).map(r -> r.getName() + " (" + r.getPhone() + ")").orElse(null)))
+						: riderRepo.findById(p.getRiderId()).map(r -> r.getName() + " (" + r.getPhone() + ")").orElse(null),
+				o.cash() ? et.tenapay.shop.dispute.DisputeService.parcelPaid(p) : null, p.getCashCollectedAt()))
 				.toList();
 		return new OrderDetail(OrderRow.from(o), o.getCustomerEmail(), DeliveryDetail.from(o),
 				o.getItems().stream().map(ItemRow::from).toList(),

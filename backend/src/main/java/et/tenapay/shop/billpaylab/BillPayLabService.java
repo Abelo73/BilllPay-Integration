@@ -129,7 +129,11 @@ public class BillPayLabService {
 		}
 		BigDecimal amt = amount == null ? run.amount() : amount.setScale(2, RoundingMode.HALF_UP);
 		BillPayEnvironment env = BillPayEnvironment.valueOf(run.environment());
-		String body = billPay.toJson(Map.of("amount", amt, "reason", reason == null || reason.isBlank() ? "Lab refund" : reason.trim()));
+		// exactly {"amount", "reason"} in that order (BillPay 400s on any other field)
+		Map<String, Object> fields = new java.util.LinkedHashMap<>();
+		fields.put("amount", amt);
+		fields.put("reason", reason == null || reason.isBlank() ? "Lab refund" : reason.trim());
+		String body = billPay.toJson(fields);
 		record(id, "create_refund", body, () -> billPay.createRefund(env, run.billpayPaymentId(), body, UUID.randomUUID()),
 				BillPayRefund::raw);
 		return detail(id);

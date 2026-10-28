@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import et.tenapay.shop.common.ApiException;
 import et.tenapay.shop.payment.PaymentAttempt;
 import et.tenapay.shop.payment.PaymentAttemptRepository;
+import et.tenapay.shop.payment.PaymentProblem;
 import et.tenapay.shop.payment.PaymentService;
 import et.tenapay.shop.payment.PaymentStatus;
 import et.tenapay.shop.payment.billpay.BillPayException;
@@ -130,7 +131,9 @@ public class CheckoutController {
 			BigDecimal lineTotal, Integer parcelNo) {
 	}
 
-	public record PaymentView(int attemptNo, String status, String reasonCode, String paymentMethod) {
+	public record PaymentView(int attemptNo, String status, String reasonCode, String paymentMethod,
+			/** Why BillPay never opened this payment (UNREACHABLE, BUSY, KEY_REJECTED, REFUSED), else null */
+			String problem) {
 	}
 
 	public record DeliveryView(String address, String city, String notes, String fulfilmentStatus, String trackingNote,
@@ -284,10 +287,11 @@ public class CheckoutController {
 		try {
 			return payments.startPayment(order.getId());
 		} catch (BillPayException e) {
-			log.error("Could not start BillPay payment for {}: {}", order.getOrderNumber(), e.getMessage());
-			throw new ApiException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR",
-					"We couldn't reach the payment provider. Your order is saved; please try paying again.",
-					Map.of("orderNumber", order.getOrderNumber()));
+			PaymentProblem problem = PaymentProblem.of(e);
+			log.error("Could not start BillPay payment for {} ({}): {}", order.getOrderNumber(), problem, e.getMessage());
+			// code stays PAYMENT_PROVIDER_ERROR (the order exists, the buyer can retry); "problem" says why in plain words
+			throw new ApiException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR", problem.message(),
+					Map.of("orderNumber", order.getOrderNumber(), "problem", problem.name()));
 		}
 	}
 
@@ -311,7 +315,11 @@ public class CheckoutController {
 
 	private OrderStatusView view(Order order) {
 		PaymentView payment = attempts.findFirstByOrderIdOrderByAttemptNoDesc(order.getId())
-				.map(a -> new PaymentView(a.getAttemptNo(), a.getStatus().name(), a.getReasonCode(), a.getPaymentMethod()))
+				.map(a -> {
+					PaymentProblem problem = PaymentProblem.of(a);
+					return new PaymentView(a.getAttemptNo(), a.getStatus().name(), a.getReasonCode(), a.getPaymentMethod(),
+							problem == null ? null : problem.name());
+				})
 				.orElse(null);
 		DeliveryView delivery = new DeliveryView(order.getDeliveryAddress(), order.getDeliveryCity(),
 				order.getDeliveryNotes(), order.getFulfilmentStatus() == null ? null : order.getFulfilmentStatus().name(),

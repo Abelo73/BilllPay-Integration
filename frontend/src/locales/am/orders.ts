@@ -207,4 +207,14 @@ export const orders: Record<string, string> = {
   'Choose your area (sets the delivery fee)': 'አካባቢዎን ይምረጡ (የማድረሻ ክፍያውን ይወስናል)',
   'standard fee': 'መደበኛ ክፍያ',
   '{name} is bringing it': '{name} እያመጣልዎት ነው',
+
+  // why BillPay could not open a payment
+  'Couldn’t reach BillPay': 'BillPayን ማግኘት አልተቻለም',
+  'Check your internet connection, then try paying again. Your order is saved.': 'የኢንተርኔት ግንኙነትዎን ያረጋግጡ፣ ከዚያ እንደገና ለመክፈል ይሞክሩ። ትዕዛዝዎ ተቀምጧል።',
+  'BillPay is busy': 'BillPay ተጨናንቋል',
+  'Please try paying again in a minute. Your order is saved.': 'እባክዎ ከአንድ ደቂቃ በኋላ እንደገና ለመክፈል ይሞክሩ። ትዕዛዝዎ ተቀምጧል።',
+  'Online payment is paused': 'የኦንላይን ክፍያ ለጊዜው ቆሟል',
+  'Online payment isn’t available right now. Your order is saved; please try again later or contact us.': 'የኦንላይን ክፍያ አሁን አይገኝም። ትዕዛዝዎ ተቀምጧል፤ እባክዎ ቆይተው ይሞክሩ ወይም ያግኙን።',
+  'BillPay couldn’t accept this payment': 'BillPay ይህን ክፍያ መቀበል አልቻለም',
+  'Please try again, or contact us if it keeps happening. Your order is saved.': 'እባክዎ እንደገና ይሞክሩ፤ ችግሩ ከቀጠለ ያግኙን። ትዕዛዝዎ ተቀምጧል።',
 }

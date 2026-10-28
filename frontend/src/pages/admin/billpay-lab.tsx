@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, ExternalLink, FlaskConical, Gauge, KeyRound, Loader2, RefreshCw, RotateCcw, ShieldAlert, Webhook } from 'lucide-react'
+import { CheckCircle2, CircleDashed, Download, ExternalLink, FlaskConical, Gauge, KeyRound, ListChecks, Loader2, RefreshCw, RotateCcw, ShieldAlert, Webhook, XCircle } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { isAdmin } from '@/lib/admin-api'
-import { labApi, type LabCall, type LabCreate, type LabDetail, type LabKeyCheck, type LabRun } from '@/lib/billpay-lab-api'
+import { labApi, type LabCall, type LabCreate, type LabDetail, type LabBoard, type LabKeyCheck, type LabRun, type LabVerdict } from '@/lib/billpay-lab-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { JsonBlock, PageHeader } from './shared'
@@ -217,6 +217,123 @@ function RunPanel({ id }: { id: string }) {
   )
 }
 
+const VERDICT_LOOK: Record<NonNullable<LabVerdict>, [string, string, typeof CheckCircle2]> = {
+  PASS: ['Passed', 'border-success/40 text-success', CheckCircle2],
+  FAIL: ['Failed', 'border-destructive/40 text-destructive', XCircle],
+  WAITING: ['Waiting', 'text-muted-foreground', CircleDashed],
+  NOT_STARTED: ['Not created', 'border-destructive/40 text-destructive', XCircle],
+}
+
+function VerdictBadge({ v }: { v: LabVerdict }) {
+  if (!v) return <Badge variant="outline" className="text-muted-foreground">Not run</Badge>
+  const [label, cls, Icon] = VERDICT_LOOK[v]
+  return <Badge variant="outline" className={cn('gap-1', cls)}><Icon className="size-3" /> {label}</Badge>
+}
+
+/**
+ * Scenario run: one sandbox payment per BillPay test case. BillPay decides by what is typed on its checkout page, so
+ * a person pays each one; this card then asks BillPay every 15 s and marks each case passed or failed.
+ */
+function ScenarioCard({ onOpen }: { onOpen: (runId: string) => void }) {
+  const qc = useQueryClient()
+  const admin = isAdmin()
+  const board = useQuery({ queryKey: ['lab-scenarios'], queryFn: labApi.scenarios })
+  const set = (b: LabBoard) => { qc.setQueryData(['lab-scenarios'], b); qc.invalidateQueries({ queryKey: ['lab-runs'] }); qc.invalidateQueries({ queryKey: ['lab-stats'] }) }
+  const start = useMutation({ mutationFn: labApi.startScenarios, onSuccess: (b) => { set(b); toast.success('8 sandbox payments created. Open each checkout and type what it says.') }, onError: (e) => toast.error(e.message) })
+  const check = useMutation({ mutationFn: labApi.checkScenarios, onSuccess: set })
+  const refunds = useMutation({ mutationFn: labApi.scenarioRefunds, onSuccess: set, onError: (e) => toast.error(e.message) })
+  const b = board.data
+  const waiting = (b?.waiting ?? 0) > 0
+  // admins ask BillPay; support staff just reread what admins' checks found
+  useEffect(() => {
+    if (!waiting) return
+    const t = setInterval(() => { if (admin) { if (!check.isPending) check.mutate() } else board.refetch() }, AUTO_EVERY_MS)
+    return () => clearInterval(t)
+  }, [waiting, admin]) // eslint-disable-line react-hooks/exhaustive-deps
+  const paidPassed = b?.rows.find((r) => r.key === 'PAID')?.verdict === 'PASS'
+  const refundsRun = b?.refunds.some((r) => r.verdict !== null)
+  return (
+    <Card>
+      <CardHeader className="space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-base"><ListChecks className="size-4" /> Sandbox scenario run</CardTitle>
+            <CardDescription>One test payment per BillPay case. Open each checkout, type what it says, and the result is checked for you.</CardDescription>
+          </div>
+          {admin && (
+            <Button size="sm" disabled={start.isPending} onClick={() => { if (!b?.batch || window.confirm('Start a new run? It creates 8 new sandbox payments.')) start.mutate() }}>
+              {start.isPending && <Loader2 className="animate-spin" />} {b?.batch ? 'New run' : 'Start a run'}
+            </Button>
+          )}
+        </div>
+        {b?.batch && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono text-muted-foreground">run {b.batch}</span>
+            <Badge variant="outline" className="border-success/40 text-success">{b.passed} passed</Badge>
+            {b.failed > 0 && <Badge variant="outline" className="border-destructive/40 text-destructive">{b.failed} failed</Badge>}
+            {b.waiting > 0 && <Badge variant="outline">{b.waiting} waiting</Badge>}
+            {waiting && <span className="flex items-center gap-1 text-muted-foreground"><Loader2 className="size-3 animate-spin" /> checking every 15 s</span>}
+            {admin && (
+              <Button size="xs" variant="ghost" className="ml-auto" disabled={check.isPending} onClick={() => check.mutate()}>
+                {check.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Check now
+              </Button>
+            )}
+          </div>
+        )}
+      </CardHeader>
+      {b?.batch && (
+        <CardContent className="space-y-4 px-0">
+          <ul className="divide-y border-y text-sm">
+            {b.rows.map((r) => (
+              <li key={r.key} className="space-y-1 px-4 py-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold">{r.title}</span>
+                  <VerdictBadge v={r.verdict} />
+                  <span className="ml-auto flex gap-1">
+                    {r.checkoutUrl && r.verdict === 'WAITING' && (
+                      <Button asChild size="xs" variant="outline"><a href={r.checkoutUrl} target="_blank" rel="noreferrer"><ExternalLink /> Pay</a></Button>
+                    )}
+                    {r.runId && <Button size="xs" variant="ghost" onClick={() => onOpen(r.runId!)}>Details</Button>}
+                  </span>
+                </div>
+                <p className="text-xs"><span className="text-muted-foreground">Type:</span> <span className="font-mono">{r.howTo}</span></p>
+                <p className="text-xs text-muted-foreground">
+                  Expect {r.expected}
+                  {r.status && <> · BillPay: <span className="font-mono">{r.status}{r.reasonCode && ` (${r.reasonCode})`}</span></>}
+                </p>
+                {r.note && <p className={cn('text-xs', r.verdict === 'FAIL' || r.verdict === 'NOT_STARTED' ? 'text-destructive' : 'text-muted-foreground')}>{r.note}</p>}
+              </li>
+            ))}
+          </ul>
+          <div className="space-y-2 px-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold"><RotateCcw className="size-4" /> Refunds on the Paid payment</h3>
+              {admin && (
+                <Button size="xs" variant="outline" className="ml-auto" disabled={!paidPassed || refunds.isPending}
+                  title={paidPassed ? undefined : 'Pay the "Paid" case first'} onClick={() => refunds.mutate()}>
+                  {refunds.isPending && <Loader2 className="animate-spin" />} {refundsRun ? 'Test refunds again' : 'Test refunds'}
+                </Button>
+              )}
+            </div>
+            {!paidPassed && <p className="text-xs text-muted-foreground">Unlocks once the Paid case passes: refunds 1.00 (should be accepted) and 1.13 (the sandbox refuses it).</p>}
+            {b.refunds.map((r) => (
+              <div key={r.key} className="space-y-0.5 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium">{r.title} · {formatETB(r.amount)}</span>
+                  <VerdictBadge v={r.verdict} />
+                  {r.httpStatus !== null && <span className="font-mono text-muted-foreground">HTTP {r.httpStatus}</span>}
+                  <span className="ml-auto text-muted-foreground">expect {r.expected}</span>
+                </div>
+                {r.note && <p className="text-muted-foreground">{r.note}</p>}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
 const VERDICT: Record<LabKeyCheck['verdict'], [string, string]> = {
   OK: ['Key accepted', 'border-success/40 text-success'],
   KEY_REJECTED: ['Key rejected', 'border-destructive/40 text-destructive'],
@@ -394,6 +511,7 @@ export function AdminBillPayLabPage() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
         <div className="space-y-6">
           {isAdmin() && <CreateForm onCreated={(d) => { setSelected(d.run.id); runs.refetch() }} />}
+          <ScenarioCard onOpen={setSelected} />
           {current && <RunPanel key={current} id={current} />}
         </div>
         <div className="space-y-6">

@@ -194,6 +194,8 @@ class PaymentFlowIntegrationTest extends IntegrationTest {
 		Res res = checkout(1);
 		assertThat(res.status()).isEqualTo(502);
 		assertThat(res.text("code")).isEqualTo("PAYMENT_PROVIDER_ERROR");
+		assertThat(res.text("problem")).isEqualTo("BUSY");
+		assertThat(res.text("detail")).contains("busy");
 		String orderNumber = res.text("orderNumber");
 		assertThat(orderNumber).isNotBlank();
 		assertThat(latestAttempt(orderNumber).getStatus()).isEqualTo(PaymentStatus.ERROR);
@@ -209,6 +211,20 @@ class PaymentFlowIntegrationTest extends IntegrationTest {
 		assertThat(keys).hasSize(1);
 		assertThat(latestAttempt(orderNumber).getAttemptNo()).isEqualTo(1);
 		assertThat(latestAttempt(orderNumber).getStatus()).isEqualTo(PaymentStatus.PENDING);
+	}
+
+	@Test
+	void rejectedApiKey_buyerIsToldPlainly_notWithHttpCodes() {
+		BillPayFake.createFails(billPay, 401);
+		Res res = checkout(1);
+		assertThat(res.status()).isEqualTo(502);
+		assertThat(res.text("problem")).isEqualTo("KEY_REJECTED");
+		assertThat(res.text("detail")).contains("not available right now").doesNotContain("401");
+		String orderNumber = res.text("orderNumber");
+		assertThat(latestAttempt(orderNumber).getStatus()).isEqualTo(PaymentStatus.FAILED);
+		// the order page says why too, so the buyer is not left with "payment not started"
+		assertThat(get("/api/orders/" + orderNumber + "/status?phone=" + PHONE).body().path("payment").path("problem").asString())
+				.isEqualTo("KEY_REJECTED");
 	}
 
 	@Test

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronLeft, ExternalLink, Loader2, Mail, MapPin, Package, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
+import { Banknote, ChevronLeft, ExternalLink, Loader2, Mail, MapPin, Package, RefreshCw, RotateCcw, Truck, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { adminApi, EMAIL_KIND_LABEL, fulfilParcel, isAdmin, type Attempt, type OrderDetail, type ParcelRow } from '@/lib/admin-api'
+import { adminApi, cashReceived, EMAIL_KIND_LABEL, fulfilParcel, isAdmin, type Attempt, type OrderDetail, type ParcelRow } from '@/lib/admin-api'
 import { deliveryAdminApi } from '@/lib/delivery-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { JsonBlock, PageHeader, StatusBadge } from './shared'
@@ -122,6 +122,40 @@ function RiderPicker({ orderNumber, parcel }: { orderNumber: string; parcel: Par
   )
 }
 
+/**
+ * Cash on delivery: what the buyer pays at the door for one parcel, and "Cash received" for staff (Sodo Gebeya's own
+ * items, or a seller who forgot to tap it). Marks the parcel delivered and books the commission on the seller.
+ */
+function CashCollect({ orderNumber, parcel }: { orderNumber: string; parcel: ParcelRow }) {
+  const qc = useQueryClient()
+  const got = useMutation({
+    mutationFn: () => cashReceived(orderNumber, parcel.parcelNo),
+    onSuccess: (r) => {
+      toast.success(`${formatETB(r.collected)} cash recorded${r.commission > 0 ? `; ${formatETB(r.commission)} commission charged to the seller` : ''}${r.orderPaid ? '. The order is now paid.' : ''}`)
+      qc.invalidateQueries({ queryKey: ['admin-order', orderNumber] })
+      qc.invalidateQueries({ queryKey: ['admin-orders'] })
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  if (parcel.cashToCollect === null) return null
+  if (parcel.cashCollectedAt) {
+    return <p className="flex items-center gap-1.5 text-xs text-success"><Banknote className="size-3.5" /> Cash {formatETB(parcel.cashToCollect)} received {formatDate(parcel.cashCollectedAt)}</p>
+  }
+  if (parcel.fulfilmentStatus === 'CANCELLED') return null
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-market/50 bg-market/10 px-3 py-2 text-xs">
+      <Banknote className="size-4 shrink-0" />
+      <span>Cash on delivery: collect <b className="tabular-nums">{formatETB(parcel.cashToCollect)}</b></span>
+      {isAdmin() && (
+        <Button size="xs" className="ml-auto" disabled={got.isPending}
+          onClick={() => { if (window.confirm(`Record ${formatETB(parcel.cashToCollect ?? 0)} cash received for parcel ${parcel.number}? It is marked delivered and the seller is charged our commission.`)) got.mutate() }}>
+          {got.isPending ? <Loader2 className="animate-spin" /> : <Banknote />} Cash received
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /** Orders from several sellers: each seller's parcel with its own delivery steps. */
 function ParcelsCard({ data }: { data: OrderDetail }) {
   const qc = useQueryClient()
@@ -148,7 +182,8 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
       <CardContent className="space-y-4 text-sm">
         <p className="text-xs text-muted-foreground">Each seller delivers their own parcel. The order above follows the slowest parcel.</p>
         {data.parcels.map((p) => {
-          const steps = p.nextSteps.filter((s) => s !== 'CANCELLED')
+          // a cash parcel is delivered by recording the cash, so the money and the delivery never disagree
+          const steps = p.nextSteps.filter((s) => s !== 'CANCELLED' && !(s === 'DELIVERED' && p.cashToCollect !== null && !p.cashCollectedAt))
           return (
             <div key={p.number} className="space-y-2 rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -161,6 +196,7 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
               </p>
               {p.trackingNote && <p className="text-xs text-muted-foreground">Tracking: {p.trackingNote}</p>}
               <RiderPicker orderNumber={orderNumber} parcel={p} />
+              <CashCollect orderNumber={orderNumber} parcel={p} />
               {isAdmin() && (steps.length > 0 || p.nextSteps.includes('CANCELLED')) && (
                 <div className="space-y-2 pt-1">
                   {steps.includes('SHIPPED') && (
@@ -176,7 +212,7 @@ function ParcelsCard({ data }: { data: OrderDetail }) {
                     {p.nextSteps.includes('CANCELLED') && (
                       <Button size="xs" variant="ghost" className="text-destructive hover:text-destructive" disabled={step.isPending}
                         onClick={() => {
-                          const reason = window.prompt(`Cancel parcel ${p.number}? The buyer is refunded for it through BillPay. Why? (the buyer sees this)`)
+                          const reason = window.prompt(p.cashToCollect !== null ? `Cancel parcel ${p.number}? Nothing was paid, so there is no refund; the items go back on sale. Why? (the buyer sees this)` : `Cancel parcel ${p.number}? The buyer is refunded for it through BillPay. Why? (the buyer sees this)`)
                           if (reason?.trim()) step.mutate({ parcelNo: p.parcelNo, to: 'CANCELLED', reason: reason.trim() })
                         }}>
                         Cancel parcel
@@ -225,7 +261,9 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
     onError: (e) => toast.error(e.message),
   })
   const unpaid = data.order.status === 'PENDING_PAYMENT' || data.order.status === 'PAYMENT_FAILED'
-  const steps = d.nextSteps.filter((s) => s !== 'CANCELLED')
+  const cash = data.order.paymentMethod === 'CASH'
+  const cashOpen = cash && data.parcels.some((p) => p.cashToCollect !== null && !p.cashCollectedAt && p.fulfilmentStatus !== 'CANCELLED')
+  const steps = d.nextSteps.filter((s) => s !== 'CANCELLED' && !(s === 'DELIVERED' && cashOpen))
   const canCancelDelivery = d.nextSteps.includes('CANCELLED')
 
   return (
@@ -247,6 +285,8 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
         {d.area && <p className="pl-6 text-xs text-muted-foreground">Area: {d.area}</p>}
         {d.trackingNote && <p className="text-muted-foreground">Tracking: {d.trackingNote}</p>}
         {data.parcels.length === 1 && <RiderPicker orderNumber={data.order.orderNumber} parcel={data.parcels[0]} />}
+        {data.parcels.length === 1 && <CashCollect orderNumber={data.order.orderNumber} parcel={data.parcels[0]} />}
+        {cashOpen && data.parcels.length > 1 && <p className="flex items-center gap-1.5 text-xs"><Banknote className="size-3.5" /> Cash order: record each seller's cash under Parcels.</p>}
         {d.shippedAt && <p className="text-xs text-muted-foreground">Shipped {formatDate(d.shippedAt)}</p>}
         {d.deliveredAt && <p className="text-xs text-muted-foreground">Delivered {formatDate(d.deliveredAt)}</p>}
 
@@ -263,7 +303,7 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
               {canCancelDelivery && (
                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={fulfil.isPending}
                   onClick={() => {
-                    const reason = note.trim() || window.prompt('Cancel delivery? Every parcel not yet sent is refunded through BillPay. Why? (the buyer sees this)')?.trim()
+                    const reason = note.trim() || window.prompt(cash ? 'Cancel delivery? Nothing was paid, so there is no refund; the items go back on sale. Why? (the buyer sees this)' : 'Cancel delivery? Every parcel not yet sent is refunded through BillPay. Why? (the buyer sees this)')?.trim()
                     if (reason) fulfil.mutate({ to: 'CANCELLED', note: reason })
                   }}>
                   {STEP_LABEL.CANCELLED}
@@ -271,7 +311,7 @@ function DeliveryCard({ data }: { data: OrderDetail }) {
               )}
             </div>
             {data.parcels.length > 1 && <p className="text-xs text-muted-foreground">These buttons move every parcel that can take the step. To move one seller's parcel, use Parcels below.</p>}
-            {canCancelDelivery && <p className="text-xs text-muted-foreground">Cancelling refunds the buyer through BillPay for every parcel not yet sent. If BillPay refuses (for example its refund limit), nothing is cancelled.</p>}
+            {canCancelDelivery && !cash && <p className="text-xs text-muted-foreground">Cancelling refunds the buyer through BillPay for every parcel not yet sent. If BillPay refuses (for example its refund limit), nothing is cancelled.</p>}
           </div>
         )}
         {!d.fulfilmentStatus && !unpaid && data.order.status !== 'CANCELLED' && (

@@ -136,6 +136,29 @@ class CashOnDeliveryIntegrationTest extends IntegrationTest {
 	}
 
 	@Test
+	void staffRecordTheCash_fromTheAdminOrderPage() {
+		put("/api/admin/features/cash_on_delivery", Map.of("value", "true"), admin);
+		Seller s = seller(true);
+		String n = checkoutCash(s.productId()).text("orderNumber");
+
+		JsonNode d = get("/api/admin/orders/" + n, admin).body();
+		assertThat(d.path("order").path("paymentMethod").asString()).isEqualTo("CASH");
+		JsonNode parcel = d.path("parcels").get(0);
+		assertThat(parcel.path("cashToCollect").decimalValue()).isEqualByComparingTo("1150.00");
+		assertThat(parcel.path("cashCollectedAt").isNull()).isTrue();
+
+		JsonNode got = post("/api/admin/orders/" + n + "/parcels/1/cash-received", Map.of(), admin).body();
+		assertThat(got.path("collected").decimalValue()).isEqualByComparingTo("1150.00");
+		assertThat(got.path("orderPaid").asBoolean()).isTrue();
+		JsonNode after = get("/api/admin/orders/" + n, admin).body();
+		assertThat(after.path("order").path("status").asString()).isEqualTo("PAID");
+		assertThat(after.path("parcels").get(0).path("cashCollectedAt").isNull()).isFalse();
+		assertThat(after.path("parcels").get(0).path("fulfilmentStatus").asString()).isEqualTo("DELIVERED");
+		// a second click is refused, so cash is never counted twice
+		assertThat(post("/api/admin/orders/" + n + "/parcels/1/cash-received", Map.of(), admin).text("code")).isEqualTo("ALREADY_COLLECTED");
+	}
+
+	@Test
 	void cancellingACashOrder_refundsNothing_andPutsItemsBack() {
 		put("/api/admin/features/cash_on_delivery", Map.of("value", "true"), admin);
 		Seller s = seller(true);

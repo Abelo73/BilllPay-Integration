@@ -470,6 +470,16 @@ function describe(o: OrderStatusView, cancelled: boolean) {
       if (o.payment?.status === 'PENDING') {
         return { icon: Loader2, iconClass: 'animate-spin text-brand', tone: 'bg-accent', title: 'Confirming your payment…', text: tr('This usually takes a few seconds. You can keep this page open; it updates by itself.') }
       }
+      switch (o.payment?.problem) {
+        case 'UNREACHABLE':
+          return { icon: AlertTriangle, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'Couldn’t reach BillPay', text: tr('Check your internet connection, then try paying again. Your order is saved.') }
+        case 'BUSY':
+          return { icon: Clock, iconClass: 'text-warning', tone: 'bg-warning/10', title: 'BillPay is busy', text: tr('Please try paying again in a minute. Your order is saved.') }
+        case 'KEY_REJECTED':
+          return { icon: AlertTriangle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'Online payment is paused', text: tr('Online payment isn’t available right now. Your order is saved; please try again later or contact us.') }
+        case 'REFUSED':
+          return { icon: XCircle, iconClass: 'text-destructive', tone: 'bg-destructive/10', title: 'BillPay couldn’t accept this payment', text: tr('Please try again, or contact us if it keeps happening. Your order is saved.') }
+      }
       return { icon: Clock, iconClass: 'text-brand', tone: 'bg-accent', title: 'Payment not started', text: tr('We couldn’t open BillPay for this order yet. Please try again.') }
   }
 }

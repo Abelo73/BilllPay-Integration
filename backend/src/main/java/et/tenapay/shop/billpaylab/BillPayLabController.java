@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class BillPayLabController {
 
 	private final BillPayLabService lab;
+	private final BillPayScenarioService scenarios;
 	private final AppProperties app;
 
 	public record CreateRequest(@NotNull BillPayEnvironment environment, @NotNull BigDecimal amount,
@@ -54,6 +55,29 @@ public class BillPayLabController {
 	@PostMapping("/api/admin/billpay-lab/key-check")
 	public List<BillPayLabService.KeyCheck> keyCheck() {
 		return lab.checkKeys();
+	}
+
+	/** The latest scenario run: one sandbox payment per BillPay test case, each passed, failed or waiting. */
+	@GetMapping("/api/admin/billpay-lab/scenarios")
+	public BillPayScenarioService.Board scenarios() {
+		return scenarios.board();
+	}
+
+	@PostMapping("/api/admin/billpay-lab/scenarios")
+	public BillPayScenarioService.Board startScenarios() {
+		return scenarios.start(CurrentUser.get().map(CurrentUser::email).orElse(null));
+	}
+
+	/** Asks BillPay about every scenario payment still waiting. */
+	@PostMapping("/api/admin/billpay-lab/scenarios/check")
+	public BillPayScenarioService.Board checkScenarios() {
+		return scenarios.check();
+	}
+
+	/** After "Paid" passed: a refund BillPay should accept and one it should refuse (.13). */
+	@PostMapping("/api/admin/billpay-lab/scenarios/refunds")
+	public BillPayScenarioService.Board scenarioRefunds() {
+		return scenarios.refunds();
 	}
 
 	@GetMapping("/api/admin/billpay-lab/{id}")

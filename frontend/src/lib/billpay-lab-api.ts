@@ -79,7 +79,29 @@ export type LabStats = {
   outcomes: { environment: 'SANDBOX' | 'LIVE'; status: string; runs: number }[]
 }
 
-const json =(b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) })
+/** PASS / FAIL / WAITING (BillPay has not decided yet) / NOT_STARTED (BillPay never created the payment); null = not run */
+export type LabVerdict = 'PASS' | 'FAIL' | 'WAITING' | 'NOT_STARTED' | null
+
+export type LabScenarioRow = {
+  key: string
+  title: string
+  /** What to type on BillPay's sandbox checkout */
+  howTo: string
+  expected: string
+  runId: string | null
+  merchantReference: string | null
+  checkoutUrl: string | null
+  status: string | null
+  reasonCode: string | null
+  verdict: LabVerdict
+  note: string | null
+}
+
+export type LabRefundCheck = { key: string; title: string; amount: number; expected: string; httpStatus: number | null; verdict: LabVerdict; note: string | null }
+
+export type LabBoard = { batch: string | null; rows: LabScenarioRow[]; refunds: LabRefundCheck[]; passed: number; failed: number; waiting: number }
+
+const json = (b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) })
 
 export const labApi = {
   list: () => staffRequest<LabRun[]>('/billpay-lab'),
@@ -87,6 +109,10 @@ export const labApi = {
   create: (b: LabCreate) => staffRequest<LabDetail>('/billpay-lab', json(b)),
   refresh: (id: string) => staffRequest<LabDetail>(`/billpay-lab/${id}/refresh`, json({})),
   refund: (id: string, amount: number, reason?: string) => staffRequest<LabDetail>(`/billpay-lab/${id}/refund`, json({ amount, reason })),
+  scenarios: () => staffRequest<LabBoard>('/billpay-lab/scenarios'),
+  startScenarios: () => staffRequest<LabBoard>('/billpay-lab/scenarios', json({})),
+  checkScenarios: () => staffRequest<LabBoard>('/billpay-lab/scenarios/check', json({})),
+  scenarioRefunds: () => staffRequest<LabBoard>('/billpay-lab/scenarios/refunds', json({})),
   stats: () => staffRequest<LabStats>('/billpay-lab/stats'),
   checkKeys: () => staffRequest<LabKeyCheck[]>('/billpay-lab/key-check', json({})),
 }

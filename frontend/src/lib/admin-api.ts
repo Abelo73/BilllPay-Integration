@@ -123,6 +123,8 @@ export type OrderRow = {
   createdAt: string
   paidAt: string | null
   environment: BillPayEnv
+  /** CASH = paid to the seller at the door (cash on delivery) */
+  paymentMethod: 'BILLPAY' | 'CASH'
 }
 
 export type DeliveryDetail = {
@@ -271,7 +273,16 @@ export type ParcelRow = {
   /** Rider on this parcel (M21) */
   riderId: number | null
   riderName: string | null
+  /** Cash orders: what the buyer pays at the door for this parcel (null = paid online) */
+  cashToCollect: number | null
+  cashCollectedAt: string | null
 }
+
+export type CashCollected = { orderNumber: string; parcelNo: number; collected: number; commission: number; orderPaid: boolean }
+
+/** Staff record the cash for one parcel of a cash-on-delivery order (marks it delivered, books the commission). */
+export const cashReceived = (orderNumber: string, parcelNo: number) =>
+  request<CashCollected>(`/orders/${encodeURIComponent(orderNumber)}/parcels/${parcelNo}/cash-received`, { method: 'POST' })
 
 /** Moves one seller's parcel (staff can move any parcel). */
 export const fulfilParcel = (orderNumber: string, parcelNo: number, status: string, note?: string) =>

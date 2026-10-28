@@ -96,6 +96,54 @@ class BillPayLabIntegrationTest extends IntegrationTest {
 	}
 
 	@Test
+	void scenarioRunMarksEachBillPayCasePassedFailedOrWaiting() {
+		String admin = adminToken();
+		BillPayFake.acceptsEveryPayment(billPay);
+		JsonNode board = post("/api/admin/billpay-lab/scenarios", Map.of(), admin).body();
+		assertThat(board.path("rows").size()).isEqualTo(8);
+		Map<String, JsonNode> rows = new java.util.HashMap<>();
+		board.path("rows").forEach(r -> rows.put(r.path("key").asString(), r));
+		rows.values().forEach(r -> assertThat(r.path("verdict").asString()).as(r.toString()).isEqualTo("WAITING"));
+		assertThat(rows.get("INSUFFICIENT_FUNDS").path("howTo").asString()).contains("0000");
+
+		// refunds need the "Paid" case first
+		assertThat(post("/api/admin/billpay-lab/scenarios/refunds", Map.of(), admin).text("code")).isEqualTo("PAY_FIRST");
+
+		// what the tester did on BillPay's page: paid; typed …0000; and for "declines" paid by mistake
+		stubStatus(rows.get("PAID"), "CAPTURED", null);
+		stubStatus(rows.get("INSUFFICIENT_FUNDS"), "CREATED", "INSUFFICIENT_FUNDS");
+		stubStatus(rows.get("CUSTOMER_DECLINED"), "CAPTURED", null);
+		JsonNode checked = post("/api/admin/billpay-lab/scenarios/check", Map.of(), admin).body();
+		Map<String, String> verdicts = new java.util.HashMap<>();
+		checked.path("rows").forEach(r -> verdicts.put(r.path("key").asString(), r.path("verdict").asString()));
+		assertThat(verdicts).containsEntry("PAID", "PASS").containsEntry("INSUFFICIENT_FUNDS", "PASS")
+				.containsEntry("CUSTOMER_DECLINED", "FAIL").containsEntry("NO_ANSWER", "WAITING");
+		assertThat(checked.path("passed").asInt()).isEqualTo(2);
+		assertThat(checked.path("failed").asInt()).isEqualTo(1);
+
+		// refunds: 1.00 accepted, 1.13 refused (as the sandbox does)
+		BillPayFake.acceptsRefunds(billPay);
+		billPay.stubFor(com.github.tomakehurst.wiremock.client.WireMock.post(
+				com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/[^/]+/refunds")).atPriority(2)
+				.withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing("1.13"))
+				.willReturn(com.github.tomakehurst.wiremock.client.WireMock.aResponse().withStatus(422)
+						.withHeader("Content-Type", "application/json")
+						.withBody("{\"statusCode\":422,\"message\":\"REFUND_REFUSED\"}")));
+		JsonNode refunds = post("/api/admin/billpay-lab/scenarios/refunds", Map.of(), admin).body().path("refunds");
+		Map<String, String> refundVerdicts = new java.util.HashMap<>();
+		refunds.forEach(r -> refundVerdicts.put(r.path("key").asString(), r.path("verdict").asString()));
+		assertThat(refundVerdicts).containsEntry("REFUND_OK", "PASS").containsEntry("REFUND_REFUSED", "PASS");
+
+		// reading the board is open to staff, starting a run is admin-only
+		assertThat(post("/api/admin/billpay-lab/scenarios", Map.of(), shopperToken()).status()).isIn(401, 403);
+	}
+
+	private static void stubStatus(JsonNode row, String status, String failureCode) {
+		String ref = row.path("merchantReference").asString();
+		BillPayFake.paymentStatus(billPay, "pay-" + ref, ref, new BigDecimal("25.00"), status, failureCode);
+	}
+
+	@Test
 	void livePaymentsNeedAConfirmAndStayUnderTheCap() {
 		String admin = adminToken();
 		Res noConfirm = post("/api/admin/billpay-lab", Map.of("environment", "LIVE", "amount", 5), admin);

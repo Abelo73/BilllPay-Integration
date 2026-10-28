@@ -61,8 +61,8 @@ public class PaymentService {
 			metrics.paymentRequested("error");
 			tx.executeWithoutResult(s -> recordCreateFailure(attempt.getId(),
 					new BillPayException(502, response.raw(), "No checkout URL in BillPay response", null)));
-			throw new ApiException(HttpStatus.BAD_GATEWAY, "PAYMENT_PROVIDER_ERROR",
-					"The payment provider returned an unexpected response.");
+			// handled like any other BillPay failure (the buyer is told BillPay is busy, the order is kept)
+			throw new BillPayException(502, response.raw(), "No checkout URL in BillPay response", null);
 		}
 		metrics.paymentRequested("created");
 		tx.executeWithoutResult(s -> recordCreated(attempt.getId(), response));
