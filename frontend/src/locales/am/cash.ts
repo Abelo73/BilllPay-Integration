@@ -24,7 +24,6 @@ export const cash: Record<string, string> = {
     'እናመሰግናለን {name}! ሻጩ ትዕዛዝዎን እያዘጋጀ ነው። ሲደርስ ወይም ሲወስዱ {amount} በጥሬ ገንዘብ ይክፈሉ።',
   'Cancelled. Nothing was charged.': 'ተሰርዟል። ምንም አልተከፈለም።',
   'Cancel the items from {seller}': 'ከ{seller} ያሉትን ዕቃዎች ሰርዝ',
-  'Cancel this order': 'ይህን ትዕዛዝ ሰርዝ',
   'Cancel this cash order?': 'ይህን በጥሬ ገንዘብ የሚከፈል ትዕዛዝ ይሰርዙ?',
   'You can cancel until the seller starts packing. You pay nothing.': 'ሻጩ ማሸግ እስኪጀምር ድረስ መሰረዝ ይችላሉ። ምንም አይከፍሉም።',
   'Yes, cancel': 'አዎ፣ ሰርዝ',

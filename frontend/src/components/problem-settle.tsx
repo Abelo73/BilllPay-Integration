@@ -119,7 +119,7 @@ function SellerRefund({ p, onChange }: { p: Problem; onChange: (p: Problem) => v
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={refund.isPending || !partOk}>
-              {refund.isPending && <Loader2 className="animate-spin" />} {mode === 'part' ? t('Send offer') : t('Refund now')}
+              {refund.isPending && <Loader2 className="animate-spin" />} {mode === 'part' ? t('Send refund offer') : t('Refund now')}
             </Button>
             <Button type="button" variant="ghost" onClick={() => setMode('none')}>{t('Cancel')}</Button>
           </div>

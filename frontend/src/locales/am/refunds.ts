@@ -23,7 +23,6 @@ export const refunds: Record<string, string> = {
   'Why? (the buyer sees this)': 'ለምን? (ገዢው ያየዋል)',
   'e.g. Sold out in the shop': 'ለምሳሌ፦ በሱቁ ውስጥ አልቋል',
   'Cancel and refund': 'ሰርዝና ገንዘቡን መልስ',
-  'Keep it': 'ይቆይ',
   'Cancelled. The buyer gets {amount} back and was told why.': 'ተሰርዟል። ገዢው {amount} ይመለስለታል፤ ምክንያቱም ተነግሮታል።',
 
   // seller: settle a problem
@@ -39,7 +38,7 @@ export const refunds: Record<string, string> = {
   'The buyer gets {amount} back now through BillPay and you are not paid for this order.':
     'ገዢው አሁን {amount} በBillPay በኩል ይመለስለታል፤ ለዚህ ትዕዛዝ አይከፈልዎትም።',
   'Message to the buyer (optional)': 'ለገዢው መልዕክት (አማራጭ)',
-  'Send offer': 'አቅርቦቱን ላክ',
+  'Send refund offer': 'የተመላሽ አቅርቦቱን ላክ',
   'Refund now': 'አሁን መልስ',
   'Offer sent. The buyer accepts or declines.': 'አቅርቦቱ ተልኳል። ገዢው ይቀበላል ወይም ይመልሳል።',
   'Refunded in full. The buyer has been told.': 'ሙሉው ገንዘብ ተመልሷል። ለገዢው ተነግሯል።',
@@ -52,7 +51,6 @@ export const refunds: Record<string, string> = {
   'Accept and the money goes back to you through BillPay; the seller is paid the rest. Decline and Sodo Gebeya decides.':
     'ከተቀበሉ ገንዘቡ በBillPay በኩል ይመለስልዎታል፤ ሻጩ ቀሪውን ይከፈለዋል። ካልተቀበሉ ሶዶ ገበያ ይወስናል።',
   'Accept {amount}': '{amount} ተቀበል',
-  'Decline': 'አልቀበልም',
   'Accepted: {amount} is on its way back to you.': 'ተቀብለዋል፦ {amount} ወደ እርስዎ እየተመለሰ ነው።',
   'Declined. Sodo Gebeya will decide.': 'አልተቀበሉም። ሶዶ ገበያ ይወስናል።',
 }
