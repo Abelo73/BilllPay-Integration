@@ -26,6 +26,7 @@ import et.tenapay.shop.payment.billpay.BillPayClient;
 import et.tenapay.shop.payment.billpay.BillPayEnvironment;
 import et.tenapay.shop.payment.billpay.BillPayException;
 import et.tenapay.shop.payment.billpay.BillPayPayment;
+import et.tenapay.shop.payment.billpay.BillPayProperties;
 import et.tenapay.shop.payment.billpay.BillPayRefund;
 import et.tenapay.shop.webhook.WebhookEvent;
 import et.tenapay.shop.webhook.WebhookEventRepository;
@@ -42,12 +43,15 @@ public class BillPayLabService {
 	static final BigDecimal MAX_LIVE_AMOUNT = new BigDecimal("1000.00");
 	private static final DateTimeFormatter REF_TIME = DateTimeFormatter.ofPattern("yyMMdd-HHmmss").withZone(ZoneId.of("Africa/Addis_Ababa"));
 	private static final Pattern STATUS_CODE = Pattern.compile("\"statusCode\"\\s*:\\s*(\\d{3})");
+	/** A payment id that cannot exist, used only to test the API key. */
+	static final String KEY_CHECK_PAYMENT_ID = "00000000-0000-0000-0000-000000000000";
 	static final Pattern REFERENCE = Pattern.compile("^LAB-\\d{6}-\\d{6}-[A-Z0-9]{4}$");
 
 	private final BillPayClient billPay;
 	private final JdbcTemplate jdbc;
 	private final AppProperties app;
 	private final WebhookEventRepository webhooks;
+	private final BillPayProperties billPayProps;
 
 	public record Call(long id, String operation, Integer httpStatus, int durationMs, String request, String response,
 			String error, Instant at) {
@@ -129,6 +133,97 @@ public class BillPayLabService {
 		record(id, "create_refund", body, () -> billPay.createRefund(env, run.billpayPaymentId(), body, UUID.randomUUID()),
 				BillPayRefund::raw);
 		return detail(id);
+	}
+
+	/** One environment's key check: does BillPay accept our API key, and how fast does it answer? */
+	public record KeyCheck(String environment, boolean configured, String verdict, Integer httpStatus, Integer durationMs,
+			String message) {
+	}
+
+	/**
+	 * Asks BillPay, in each environment, for a payment that does not exist. "Not found" means the key was accepted;
+	 * 401/403 means BillPay rejected the key. Nothing is created and nothing is kept.
+	 */
+	public List<KeyCheck> checkKeys() {
+		List<KeyCheck> out = new ArrayList<>();
+		for (BillPayEnvironment env : BillPayEnvironment.values()) {
+			if (!billPayProps.credentials(env).hasApiKey()) {
+				out.add(new KeyCheck(env.name(), false, "NOT_SET", null, null,
+						"BILLPAY_" + env.name() + "_API_KEY is empty in .env."));
+				continue;
+			}
+			long started = System.nanoTime();
+			String verdict;
+			Integer status;
+			String message;
+			try {
+				billPay.getPayment(env, KEY_CHECK_PAYMENT_ID);
+				verdict = "OK";
+				status = 200;
+				message = "Key accepted.";
+			} catch (BillPayException e) {
+				status = e.isNetworkError() ? null : e.getHttpStatus();
+				verdict = keyVerdict(status);
+				message = switch (verdict) {
+					case "OK" -> "Key accepted (BillPay answered " + status + " for a made-up payment, as expected).";
+					case "KEY_REJECTED" -> "BillPay rejected the key. Copy a fresh key into .env and restart.";
+					case "UNREACHABLE" -> "No answer from BillPay: " + cut(e.getMessage(), 200);
+					default -> "BillPay answered HTTP " + status + ": " + cut(e.getResponseBody(), 200);
+				};
+			} catch (RuntimeException e) {
+				status = null;
+				verdict = "UNEXPECTED";
+				message = cut(e.getClass().getSimpleName() + ": " + e.getMessage(), 200);
+			}
+			out.add(new KeyCheck(env.name(), true, verdict, status, (int) ((System.nanoTime() - started) / 1_000_000), message));
+		}
+		return out;
+	}
+
+	static String keyVerdict(Integer status) {
+		if (status == null || status == 0) {
+			return "UNREACHABLE";
+		}
+		if (status == 401 || status == 403) {
+			return "KEY_REJECTED";
+		}
+		if (status < 300 || status == 400 || status == 404 || status == 422) {
+			return "OK";
+		}
+		return "BILLPAY_ERROR";
+	}
+
+	/** How fast and how reliable each BillPay call has been, per environment and operation. */
+	public record OpStats(String environment, String operation, int calls, int ok, int failed, int noAnswer, int avgMs,
+			int p95Ms, int maxMs) {
+	}
+
+	public record StatusCount(String environment, String status, int runs) {
+	}
+
+	public record Stats(List<OpStats> operations, List<StatusCount> outcomes) {
+	}
+
+	public Stats stats() {
+		List<OpStats> ops = jdbc.query("""
+				select r.environment, c.operation, count(*) calls,
+				       count(*) filter (where c.http_status < 300) ok,
+				       count(*) filter (where c.http_status >= 300) failed,
+				       count(*) filter (where c.http_status is null) no_answer,
+				       coalesce(round(avg(c.duration_ms)), 0) avg_ms,
+				       coalesce(round(percentile_cont(0.95) within group (order by c.duration_ms)), 0) p95_ms,
+				       coalesce(max(c.duration_ms), 0) max_ms
+				from billpay_lab_calls c join billpay_lab_runs r on r.id = c.run_id
+				group by r.environment, c.operation
+				order by r.environment, c.operation""",
+				(rs, i) -> new OpStats(rs.getString("environment"), rs.getString("operation"), rs.getInt("calls"), rs.getInt("ok"),
+						rs.getInt("failed"), rs.getInt("no_answer"), rs.getInt("avg_ms"), rs.getInt("p95_ms"), rs.getInt("max_ms")));
+		List<StatusCount> outcomes = jdbc.query("""
+				select environment, coalesce(status, 'NEW') status, count(*) runs
+				from billpay_lab_runs group by environment, coalesce(status, 'NEW')
+				order by environment, runs desc""",
+				(rs, i) -> new StatusCount(rs.getString("environment"), rs.getString("status"), rs.getInt("runs")));
+		return new Stats(ops, outcomes);
 	}
 
 	public List<Run> recent() {

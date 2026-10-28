@@ -58,6 +58,44 @@ class BillPayLabIntegrationTest extends IntegrationTest {
 	}
 
 	@Test
+	void keyCheckTellsAcceptedFromRejectedAndStatsCountTheCalls() {
+		String admin = adminToken();
+		// a made-up payment: BillPay says "not found" when it accepts the key
+		billPay.stubFor(com.github.tomakehurst.wiremock.client.WireMock.get(
+				com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/00000000-0000-0000-0000-000000000000"))
+				.withHeader("x-api-key", com.github.tomakehurst.wiremock.client.WireMock.equalTo("test-api-key"))
+				.willReturn(com.github.tomakehurst.wiremock.client.WireMock.aResponse().withStatus(404)
+						.withHeader("Content-Type", "application/json").withBody("{\"statusCode\":404,\"message\":\"Payment not found\"}")));
+		billPay.stubFor(com.github.tomakehurst.wiremock.client.WireMock.get(
+				com.github.tomakehurst.wiremock.client.WireMock.urlMatching(".*/payments/00000000-0000-0000-0000-000000000000"))
+				.withHeader("x-api-key", com.github.tomakehurst.wiremock.client.WireMock.equalTo(LIVE_API_KEY))
+				.willReturn(com.github.tomakehurst.wiremock.client.WireMock.aResponse().withStatus(401)
+						.withHeader("Content-Type", "application/json").withBody("{\"statusCode\":401,\"message\":\"Invalid API key\"}")));
+
+		Res checked = post("/api/admin/billpay-lab/key-check", Map.of(), admin);
+		assertThat(checked.status()).as(checked.raw()).isEqualTo(200);
+		Map<String, String> verdicts = new java.util.HashMap<>();
+		checked.body().forEach(k -> verdicts.put(k.path("environment").asString(), k.path("verdict").asString()));
+		assertThat(verdicts).containsEntry("SANDBOX", "OK").containsEntry("LIVE", "KEY_REJECTED");
+		// only admins may call BillPay from the lab
+		assertThat(post("/api/admin/billpay-lab/key-check", Map.of(), shopperToken()).status()).isIn(401, 403);
+
+		BillPayFake.acceptsPayments(billPay, UUID.randomUUID().toString());
+		post("/api/admin/billpay-lab", Map.of("environment", "SANDBOX", "amount", 12), admin);
+		JsonNode stats = get("/api/admin/billpay-lab/stats", admin).body();
+		JsonNode create = null;
+		for (JsonNode op : stats.path("operations")) {
+			if (op.path("environment").asString().equals("SANDBOX") && op.path("operation").asString().equals("create_payment")) {
+				create = op;
+			}
+		}
+		assertThat(create).isNotNull();
+		assertThat(create.path("calls").asInt()).isGreaterThanOrEqualTo(1);
+		assertThat(create.path("ok").asInt()).isGreaterThanOrEqualTo(1);
+		assertThat(stats.path("outcomes").size()).isGreaterThanOrEqualTo(1);
+	}
+
+	@Test
 	void livePaymentsNeedAConfirmAndStayUnderTheCap() {
 		String admin = adminToken();
 		Res noConfirm = post("/api/admin/billpay-lab", Map.of("environment", "LIVE", "amount", 5), admin);

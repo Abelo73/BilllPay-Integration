@@ -52,7 +52,34 @@ export type LabCreate = {
   confirmLive?: boolean
 }
 
-const json = (b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) })
+/** OK = key accepted; KEY_REJECTED = 401/403; NOT_SET = empty in .env; UNREACHABLE = no answer */
+export type LabKeyCheck = {
+  environment: 'SANDBOX' | 'LIVE'
+  configured: boolean
+  verdict: 'OK' | 'KEY_REJECTED' | 'NOT_SET' | 'UNREACHABLE' | 'BILLPAY_ERROR' | 'UNEXPECTED'
+  httpStatus: number | null
+  durationMs: number | null
+  message: string
+}
+
+export type LabOpStats = {
+  environment: 'SANDBOX' | 'LIVE'
+  operation: string
+  calls: number
+  ok: number
+  failed: number
+  noAnswer: number
+  avgMs: number
+  p95Ms: number
+  maxMs: number
+}
+
+export type LabStats = {
+  operations: LabOpStats[]
+  outcomes: { environment: 'SANDBOX' | 'LIVE'; status: string; runs: number }[]
+}
+
+const json =(b: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(b) })
 
 export const labApi = {
   list: () => staffRequest<LabRun[]>('/billpay-lab'),
@@ -60,4 +87,6 @@ export const labApi = {
   create: (b: LabCreate) => staffRequest<LabDetail>('/billpay-lab', json(b)),
   refresh: (id: string) => staffRequest<LabDetail>(`/billpay-lab/${id}/refresh`, json({})),
   refund: (id: string, amount: number, reason?: string) => staffRequest<LabDetail>(`/billpay-lab/${id}/refund`, json({ amount, reason })),
+  stats: () => staffRequest<LabStats>('/billpay-lab/stats'),
+  checkKeys: () => staffRequest<LabKeyCheck[]>('/billpay-lab/key-check', json({})),
 }

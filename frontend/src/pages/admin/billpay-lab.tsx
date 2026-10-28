@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, FlaskConical, Loader2, RefreshCw, RotateCcw, ShieldAlert, Webhook } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Download, ExternalLink, FlaskConical, Gauge, KeyRound, Loader2, RefreshCw, RotateCcw, ShieldAlert, Webhook } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { isAdmin } from '@/lib/admin-api'
-import { labApi, type LabCall, type LabCreate, type LabDetail, type LabRun } from '@/lib/billpay-lab-api'
+import { labApi, type LabCall, type LabCreate, type LabDetail, type LabKeyCheck, type LabRun } from '@/lib/billpay-lab-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { JsonBlock, PageHeader } from './shared'
@@ -36,6 +36,32 @@ function statusTone(s: string | null) {
   if (/FAIL|REFUSED|DECLINED|EXPIRED|CANCEL/.test(v)) return 'bg-destructive/15 text-destructive'
   return 'bg-muted text-muted-foreground'
 }
+
+/** BillPay has made up its mind: no point asking again. */
+function isFinal(s: string | null) {
+  return /CAPTURED|SUCCEEDED|PAID|COMPLETED|FAIL|REFUSED|DECLINED|EXPIRED|CANCEL|REFUND/.test((s ?? '').toUpperCase())
+}
+
+/** Sum of the refunds BillPay accepted (2xx), read from what we sent. */
+function refundedSoFar(calls: LabCall[]) {
+  return calls
+    .filter((c) => c.operation === 'create_refund' && c.httpStatus !== null && c.httpStatus < 300 && c.request)
+    .reduce((sum, c) => { try { return sum + Number(JSON.parse(c.request!).amount ?? 0) } catch { return sum } }, 0)
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+function download(name: string, data: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+const AUTO_EVERY_MS = 15_000
+const AUTO_MAX_CHECKS = 40 // 10 minutes: long enough for the "paid after two minutes" scenario
 
 function CallRow({ c }: { c: LabCall }) {
   const [open, setOpen] = useState(false)
@@ -67,15 +93,37 @@ function RunPanel({ id }: { id: string }) {
   const { data, isLoading } = useQuery({ queryKey: ['lab-run', id], queryFn: () => labApi.detail(id), refetchInterval: 5_000 })
   const [refundAmount, setRefundAmount] = useState('')
   const [reason, setReason] = useState('')
+  const [auto, setAuto] = useState(true)
+  const [autoChecks, setAutoChecks] = useState(0)
+  const autoBusy = useRef(false)
   const done = (d: LabDetail) => { qc.setQueryData(['lab-run', id], d); qc.invalidateQueries({ queryKey: ['lab-runs'] }) }
   const refresh = useMutation({ mutationFn: () => labApi.refresh(id), onSuccess: (d) => { done(d); toast.success(`BillPay says: ${d.run.status ?? 'no status'}`) }, onError: (e) => toast.error(e.message) })
   const refund = useMutation({
-    mutationFn: () => labApi.refund(id, Number(refundAmount || data?.run.amount), reason || undefined),
+    mutationFn: () => labApi.refund(id, Number(refundAmount) || round2((data?.run.amount ?? 0) - refundedSoFar(data?.calls ?? [])), reason || undefined),
     onSuccess: (d) => { done(d); const last = d.calls[d.calls.length - 1]; toast[last?.httpStatus && last.httpStatus < 300 ? 'success' : 'error'](`Refund: HTTP ${last?.httpStatus ?? 'no answer'}`) },
     onError: (e) => toast.error(e.message),
   })
+  const pending = !!data?.run.billpayPaymentId && !isFinal(data.run.status)
+  const autoOn = auto && pending && autoChecks < AUTO_MAX_CHECKS
+  // while BillPay hasn't settled, ask it for the status now and then (webhooks alone don't change the status here)
+  useEffect(() => {
+    if (!autoOn) return
+    const t = setInterval(() => {
+      if (autoBusy.current) return
+      autoBusy.current = true
+      labApi.refresh(id)
+        .then((d) => done(d))
+        .catch(() => undefined)
+        .finally(() => { autoBusy.current = false; setAutoChecks((n) => n + 1) })
+    }, AUTO_EVERY_MS)
+    return () => clearInterval(t)
+  }, [autoOn, id]) // eslint-disable-line react-hooks/exhaustive-deps
   if (isLoading || !data) return <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Loading…</CardContent></Card>
   const r = data.run
+  const refunded = refundedSoFar(data.calls)
+  const left = Math.max(0, round2(r.amount - refunded))
+  const presets: [string, number][] = [['All that is left', left], ['Half', round2(left / 2)]]
+  if (r.environment === 'SANDBOX') presets.push(['Refused (.13)', Math.max(0, Math.floor(r.amount) - 1) + 0.13])
   return (
     <Card>
       <CardHeader className="space-y-2">
@@ -98,7 +146,18 @@ function RunPanel({ id }: { id: string }) {
               {refresh.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Check status at BillPay
             </Button>
           )}
+          <Button size="sm" variant="ghost" onClick={() => download(`${r.merchantReference}.json`, data)}>
+            <Download /> Export JSON
+          </Button>
         </div>
+        {pending && (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); setAutoChecks(0) }} />
+            {autoOn
+              ? <span className="flex items-center gap-1"><Loader2 className="size-3 animate-spin" /> Asking BillPay every 15 s until it settles ({autoChecks}/{AUTO_MAX_CHECKS})</span>
+              : autoChecks >= AUTO_MAX_CHECKS ? 'Stopped asking after 10 minutes. Tick to keep going.' : 'Ask BillPay for the status every 15 s'}
+          </label>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         <section className="space-y-2">
@@ -133,8 +192,19 @@ function RunPanel({ id }: { id: string }) {
           <section className="space-y-2 rounded-lg border p-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold"><RotateCcw className="size-4" /> Refund</h3>
             <p className="text-xs text-muted-foreground">Sends {'{"amount", "reason"}'} to BillPay. In the sandbox, an amount ending in .13 is refused.</p>
+            <p className="text-xs">
+              Refunded so far <b className="tabular-nums">{formatETB(refunded)}</b> · left <b className="tabular-nums">{formatETB(left)}</b>
+              {refunded > 0 && left === 0 && <span className="text-muted-foreground"> · asking for more shows how BillPay answers an over-refund</span>}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {presets.map(([label, v]) => (
+                <Button key={label} type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setRefundAmount(v.toFixed(2))}>
+                  {label}: {v.toFixed(2)}
+                </Button>
+              ))}
+            </div>
             <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); refund.mutate() }}>
-              <Input className="w-32" inputMode="decimal" placeholder={String(r.amount)} aria-label="Refund amount" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
+              <Input className="w-32" inputMode="decimal" placeholder={left.toFixed(2)} aria-label="Refund amount" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
               <Input className="min-w-40 flex-1" placeholder="Reason (optional)" aria-label="Refund reason" value={reason} onChange={(e) => setReason(e.target.value)} />
               <Button type="submit" variant={r.environment === 'LIVE' ? 'destructive' : 'default'} disabled={refund.isPending}>
                 {refund.isPending && <Loader2 className="animate-spin" />} Refund {r.environment === 'LIVE' && '(real money)'}
@@ -142,6 +212,100 @@ function RunPanel({ id }: { id: string }) {
             </form>
           </section>
         )}
+      </CardContent>
+    </Card>
+  )
+}
+
+const VERDICT: Record<LabKeyCheck['verdict'], [string, string]> = {
+  OK: ['Key accepted', 'border-success/40 text-success'],
+  KEY_REJECTED: ['Key rejected', 'border-destructive/40 text-destructive'],
+  NOT_SET: ['Not set', 'text-muted-foreground'],
+  UNREACHABLE: ['No answer', 'border-destructive/40 text-destructive'],
+  BILLPAY_ERROR: ['BillPay error', 'border-destructive/40 text-destructive'],
+  UNEXPECTED: ['Unexpected', 'border-destructive/40 text-destructive'],
+}
+
+/** Does BillPay accept our keys? Asks for a payment that cannot exist: "not found" = key OK, 401 = key wrong. */
+function KeyCheckCard() {
+  const check = useMutation({ mutationFn: labApi.checkKeys, onError: (e) => toast.error(e.message) })
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
+        <div className="space-y-1">
+          <CardTitle className="flex items-center gap-2 text-base"><KeyRound className="size-4" /> API keys</CardTitle>
+          <CardDescription>Checks both keys from .env with BillPay. Creates nothing.</CardDescription>
+        </div>
+        <Button size="sm" variant="outline" disabled={check.isPending} onClick={() => check.mutate()}>
+          {check.isPending && <Loader2 className="animate-spin" />} Check keys
+        </Button>
+      </CardHeader>
+      {check.data && (
+        <CardContent className="space-y-2">
+          {check.data.map((k) => (
+            <div key={k.environment} className="space-y-0.5 rounded-lg border px-3 py-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">{k.environment === 'LIVE' ? 'Live' : 'Sandbox'}</span>
+                <Badge variant="outline" className={VERDICT[k.verdict][1]}>{VERDICT[k.verdict][0]}</Badge>
+                {k.httpStatus !== null && <span className="font-mono text-xs text-muted-foreground">HTTP {k.httpStatus}</span>}
+                {k.durationMs !== null && <span className="ml-auto text-xs text-muted-foreground">{k.durationMs} ms</span>}
+              </div>
+              <p className="text-xs text-muted-foreground">{k.message}</p>
+            </div>
+          ))}
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+/** Speed and reliability of every BillPay call the lab has made. */
+function StatsCard() {
+  const { data } = useQuery({ queryKey: ['lab-stats'], queryFn: labApi.stats, refetchInterval: 30_000 })
+  if (!data || data.operations.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><Gauge className="size-4" /> How BillPay has been doing</CardTitle>
+        <CardDescription>Every lab call so far. p95: 95 of 100 calls were at least this fast.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 px-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground">
+              <tr className="border-b">
+                <th className="px-4 py-1.5 text-left font-medium">Call</th>
+                <th className="px-2 py-1.5 text-right font-medium">OK</th>
+                <th className="px-2 py-1.5 text-right font-medium">Failed</th>
+                <th className="px-2 py-1.5 text-right font-medium">Avg</th>
+                <th className="px-4 py-1.5 text-right font-medium">p95</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y tabular-nums">
+              {data.operations.map((o) => (
+                <tr key={o.environment + o.operation}>
+                  <td className="px-4 py-1.5">
+                    {OP_LABEL[o.operation] ?? o.operation}
+                    {o.environment === 'LIVE' && <Badge variant="outline" className="ml-1.5 border-destructive/40 text-destructive">LIVE</Badge>}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">{o.ok}/{o.calls}</td>
+                  <td className={cn('px-2 py-1.5 text-right', o.failed + o.noAnswer > 0 && 'text-destructive')}>
+                    {o.failed}{o.noAnswer > 0 && ` +${o.noAnswer} no answer`}
+                  </td>
+                  <td className="px-2 py-1.5 text-right">{o.avgMs} ms</td>
+                  <td className="px-4 py-1.5 text-right" title={`slowest ${o.maxMs} ms`}>{o.p95Ms} ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex flex-wrap gap-1.5 px-4">
+          {data.outcomes.map((o) => (
+            <Badge key={o.environment + o.status} variant="outline" className={statusTone(o.status)}>
+              {o.environment === 'LIVE' && 'LIVE '}{o.status} · {o.runs}
+            </Badge>
+          ))}
+        </div>
       </CardContent>
     </Card>
   )
@@ -210,6 +374,7 @@ function CreateForm({ onCreated }: { onCreated: (d: LabDetail) => void }) {
 export function AdminBillPayLabPage() {
   const [params, setParams] = useSearchParams()
   const [selected, setSelected] = useState<string | null>(null)
+  const [envFilter, setEnvFilter] = useState<'ALL' | 'SANDBOX' | 'LIVE'>('ALL')
   const runs = useQuery({ queryKey: ['lab-runs'], queryFn: labApi.list, refetchInterval: 10_000 })
   // coming back from BillPay's checkout: ?run=LAB-… opens that payment
   const fromRef = params.get('run')
@@ -222,6 +387,7 @@ export function AdminBillPayLabPage() {
     }
   }, [fromRef, runs.data, setParams])
   const current = selected ?? runs.data?.[0]?.id ?? null
+  const shown = runs.data?.filter((r) => envFilter === 'ALL' || r.environment === envFilter)
   return (
     <>
       <PageHeader title="BillPay lab" description="Make test payments straight against BillPay, then watch every API call, its timing, the webhooks and refunds." />
@@ -231,11 +397,22 @@ export function AdminBillPayLabPage() {
           {current && <RunPanel key={current} id={current} />}
         </div>
         <div className="space-y-6">
+          {isAdmin() && <KeyCheckCard />}
           <Card>
-            <CardHeader><CardTitle className="text-base">Recent test payments</CardTitle></CardHeader>
+            <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
+              <CardTitle className="text-base">Recent test payments</CardTitle>
+              <div className="flex gap-1" role="radiogroup" aria-label="Show">
+                {(['ALL', 'SANDBOX', 'LIVE'] as const).map((f) => (
+                  <Button key={f} type="button" size="sm" className="h-7 px-2 text-xs" role="radio" aria-checked={envFilter === f}
+                    variant={envFilter === f ? 'secondary' : 'ghost'} onClick={() => setEnvFilter(f)}>
+                    {f === 'ALL' ? 'All' : f === 'SANDBOX' ? 'Sandbox' : 'Live'}
+                  </Button>
+                ))}
+              </div>
+            </CardHeader>
             <CardContent className="divide-y p-0">
-              {runs.data?.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">None yet.</p>}
-              {runs.data?.map((r) => (
+              {shown?.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">None yet.</p>}
+              {shown?.map((r) => (
                 <button key={r.id} type="button" onClick={() => setSelected(r.id)}
                   className={cn('flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm hover:bg-muted/50', r.id === current && 'bg-accent/50')}>
                   <span className="font-mono text-xs">{r.merchantReference}</span>
@@ -260,6 +437,7 @@ export function AdminBillPayLabPage() {
               ))}
             </CardContent>
           </Card>
+          <StatsCard />
         </div>
       </div>
     </>

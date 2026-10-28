@@ -44,6 +44,18 @@ public class BillPayLabController {
 		return lab.recent();
 	}
 
+	/** Call counts and timings per environment and operation, and how lab payments ended. */
+	@GetMapping("/api/admin/billpay-lab/stats")
+	public BillPayLabService.Stats stats() {
+		return lab.stats();
+	}
+
+	/** Does BillPay accept our sandbox and live API keys? Creates nothing (admin only, like every lab POST). */
+	@PostMapping("/api/admin/billpay-lab/key-check")
+	public List<BillPayLabService.KeyCheck> keyCheck() {
+		return lab.checkKeys();
+	}
+
 	@GetMapping("/api/admin/billpay-lab/{id}")
 	public BillPayLabService.RunDetail detail(@PathVariable UUID id) {
 		return lab.detail(id);
