@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { ProductCard } from '@/components/product-card'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { promoApi, type Banner } from '@/lib/promo-api'
 
 /** Home page banners (M17), managed in Admin → Banners. Clicks are counted. */
@@ -22,7 +23,9 @@ export function HomeBanners() {
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
         {data.map((b) => (
           <button key={b.id} type="button" onClick={() => open(b)}
-            className="group relative aspect-[3/1] w-[88%] shrink-0 snap-start overflow-hidden rounded-3xl bg-primary text-left text-primary-foreground sm:w-[70%] lg:w-[48%]">
+            className={cn('group relative shrink-0 snap-start overflow-hidden rounded-3xl bg-primary text-left text-primary-foreground',
+              // one banner fills the row; several scroll side by side
+              data.length === 1 ? 'aspect-[5/2] w-full sm:aspect-[4/1]' : 'aspect-[3/1] w-[88%] sm:w-[70%] lg:w-[48%]')}>
             {b.imageUrl && <img src={b.imageUrl} alt="" className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]" />}
             <span className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
             <span className="relative flex h-full flex-col justify-end gap-1 p-5 sm:p-7">

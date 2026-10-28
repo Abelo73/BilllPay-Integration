@@ -85,11 +85,53 @@ function Reveal({ children, className, delay = 0 }: { children: ReactNode; class
   )
 }
 
+/** Section label: a small pill with a dot. */
 function Eyebrow({ children, light = false }: { children: ReactNode; light?: boolean }) {
   return (
-    <p className={cn('text-xs font-bold uppercase tracking-[0.18em]', light ? 'text-[#F2C77E]' : 'text-market-deep dark:text-market')}>
+    <p
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em]',
+        light ? 'border-white/20 bg-white/10 text-[#F2C77E]' : 'border-market/30 bg-amber-soft/70 text-market-deep dark:bg-market/10 dark:text-market',
+      )}
+    >
+      <span className={cn('size-1.5 rounded-full', light ? 'bg-[#F2C77E]' : 'bg-market')} />
       {children}
     </p>
+  )
+}
+
+/** Soft moving glow behind a section (Sodo green and market amber). The section needs `relative isolate overflow-hidden`. */
+function Aurora({ dark = false }: { dark?: boolean }) {
+  return (
+    <div className="aurora" aria-hidden>
+      <span className={cn('-left-24 -top-32 size-[26rem] sm:size-[32rem]', dark ? 'bg-emerald-400/30' : 'bg-primary/35 dark:bg-primary/30')} />
+      <span className={cn('-right-24 top-16 size-[22rem] sm:size-[28rem]', dark ? 'bg-[#F2C77E]/25' : 'bg-market/30 dark:bg-market/20')} />
+      <span className={cn('-bottom-40 left-1/3 size-[24rem] sm:size-[30rem]', dark ? 'bg-teal-300/20' : 'bg-emerald-300/30 dark:bg-emerald-500/15')} />
+    </div>
+  )
+}
+
+/** Real numbers from the store (never invented): listings on sale now and categories. Hidden until there are some. */
+function Stats() {
+  const t = useT()
+  const listings = useQuery({ queryKey: ['home-listing-count'], queryFn: () => api.products({ size: 1 }), staleTime: 60_000 })
+  const cats = useQuery({ queryKey: ['categories'], queryFn: api.categories, staleTime: 5 * 60_000 })
+  const count = listings.data?.totalElements ?? 0
+  if (!count) return null
+  const items = [
+    { value: count.toLocaleString(), label: t('Listings now') },
+    { value: String(cats.data?.length ?? '–'), label: t('Categories') },
+    { value: t('Free'), label: t('for buyers') },
+  ]
+  return (
+    <dl className="glass grid max-w-xl grid-cols-3 divide-x rounded-2xl border shadow-sm">
+      {items.map((s) => (
+        <div key={s.label} className="flex flex-col px-3 py-3 text-center sm:px-5">
+          <dt className="order-2 text-[11px] font-medium text-muted-foreground sm:text-xs">{s.label}</dt>
+          <dd className="text-xl font-extrabold tracking-tight sm:text-2xl">{s.value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
@@ -100,7 +142,7 @@ function SearchBox() {
   return (
     <form
       role="search"
-      className="flex h-14 items-center gap-2 rounded-2xl border bg-card pl-4 pr-1.5 shadow-lg shadow-primary/5 transition focus-within:border-primary focus-within:shadow-primary/10"
+      className="glass flex h-14 items-center gap-2 rounded-2xl border pl-4 pr-1.5 shadow-xl shadow-primary/10 ring-1 ring-white/50 transition focus-within:border-primary focus-within:shadow-primary/20 dark:ring-white/5 sm:h-16"
       onSubmit={(e) => {
         e.preventDefault()
         navigate(q.trim() ? `/shop?q=${encodeURIComponent(q.trim())}` : '/shop')
@@ -278,19 +320,20 @@ function Hero({ payments }: { payments: boolean }) {
     ? [{ icon: ShieldCheck, text: 'Money held safely' }, { icon: BadgeCheck, text: 'Verified sellers' }, { icon: Truck, text: 'Pick up or delivery' }]
     : [{ icon: MessageCircle, text: 'Chat before you buy' }, { icon: BadgeCheck, text: 'Verified sellers' }, { icon: Handshake, text: 'Free for buyers' }]
   return (
-    <section className="relative overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-grid opacity-40 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]" />
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:pb-24 lg:pt-16">
-        <div className="space-y-7">
+    <section className="relative isolate overflow-hidden">
+      <Aurora />
+      <div className="absolute inset-0 -z-10 bg-grid opacity-30 [mask-image:radial-gradient(ellipse_at_top,black,transparent_65%)]" />
+      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:pb-24 lg:pt-20">
+        <div className="min-w-0 space-y-7">
           <Reveal>
-            <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-semibold shadow-sm">
-              <span className="rounded-full bg-market px-1.5 py-0.5 text-[10px] font-extrabold text-[#13201A]">{t('NEW')}</span>
+            <span className="glass inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm">
+              <span className="live-dot size-2 rounded-full bg-primary" aria-hidden />
               {t("Wolaita Sodo's own online market")}
             </span>
           </Reveal>
           <Reveal delay={80}>
-            <h1 className="text-4xl leading-[1.05] tracking-tight text-balance sm:text-6xl">
-              {t('Buy, sell, hire and')} <span className="text-market-deep dark:text-market">{t('get hired')}</span>{t(', all in Sodo.')}
+            <h1 className="text-[2.6rem] leading-[1.02] tracking-tight text-balance sm:text-6xl lg:text-7xl">
+              {t('Buy, sell, hire and')} <span className="text-gradient-market">{t('get hired')}</span>{t(', all in Sodo.')}
             </h1>
           </Reveal>
           <Reveal delay={160}>
@@ -305,7 +348,7 @@ function Hero({ payments }: { payments: boolean }) {
             {/* one swipeable row on phones, wrapping on wider screens */}
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
               {chips.map((c) => (
-                  <Link key={c.label} to={c.to} className="flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3.5 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
+                  <Link key={c.label} to={c.to} className="glass flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
                     <c.icon className="size-4 text-primary" /> {t(c.label)}
                   </Link>
               ))}
@@ -321,8 +364,11 @@ function Hero({ payments }: { payments: boolean }) {
               ))}
             </ul>
           </Reveal>
+          <Reveal delay={400}>
+            <Stats />
+          </Reveal>
         </div>
-        <div className="pin-drop">
+        <div className="pin-drop min-w-0">
           <HeroPhone products={featured.data ?? []} payments={payments} />
         </div>
       </div>
@@ -362,24 +408,46 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
         </div>
         <Button asChild variant="outline" className="rounded-full"><Link to="/shop">{t('Browse all')} <ArrowRight /></Link></Button>
       </Reveal>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+      {/* bento: one big "everything" tile, then categories, then workers and jobs in amber */}
+      <div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-2 gap-3 sm:grid-cols-4">
+        <Reveal className="col-span-2 row-span-2">
+          <Link
+            to="/shop"
+            className="bento-tile group relative isolate flex h-full min-h-60 flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] p-6 text-white"
+          >
+            <span className="absolute -right-10 -top-10 -z-10 size-56 rounded-full bg-[#F2C77E]/25 blur-3xl" aria-hidden />
+            <span className="absolute -bottom-16 -left-10 -z-10 size-56 rounded-full bg-emerald-300/20 blur-3xl" aria-hidden />
+            <ShoppingBag className="size-10 text-[#F2C77E]" strokeWidth={1.6} />
+            <span className="space-y-2">
+              <span className="block text-2xl font-extrabold tracking-tight sm:text-3xl">{t('Browse all')}</span>
+              <span className="block max-w-xs text-sm text-white/75">{t('Every listing in Sodo, in one place.')}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold backdrop-blur transition group-hover:bg-white/25">
+                {t('See everything')} <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+              </span>
+            </span>
+          </Link>
+        </Reveal>
+        {isLoading && Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="rounded-3xl" />)}
         {data?.slice(0, jobsOn ? 6 : 7).map((c, i) => {
           const Icon = iconFor(c.slug)
           return (
             <Reveal key={c.id} delay={i * 50}>
-              <Link to={`/shop?category=${c.slug}`} className="group flex h-full items-center gap-3 rounded-2xl border bg-card p-4 transition hover:-translate-y-1 hover:border-primary hover:shadow-lg">
-                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent text-primary transition group-hover:bg-primary group-hover:text-primary-foreground"><Icon className="size-5" /></span>
-                <span className="text-sm font-semibold">{c.name}</span>
+              <Link to={`/shop?category=${c.slug}`} className="bento-tile group relative flex h-full flex-col justify-between gap-3 rounded-3xl border bg-card p-4 hover:border-primary/50">
+                <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-accent to-primary/15 text-primary transition group-hover:from-primary group-hover:to-[#13785A] group-hover:text-primary-foreground">
+                  <Icon className="size-5" />
+                </span>
+                <span className="text-sm font-bold">{c.name}</span>
+                <ArrowRight className="absolute right-4 top-4 size-4 -translate-x-1 text-primary opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
               </Link>
             </Reveal>
           )
         })}
         {extra.map((c, i) => (
           <Reveal key={c.name} delay={(i + 6) * 50}>
-            <Link to={c.to} className="group flex h-full items-center gap-3 rounded-2xl border bg-card p-4 transition hover:-translate-y-1 hover:border-market hover:shadow-lg">
-              <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-soft text-market-deep transition group-hover:bg-market group-hover:text-[#13201A] dark:text-market"><c.icon className="size-5" /></span>
-              <span><span className="block text-sm font-semibold">{t(c.name)}</span><span className="block text-xs text-muted-foreground">{t(c.note)}</span></span>
+            <Link to={c.to} className="bento-tile group relative flex h-full flex-col justify-between gap-3 rounded-3xl border border-market/30 bg-gradient-to-br from-amber-soft to-card p-4 hover:border-market dark:from-market/10">
+              <span className="grid size-11 place-items-center rounded-2xl bg-market/20 text-market-deep transition group-hover:bg-market group-hover:text-[#13201A] dark:text-market"><c.icon className="size-5" /></span>
+              <span><span className="block text-sm font-bold">{t(c.name)}</span><span className="block text-xs text-muted-foreground">{t(c.note)}</span></span>
+              <ArrowRight className="absolute right-4 top-4 size-4 -translate-x-1 text-market-deep opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100 dark:text-market" aria-hidden />
             </Link>
           </Reveal>
         ))}
@@ -390,32 +458,41 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
 
 function HowItWorks({ payments }: { payments: boolean }) {
   const t = useT()
-  const steps = [
-    { title: 'Find it', text: 'Search by price, compare items and read real reviews.' },
-    { title: 'Chat & agree', text: payments ? 'Ask questions and make your offer in the app.' : 'Chat in the app or call the seller, and agree on the price.' },
+  const steps: { title: string; text: string; icon: LucideIcon }[] = [
+    { title: 'Find it', text: 'Search by price, compare items and read real reviews.', icon: Search },
+    { title: 'Chat & agree', text: payments ? 'Ask questions and make your offer in the app.' : 'Chat in the app or call the seller, and agree on the price.', icon: MessageCircle },
     payments
-      ? { title: 'Pay safely', text: 'Online with BillPay. Your money waits until you confirm.' }
-      : { title: 'Meet & check', text: 'Meet in a public place in Sodo and check the item first.' },
+      ? { title: 'Pay safely', text: 'Online with BillPay. Your money waits until you confirm.', icon: ShieldCheck }
+      : { title: 'Meet & check', text: 'Meet in a public place in Sodo and check the item first.', icon: Handshake },
     payments
-      ? { title: 'Pick up or deliver', text: 'Collect it, or get it delivered in town. Then confirm.' }
-      : { title: 'Pay your way', text: 'Cash or mobile money, only after you\'re happy with it.' },
+      ? { title: 'Pick up or deliver', text: 'Collect it, or get it delivered in town. Then confirm.', icon: Truck }
+      : { title: 'Pay your way', text: 'Cash or mobile money, only after you\'re happy with it.', icon: BadgeCheck },
   ]
   return (
-    <section className="bg-[#0E5A43] text-white">
-      <div className="mx-auto max-w-7xl space-y-10 px-4 py-20 sm:px-6">
-        <Reveal className="space-y-2">
+    <section className="relative isolate overflow-hidden bg-[#0E5A43] text-white">
+      <Aurora dark />
+      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
+      <div className="mx-auto max-w-7xl space-y-12 px-4 py-20 sm:px-6 lg:py-28">
+        <Reveal className="mx-auto max-w-2xl space-y-3 text-center">
           <Eyebrow light>{t('How it works')}</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">{t('From "I need this" to "I got it" in four steps.')}</h2>
+          <h2 className="text-3xl text-balance sm:text-5xl">{t('From "I need this" to "I got it" in four steps.')}</h2>
         </Reveal>
-        <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ol className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
+          {/* the line joining the steps on wide screens */}
+          <span className="absolute left-[12%] right-[12%] top-12 hidden h-px bg-gradient-to-r from-transparent via-[#F2C77E]/50 to-transparent lg:block" aria-hidden />
           {steps.map((s, i) => (
-            <Reveal key={s.title} delay={i * 100}>
-              <li className="h-full rounded-2xl border border-white/10 bg-white/5 p-5 transition hover:bg-white/10">
-                <span className="text-3xl font-extrabold text-[#F2C77E]">0{i + 1}</span>
-                <p className="mt-3 text-lg font-bold">{t(s.title)}</p>
-                <p className="mt-1 text-sm text-white/75">{t(s.text)}</p>
-              </li>
-            </Reveal>
+            <li key={s.title} className="h-full">
+              <Reveal delay={i * 100} className="h-full">
+                <div className="relative h-full rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-center backdrop-blur-md transition hover:-translate-y-1 hover:bg-white/10 lg:pt-8">
+                  <span className="relative mx-auto grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-white/20 to-white/5 ring-1 ring-white/20">
+                    <s.icon className="size-7 text-[#F2C77E]" strokeWidth={1.8} />
+                    <span className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-[#F2C77E] text-[11px] font-extrabold text-[#13201A]">{i + 1}</span>
+                  </span>
+                  <p className="mt-5 text-lg font-bold">{t(s.title)}</p>
+                  <p className="mt-1.5 text-sm text-white/75">{t(s.text)}</p>
+                </div>
+              </Reveal>
+            </li>
           ))}
         </ol>
         <Reveal>
@@ -631,16 +708,18 @@ function FinalCall() {
   return (
     <section className="px-4 pb-24 sm:px-6">
       <Reveal>
-        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl bg-[#0E5A43] px-6 py-14 text-center text-white sm:py-20">
+        <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] px-6 py-16 text-center text-white shadow-2xl shadow-primary/20 sm:py-24">
+          <Aurora dark />
+          <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
           <LogoSymbol onDark className="pointer-events-none absolute -right-10 -top-10 h-64 w-auto opacity-10" />
           <p className="font-ethiopic text-sm text-white/70">ሶዶ ገበያ · ይግዙ · ይሽጡ · ይቅጠሩ</p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-3xl sm:text-5xl">{t("Join Sodo's own market today. It's free.")}</h2>
-          <p className="mt-3 text-white/75">{t("Sign up with your phone number. One SMS code, and you're in.")}</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <h2 className="mx-auto mt-3 max-w-3xl text-4xl text-balance sm:text-6xl">{t("Join Sodo's own market today. It's free.")}</h2>
+          <p className="mx-auto mt-4 max-w-xl text-white/75 sm:text-lg">{t("Sign up with your phone number. One SMS code, and you're in.")}</p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3">
             {!signedIn && (
-              <Button asChild size="lg" className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/register">{t('Create free account')}</Link></Button>
+              <Button asChild size="lg" className="h-12 rounded-full bg-market px-7 text-base text-[#13201A] shadow-lg shadow-black/20 hover:bg-[#F2C77E]"><Link to="/register">{t('Create free account')} <ArrowRight /></Link></Button>
             )}
-            <Button asChild size="lg" variant="outline" className="rounded-full border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
+            <Button asChild size="lg" variant="outline" className="h-12 rounded-full border-white/30 bg-white/10 px-7 text-base text-white backdrop-blur-md hover:bg-white/20 hover:text-white">
               <Link to="/sell">{t('Start selling')}</Link>
             </Button>
           </div>

@@ -201,4 +201,9 @@ export const core: Record<string, string> = {
   "Join Sodo's own market today. It's free.": 'ዛሬውኑ የሶዶን የራሱን ገበያ ይቀላቀሉ። ነጻ ነው።',
   "Sign up with your phone number. One SMS code, and you're in.": 'በስልክ ቁጥርዎ ይመዝገቡ። በአንድ የSMS ኮድ ይገባሉ።',
   'Create free account': 'ነጻ መለያ ይክፈቱ',
+  // landing redesign (2026-10-28)
+  'Listings now': 'አሁን ያሉ ማስታወቂያዎች',
+  'Categories': 'ምድቦች',
+  'for buyers': 'ለገዢዎች',
+  'Every listing in Sodo, in one place.': 'በሶዶ ያሉ ሁሉም ማስታወቂያዎች፣ በአንድ ቦታ።',
 }
