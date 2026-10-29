@@ -31,6 +31,7 @@ import { AdminReportsPage } from './reports'
 import { AdminReviewsPage } from './reviews'
 import { AdminSetupPage } from './setup'
 import { AdminBillPayLabPage } from './billpay-lab'
+import { AdminDemoDataPage } from './demo-data'
 import { AdminShopsPage } from './shops'
 import { AdminUsersPage } from './users'
 import { AdminVerificationsPage } from './verifications'
@@ -77,6 +78,7 @@ const adminRoutes: RouteObject[] = [
       { path: 'load-tests', element: <AdminLoadTestsPage /> },
       { path: 'setup', element: <AdminSetupPage /> },
       { path: 'billpay-lab', element: <AdminBillPayLabPage /> },
+      { path: 'demo-data', element: <AdminDemoDataPage /> },
       { path: 'users', element: <AdminUsersPage /> },
       { path: 'login-history', element: <AdminLoginHistoryPage /> },
       { path: 'account', element: <AdminMyAccountPage /> },

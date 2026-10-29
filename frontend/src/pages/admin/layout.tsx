@@ -5,6 +5,7 @@ import {
   BarChart3,
   Gauge,
   ExternalLink,
+  Database,
   FlaskConical,
   Flag,
   BadgeCheck,
@@ -117,6 +118,7 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/emails', label: 'Emails', icon: Mail },
       { to: '/admin/sms', label: 'SMS', icon: MessageSquareText },
       { to: '/admin/load-tests', label: 'Load tests', icon: Gauge, adminOnly: true },
+      { to: '/admin/demo-data', label: 'Demo data', icon: Database },
     ],
   },
   {
