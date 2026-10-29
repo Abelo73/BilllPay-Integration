@@ -201,6 +201,28 @@ export type Refund = {
   billpayStatus?: string | null
   createdAt: string
   updatedAt: string
+  /** calls made to BillPay so far */
+  attempts?: number
+  /** when it is sent again on its own; null = it won't be */
+  nextTryAt?: string | null
+  /** plain words for staff: why it waits for them */
+  needsStaffWhy?: string | null
+  manualReference?: string | null
+  staffNote?: string | null
+  handledBy?: string | null
+  stuckAlertedAt?: string | null
+}
+
+export type RefundAttempt = {
+  id: string
+  attemptNo: number
+  idempotencyKey: string
+  outcome: 'ACCEPTED' | 'REFUSED' | 'NO_ANSWER'
+  httpStatus: number | null
+  reasonCode: string | null
+  error: string | null
+  responsePayload: string | null
+  createdAt: string
 }
 
 export type TimelineEvent = {

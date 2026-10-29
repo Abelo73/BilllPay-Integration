@@ -122,6 +122,20 @@ public final class BillPayFake {
 				.withBody("{\"statusCode\":422,\"message\":\"merchant is at its refund limit; settle or clear what is open first\"}")));
 	}
 
+	/** A refusal for good, as the sandbox answers a refund ending in .13. */
+	public static void refundsRefused(WireMockServer billPay, String paymentId) {
+		billPay.stubFor(post(urlEqualTo(CREATE_PATH + "/" + paymentId + "/refunds")).willReturn(aResponse()
+				.withStatus(422).withHeader("Content-Type", "application/json")
+				.withBody("{\"statusCode\":422,\"message\":\"REFUND_REFUSED\"}")));
+	}
+
+	/** BillPay is down: every refund call answers 503. */
+	public static void refundsDown(WireMockServer billPay, String paymentId) {
+		billPay.stubFor(post(urlEqualTo(CREATE_PATH + "/" + paymentId + "/refunds")).willReturn(aResponse()
+				.withStatus(503).withHeader("Content-Type", "application/json")
+				.withBody("{\"statusCode\":503,\"message\":\"Service unavailable\"}")));
+	}
+
 	/** Body of the real PaymentCaptured webhook (eventId equals the payment id, as BillPay sends it). */
 	public static String capturedWebhook(String paymentId, String reference, BigDecimal amount) {
 		Instant now = Instant.now();

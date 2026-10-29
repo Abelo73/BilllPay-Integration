@@ -17,7 +17,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Refunds without waiting for staff: the buyer cancels a paid parcel before packing starts, the seller cancels one it
  * can't send, staff cancelling a paid parcel now really refunds it, and the seller settles a problem (refund in full,
- * or an offer the buyer accepts or declines). BillPay is asked first: when it refuses, nothing is cancelled.
+ * * or an offer the buyer accepts or declines). A refund BillPay refuses stays owed and waits for staff.
  */
 class SellerBuyerRefundIntegrationTest extends IntegrationTest {
 
@@ -105,14 +105,16 @@ class SellerBuyerRefundIntegrationTest extends IntegrationTest {
 	}
 
 	@Test
-	void whenBillPayRefusesTheRefund_nothingIsCancelled() {
+	void whenBillPayRefusesTheRefund_theCancelGoesAhead_andTheRefundWaitsForStaff() {
 		Seller s = seller();
 		String n = buyAndPay(s.productId());
-		BillPayFake.refundsBlocked(billPay, "pay-" + n + "-A1");
+		BillPayFake.refundsRefused(billPay, "pay-" + n + "-A1");
 		JsonNode r = post("/api/orders/" + n + "/parcels/1/cancel", Map.of(), shopperToken()).body();
-		assertThat(r.path("code").asString()).isEqualTo("REFUND_REFUSED");
-		assertThat(held(s)).as("still held for the seller").isEqualByComparingTo("1150.00");
-		assertThat(stock(s.productId())).isEqualTo(19);
+		assertThat(r.path("refunded").decimalValue()).isEqualByComparingTo("1150.00");
+		assertThat(r.path("refundStatus").asString()).isEqualTo("NEEDS_STAFF");
+		assertThat(held(s)).as("the seller won't get it").isEqualByComparingTo("0");
+		assertThat(stock(s.productId())).as("back on sale").isEqualTo(20);
+		assertThat(get("/api/admin/refunds/needs-staff", admin).raw()).contains(n).contains("NEEDS_STAFF");
 	}
 
 	@Test

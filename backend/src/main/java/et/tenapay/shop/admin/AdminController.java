@@ -67,6 +67,7 @@ public class AdminController {
 	private final RefundRepository refundRepo;
 	private final PaymentService payments;
 	private final RefundService refunds;
+	private final et.tenapay.shop.refund.RefundRetryJob refundRetryJob;
 	private final WebhookPublisher webhookPublisher;
 	private final BillPayProperties billPay;
 	private final BillPayMode billPayMode;
@@ -137,7 +138,13 @@ public class AdminController {
 			BigDecimal amount, String currency, String reason, String status, String reasonCode, boolean external,
 			String error, String requestPayload, String responsePayload, Instant createdAt, Instant updatedAt,
 			/** BillPay's own word for the refund in its last answer, e.g. UNDER_REVIEW (ours is PENDING) */
-			String billpayStatus) {
+			String billpayStatus,
+			/** Calls made to BillPay so far */
+			int attempts,
+			/** When the retry job sends it again (null = it won't) */
+			Instant nextTryAt,
+			/** Plain words for staff: why it waits, what to do */
+			String needsStaffWhy, String manualReference, String staffNote, String handledBy, Instant stuckAlertedAt) {
 
 		private static final java.util.regex.Pattern BILLPAY_STATUS = java.util.regex.Pattern.compile("\"status\"\\s*:\\s*\"([A-Za-z_]+)\"");
 
@@ -145,7 +152,9 @@ public class AdminController {
 			return new RefundView(r.getId(), orderNumber, r.getMerchantReference(), r.getBillpayRefundId(),
 					r.getAmount(), r.getCurrency(), r.getReason(), r.getStatus().name(), r.getReasonCode(),
 					r.isExternal(), r.getError(), r.getRequestPayload(), r.getResponsePayload(), r.getCreatedAt(),
-					r.getUpdatedAt(), billpayStatus(r.getResponsePayload()));
+					r.getUpdatedAt(), billpayStatus(r.getResponsePayload()), r.getAttempts(), r.getNextTryAt(),
+					r.getNeedsStaffWhy(), r.getManualReference(), r.getStaffNote(), r.getHandledBy(),
+					r.getStuckAlertedAt());
 		}
 
 		private static String billpayStatus(String body) {
@@ -338,6 +347,49 @@ public class AdminController {
 	public RefundView retryRefund(@PathVariable UUID id) {
 		Refund r = refunds.retry(id);
 		return RefundView.from(r, orders.findById(r.getOrderId()).map(Order::getOrderNumber).orElse(null));
+	}
+
+	/** Refunds waiting for staff: refused for good, retries used up, stuck in review, or never sent. */
+	@GetMapping("/refunds/needs-staff")
+	@Transactional(readOnly = true)
+	public List<RefundView> refundsNeedingStaff() {
+		List<Refund> list = refundRepo.findNeedingStaff(Instant.now().minus(java.time.Duration.ofMinutes(10)));
+		Map<UUID, String> numbers = orderNumbers(list.stream().map(Refund::getOrderId).toList());
+		return list.stream().map(r -> RefundView.from(r, numbers.get(r.getOrderId()))).toList();
+	}
+
+	/** Every call made to BillPay for one refund, oldest first. */
+	@GetMapping("/refunds/{id}/attempts")
+	@Transactional(readOnly = true)
+	public List<et.tenapay.shop.refund.RefundAttempt> refundAttempts(@PathVariable UUID id) {
+		return refunds.attemptsOf(id);
+	}
+
+	public record PaidByHandRequest(@jakarta.validation.constraints.Size(max = 120) String reference,
+			@jakarta.validation.constraints.Size(max = 1000) String note) {
+	}
+
+	/** Staff paid the buyer another way (bank transfer, cash) and record it. */
+	@PostMapping("/refunds/{id}/paid-by-hand")
+	public RefundView refundPaidByHand(@PathVariable UUID id, @Valid @RequestBody PaidByHandRequest req) {
+		Refund r = refunds.paidByHand(id, req.reference(), req.note(), CurrentUser.require().email());
+		return RefundView.from(r, orders.findById(r.getOrderId()).map(Order::getOrderNumber).orElse(null));
+	}
+
+	public record CancelRefundRequest(@jakarta.validation.constraints.Size(max = 1000) String note) {
+	}
+
+	/** Staff: the refund is no longer owed. */
+	@PostMapping("/refunds/{id}/cancel")
+	public RefundView cancelRefund(@PathVariable UUID id, @Valid @RequestBody CancelRefundRequest req) {
+		Refund r = refunds.cancel(id, req.note(), CurrentUser.require().email());
+		return RefundView.from(r, orders.findById(r.getOrderId()).map(Order::getOrderNumber).orElse(null));
+	}
+
+	/** Runs the refund retry job now (it also runs every 2 minutes); for tests and the BillPay lab. */
+	@PostMapping("/refunds/run-retries")
+	public et.tenapay.shop.refund.RefundRetryJob.Result runRefundRetries() {
+		return refundRetryJob.run(Instant.now());
 	}
 
 	@GetMapping("/webhooks")

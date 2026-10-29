@@ -3,7 +3,6 @@ package et.tenapay.shop.order;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -16,7 +15,6 @@ import et.tenapay.shop.dispute.DisputeService;
 import et.tenapay.shop.payout.EarningStatus;
 import et.tenapay.shop.refund.Refund;
 import et.tenapay.shop.refund.RefundService;
-import et.tenapay.shop.refund.RefundStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -130,20 +128,10 @@ public class ParcelCancelService {
 		String number = p.number(order.getOrderNumber());
 		String status = cash ? "CASH_NOT_COLLECTED" : "NOTHING_TO_REFUND";
 		if (amount.signum() > 0) {
-			// BillPay first: if it fails, nothing changes and they can try again
+			// The refund is owed from here on: if BillPay refuses or doesn't answer, it is tried again or handed to
+			// staff (Admin -> Refunds), so the cancel goes ahead either way.
 			Refund r = refunds.create(order.getOrderNumber(), amount,
 					"Cancelled before sending (" + label(who) + ")" + (why != null ? ": " + why : ""), null);
-			if (r.getStatus() == RefundStatus.REFUSED) {
-				throw new ApiException(HttpStatus.CONFLICT, "REFUND_REFUSED",
-						"BillPay refused the refund" + (r.getReasonCode() != null ? " (" + r.getReasonCode() + ")" : "")
-								+ ", so nothing was cancelled. Sodo Gebeya has been told.",
-						Map.of("orderNumber", order.getOrderNumber()));
-			}
-			if (r.getStatus() == RefundStatus.ERROR) {
-				throw new ApiException(HttpStatus.BAD_GATEWAY, "REFUND_NOT_SENT",
-						"We couldn't reach BillPay to send the refund, so nothing was cancelled. Please try again in a minute.",
-						Map.of("orderNumber", order.getOrderNumber()));
-			}
 			status = r.getStatus().name();
 		}
 		// the money is on its way back: cancel the parcel (its held earning is cancelled, the buyer is told)

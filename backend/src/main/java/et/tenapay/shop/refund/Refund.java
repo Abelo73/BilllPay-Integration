@@ -59,6 +59,26 @@ public class Refund {
 
 	private String error;
 
+	/** Calls made to BillPay so far (each one is a {@link RefundAttempt}). */
+	private int attempts = 1;
+
+	/** When the retry job sends it again; null = it doesn't. */
+	private Instant nextTryAt;
+
+	/** Plain words for staff on why it waits for them. */
+	private String needsStaffWhy;
+
+	/** Bank transfer or receipt number when staff paid it another way. */
+	private String manualReference;
+
+	private String staffNote;
+
+	/** Staff member who paid it by hand or cancelled it. */
+	private String handledBy;
+
+	/** When staff were told it is stuck in review (once). */
+	private Instant stuckAlertedAt;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 

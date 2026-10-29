@@ -275,8 +275,10 @@ class PaymentFlowIntegrationTest extends IntegrationTest {
 		BillPayFake.refundsBlocked(billPay, paymentId);
 		Res refund = post("/api/admin/orders/" + orderNumber + "/refunds", Map.of("amount", "100.00", "reason", "test"), admin);
 		assertThat(refund.status()).as(refund.raw()).isEqualTo(200);
-		assertThat(refund.text("status")).isEqualTo("REFUSED");
+		// a refund limit may clear after settlement: still owed, tried again later on its own
+		assertThat(refund.text("status")).isEqualTo("RETRY_LATER");
 		assertThat(refund.text("error")).contains("refund limit");
+		assertThat(refund.text("nextTryAt")).isNotBlank();
 	}
 
 	/** BillPay reads only {"amount", "reason"} (sandbox, 2026-10-27): extra fields got 400 "Malformed request body". */
