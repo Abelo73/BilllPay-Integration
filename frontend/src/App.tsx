@@ -25,7 +25,9 @@ import { LoginPage, RegisterPage } from '@/pages/auth'
 import { CheckoutPage } from '@/pages/checkout'
 import { HomePage } from '@/pages/home'
 import { NotFoundPage } from '@/pages/not-found'
+import { OrderReceiptPage } from '@/pages/order-receipt'
 import { OrderStatusPage } from '@/pages/order-status'
+import { OrderTrackingPage } from '@/pages/order-tracking'
 import { ProductPage } from '@/pages/product'
 import { ShopPage } from '@/pages/shop'
 import { ShopPublicPage } from '@/pages/shop-page'
@@ -72,6 +74,8 @@ const router = createBrowserRouter([
       { path: '/checkout/return', element: <OrderStatusPage /> },
       { path: '/checkout/cancelled', element: <OrderStatusPage cancelled /> },
       { path: '/orders/track', element: <OrderStatusPage /> },
+      { path: '/orders/receipt', element: <OrderReceiptPage /> },
+      { path: '/orders/tracking', element: <OrderTrackingPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/account', element: <AccountPage /> },

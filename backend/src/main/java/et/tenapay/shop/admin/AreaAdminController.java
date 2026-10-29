@@ -32,7 +32,9 @@ public class AreaAdminController {
 	private final AreaRepository areas;
 
 	/** {@code deliveryFee} null = the standard delivery fee. */
-	public record AreaRow(Long id, String name, int sortOrder, boolean active, java.math.BigDecimal deliveryFee) {
+	public record AreaRow(Long id, String name, int sortOrder, boolean active, java.math.BigDecimal deliveryFee,
+			/** map point for tracking; null = centre of Sodo */
+			java.math.BigDecimal lat, java.math.BigDecimal lng) {
 	}
 
 	public record AreaRequest(@Size(max = 120) String name, Boolean active) {
@@ -45,7 +47,8 @@ public class AreaAdminController {
 	@Transactional(readOnly = true)
 	public List<AreaRow> list() {
 		return areas.findAllByOrderBySortOrderAscIdAsc().stream()
-				.map(a -> new AreaRow(a.getId(), a.getName(), a.getSortOrder(), a.isActive(), a.getDeliveryFee())).toList();
+				.map(a -> new AreaRow(a.getId(), a.getName(), a.getSortOrder(), a.isActive(), a.getDeliveryFee(), a.getLat(), a.getLng()))
+				.toList();
 	}
 
 	@PostMapping
@@ -91,6 +94,24 @@ public class AreaAdminController {
 	public List<AreaRow> deliveryFee(@PathVariable Long id, @Valid @RequestBody FeeRequest req) {
 		Area a = areas.findById(id).orElseThrow(() -> ApiException.notFound("Area"));
 		a.setDeliveryFee(req.fee() == null ? null : req.fee().setScale(2, java.math.RoundingMode.HALF_UP));
+		return list();
+	}
+
+	/** Both null = clear the point (the centre of Sodo is used). */
+	public record PointRequest(@jakarta.validation.constraints.DecimalMin("-90") @jakarta.validation.constraints.DecimalMax("90") java.math.BigDecimal lat,
+			@jakarta.validation.constraints.DecimalMin("-180") @jakarta.validation.constraints.DecimalMax("180") java.math.BigDecimal lng) {
+	}
+
+	/** Where the area is on the tracking map. */
+	@PutMapping("/{id}/point")
+	@Transactional
+	public List<AreaRow> point(@PathVariable Long id, @Valid @RequestBody PointRequest req) {
+		Area a = areas.findById(id).orElseThrow(() -> ApiException.notFound("Area"));
+		if ((req.lat() == null) != (req.lng() == null)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "POINT_INCOMPLETE", "Enter both latitude and longitude, or clear both.");
+		}
+		a.setLat(req.lat() == null ? null : req.lat().setScale(6, java.math.RoundingMode.HALF_UP));
+		a.setLng(req.lng() == null ? null : req.lng().setScale(6, java.math.RoundingMode.HALF_UP));
 		return list();
 	}
 

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Bike, CheckCircle2, Clock, Home, Loader2, MapPin, Package, Phone, RotateCcw, ShoppingCart, Truck, XCircle } from 'lucide-react'
+import { AlertTriangle, Bike, CheckCircle2, Clock, Home, Loader2, Map as MapIcon, MapPin, Package, Phone, ReceiptText, RotateCcw, ShoppingCart, Truck, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -170,6 +170,18 @@ export function OrderStatusPanel({
           <span>{t('Total')}</span>
           <span className="tabular-nums">{formatETB(o.total)}</span>
         </div>
+        {(o.paidAt || o.status === 'CASH_ON_DELIVERY') && (
+          <div className="grid grid-cols-2 gap-2">
+            {o.paidAt ? (
+              <Button asChild variant="outline" className="h-11">
+                <Link to={`/orders/receipt?order=${encodeURIComponent(o.orderNumber)}`}><ReceiptText /> {t('Receipt')}</Link>
+              </Button>
+            ) : <span />}
+            <Button asChild variant="outline" className="h-11">
+              <Link to={`/orders/tracking?order=${encodeURIComponent(o.orderNumber)}`}><MapIcon /> {t('Track delivery')}</Link>
+            </Button>
+          </div>
+        )}
         {o.delivery?.address && <DeliveryBlock o={o} />}
         <div className="flex flex-col gap-2 pt-2 sm:flex-row-reverse">
           {retryButton}

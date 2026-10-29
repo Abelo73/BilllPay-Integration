@@ -34,6 +34,11 @@ public class Area {
 	/** Delivery fee to this area; null = the standard fee, 0 = free. */
 	private BigDecimal deliveryFee;
 
+	/** Map point for order tracking; null = the centre of Sodo. */
+	private BigDecimal lat;
+
+	private BigDecimal lng;
+
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();
 }
