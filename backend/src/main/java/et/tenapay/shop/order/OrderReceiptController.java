@@ -25,7 +25,6 @@ import et.tenapay.shop.payment.PaymentAttemptRepository;
 import et.tenapay.shop.payment.PaymentStatus;
 import et.tenapay.shop.refund.Refund;
 import et.tenapay.shop.refund.RefundRepository;
-import et.tenapay.shop.refund.RefundStatus;
 import et.tenapay.shop.seller.Shop;
 import et.tenapay.shop.seller.ShopRepository;
 import et.tenapay.shop.user.CurrentUser;
@@ -43,6 +42,12 @@ public class OrderReceiptController {
 	/** Centre of Wolaita Sodo, used when an area has no map point. */
 	static final BigDecimal SODO_LAT = new BigDecimal("6.855000");
 	static final BigDecimal SODO_LNG = new BigDecimal("37.757000");
+
+	/** Refund attempts that never sent money back (left off the receipt). */
+	private static final java.util.Set<String> HIDDEN_REFUNDS = java.util.Set.of("ERROR", "REFUSED", "CANCELLED");
+
+	/** The buyer has the money back: through BillPay, or paid by hand by staff. */
+	private static final java.util.Set<String> MONEY_BACK = java.util.Set.of("SUCCEEDED", "PAID_BY_HAND");
 
 	private final OrderRepository orders;
 	private final PaymentAttemptRepository attempts;
@@ -91,11 +96,10 @@ public class OrderReceiptController {
 		PaymentAttempt paid = attempts.findByOrderIdOrderByAttemptNoAsc(o.getId()).stream()
 				.filter(a -> a.getStatus() == PaymentStatus.SUCCEEDED).reduce((a, b) -> b).orElse(null);
 		List<ReceiptRefund> refundRows = refunds.findByOrderIdOrderByCreatedAtAsc(o.getId()).stream()
-				.filter(r -> r.getStatus() != RefundStatus.ERROR && r.getStatus() != RefundStatus.REFUSED
-						&& r.getStatus() != RefundStatus.CANCELLED)
+				.filter(r -> !HIDDEN_REFUNDS.contains(r.getStatus().name()))
 				.map(r -> new ReceiptRefund(r.getAmount(), r.getStatus().name(), r.getCreatedAt())).toList();
 		BigDecimal refunded = refunds.findByOrderIdOrderByCreatedAtAsc(o.getId()).stream()
-				.filter(r -> r.getStatus() == RefundStatus.SUCCEEDED || r.getStatus() == RefundStatus.PAID_BY_HAND).map(Refund::getAmount)
+				.filter(r -> MONEY_BACK.contains(r.getStatus().name())).map(Refund::getAmount)
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
 		Instant paidAt = o.getPaidAt() != null ? o.getPaidAt()
 				: list.stream().map(OrderParcel::getCashCollectedAt).filter(Objects::nonNull).min(Instant::compareTo).orElse(null);
