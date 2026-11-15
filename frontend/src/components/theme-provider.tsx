@@ -4,12 +4,13 @@ import { THEME_STORAGE_KEY, ThemeContext, type Theme } from '@/lib/theme'
 
 const media = () => window.matchMedia('(prefers-color-scheme: dark)')
 
+/** Light by default, whatever the device prefers. Dark (or following the device) only once the visitor picks it. */
 function readStored(): Theme {
   try {
     const v = localStorage.getItem(THEME_STORAGE_KEY)
-    return v === 'light' || v === 'dark' ? v : 'system'
+    return v === 'light' || v === 'dark' || v === 'system' ? v : 'light'
   } catch {
-    return 'system'
+    return 'light'
   }
 }
 
@@ -35,8 +36,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setTheme = (next: Theme) => {
     setThemeState(next)
     try {
-      if (next === 'system') localStorage.removeItem(THEME_STORAGE_KEY)
-      else localStorage.setItem(THEME_STORAGE_KEY, next)
+      // "system" is stored too: removing the key would mean the default, which is now light.
+      localStorage.setItem(THEME_STORAGE_KEY, next)
     } catch {
       /* storage unavailable: theme lasts for this visit */
     }

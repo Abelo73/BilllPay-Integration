@@ -10,7 +10,8 @@
     <script>
       try {
         var t = localStorage.getItem("tenashop-theme");
-        if (t === "dark" || (!t && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark");
+        // Light unless the visitor chose dark (or "system" on a dark device) with the theme button.
+        if (t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.classList.add("dark");
       } catch (e) {}
     </script>
     <meta name="description" content="Sodo Gebeya: the online market for Wolaita Sodo. Shops and people selling clothes, phones, furniture and more, with BillPay checkout and local delivery." />
