@@ -36,6 +36,7 @@ public class DemoCatalogService {
 
 	static final String PREFIX = "demo-";
 	private static final String CATALOG = "demo/catalog.json";
+	private static final String MARKETPLACE = "demo/marketplace.json";
 
 	private final JdbcTemplate jdbc;
 	private final TransactionTemplate tx;
@@ -126,6 +127,7 @@ public class DemoCatalogService {
 				}
 				i++;
 			}
+			DemoMarketplace.load(jdbc, marketplace());
 			log.info("Demo data loaded: {} listings added, {} shown again, {} shops, {} categories", added, restored, shopsAdded, categoriesAdded);
 			return new LoadResult(added, restored, shopsAdded, categoriesAdded);
 		});
@@ -167,6 +169,7 @@ public class DemoCatalogService {
 				shopsClosed++;
 			}
 		}
+		DemoMarketplace.remove(jdbc, tx);
 		log.info("Demo data removed: {} listings deleted, {} hidden, {} shops deleted, {} closed", deleted, hidden, shopsDeleted, shopsClosed);
 		return new RemoveResult(deleted, hidden, shopsDeleted, shopsClosed);
 	}
@@ -194,6 +197,15 @@ public class DemoCatalogService {
 	private int count(String sql) {
 		Integer n = jdbc.queryForObject(sql, Integer.class);
 		return n == null ? 0 : n;
+	}
+
+	/** Services, job posts and talent profiles (demo/marketplace.json). */
+	private JsonNode marketplace() {
+		try (InputStream in = new ClassPathResource(MARKETPLACE).getInputStream()) {
+			return json.readTree(in);
+		} catch (IOException e) {
+			throw new IllegalStateException("Cannot read " + MARKETPLACE, e);
+		}
 	}
 
 	private JsonNode catalog() {
