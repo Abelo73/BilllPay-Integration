@@ -140,6 +140,9 @@ services:
       MAIL_HOST: ${SMTP_HOST:-mailpit}
       MAIL_PORT: ${SMTP_PORT:-1025}
       BACKEND_PORT: 8181
+      # The browser sends the page's address with every sign-in and form; the backend accepts only these. Defaults to
+      # the shop's own address, so the live site is never refused ("Invalid CORS request", 403).
+      APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-${APP_PUBLIC_BASE_URL}}
     depends_on:
       postgres:
         condition: service_healthy
