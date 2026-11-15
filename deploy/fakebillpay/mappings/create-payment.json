@@ -1,0 +1,10 @@
+{
+  "name": "Create payment. The 'checkout page' is the shop's own return page: nothing is paid until you run deploy-server.sh pay",
+  "request": { "method": "POST", "url": "/api/v1/checkout/payments" },
+  "response": {
+    "status": 201,
+    "headers": { "Content-Type": "application/json" },
+    "transformers": ["response-template"],
+    "body": "{\"statusCode\":201,\"message\":\"Payment created successfully\",\"body\":{\"id\":\"fake-{{jsonPath request.body '$.merchantReference'}}\",\"merchantReference\":\"{{jsonPath request.body '$.merchantReference'}}\",\"status\":\"CREATED\",\"amount\":{\"amount\":{{jsonPath request.body '$.amount'}},\"currency\":\"ETB\"},\"checkoutUrl\":\"{{jsonPath request.body '$.returnUrl'}}\",\"expiresAt\":\"{{now offset='30 minutes'}}\",\"attempts\":[]}}"
+  }
+}

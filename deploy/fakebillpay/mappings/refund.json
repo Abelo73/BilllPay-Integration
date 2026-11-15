@@ -1,0 +1,10 @@
+{
+  "name": "Refund request: accepted and under review, like the real sandbox (2026-10-27)",
+  "request": { "method": "POST", "urlPathPattern": "/api/v1/checkout/payments/[^/]+/refunds" },
+  "response": {
+    "status": 202,
+    "headers": { "Content-Type": "application/json" },
+    "transformers": ["response-template"],
+    "body": "{\"statusCode\":202,\"message\":\"Refund requested successfully\",\"body\":{\"id\":\"{{randomValue type='UUID'}}\",\"paymentId\":\"{{request.pathSegments.[4]}}\",\"status\":\"UNDER_REVIEW\",\"amount\":{\"amount\":{{jsonPath request.body '$.amount'}},\"currency\":\"ETB\"}}}"
+  }
+}

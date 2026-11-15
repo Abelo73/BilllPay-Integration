@@ -20,3 +20,6 @@ Thumbs.db
 
 # JVM crash logs
 hs_err_pid*.log
+
+# Server deploy history (deploy/deploy-server.sh)
+deploy/.deployed

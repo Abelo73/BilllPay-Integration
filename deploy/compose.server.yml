@@ -1,0 +1,172 @@
+# BillPay staging on the shared server (the same server as Blink staging).
+#
+#   ./deploy/deploy-server.sh            build and start (see deploy/README.md)
+#
+# How it stays out of Blink's way:
+#   - its own project name (billpay-staging), so Blink's deploys never touch it, and the other way round
+#   - its own Postgres, Kafka and photo storage, never Blink's
+#   - no port open to the internet: Blink's Caddy is the only front door (80/443). It reaches this stack's frontend
+#     over the shared "edge" network as billpay-frontend:80. The nginx in the frontend passes /api/ to the backend.
+#   - a memory limit on every container (about 2 GB in total), so this stack can never take Blink's memory
+#   - capped logs, so the disk can't fill up
+#
+# Secrets come from the repo-root .env on the server (gitignored). It is never committed or pasted anywhere.
+# Leaving out kafka-ui, Prometheus, Grafana, Alertmanager and the perf stack: they stay laptop-only for now.
+
+name: billpay-staging
+
+x-base: &base
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "20m"
+      max-file: "5"
+
+services:
+  postgres:
+    <<: *base
+    image: postgres:16-alpine
+    mem_limit: 384m
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tenashop}
+      POSTGRES_USER: ${POSTGRES_USER:-tenashop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  kafka:
+    <<: *base
+    image: apache/kafka:3.9.1
+    mem_limit: 640m
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # Only inside this stack's network: no host listener on the server.
+      KAFKA_LISTENERS: INTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_HEAP_OPTS: -Xmx384m -Xms384m
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  # Product photos (SeaweedFS, S3-compatible). Only the backend reaches it; photos are served at /api/media/...
+  media:
+    <<: *base
+    image: chrislusf/seaweedfs:4.48
+    mem_limit: 384m
+    environment:
+      MEDIA_S3_ACCESS_KEY: ${MEDIA_S3_ACCESS_KEY:?set MEDIA_S3_ACCESS_KEY in .env}
+      MEDIA_S3_SECRET_KEY: ${MEDIA_S3_SECRET_KEY:?set MEDIA_S3_SECRET_KEY in .env}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf '{"identities":[{"name":"tenashop","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' "$$MEDIA_S3_ACCESS_KEY" "$$MEDIA_S3_SECRET_KEY" > /tmp/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=256 -volume.max=0
+    volumes:
+      - mediadata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Test inbox: every email the shop sends lands here, never with a real customer.
+  # Open it through an SSH tunnel: ssh -L 8626:127.0.0.1:8626 blink@<server>, then http://localhost:8626
+  mailpit:
+    <<: *base
+    image: axllent/mailpit:v1.27
+    mem_limit: 64m
+    environment:
+      MP_MAX_MESSAGES: 2000
+      MP_DATABASE: /data/mailpit.db
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8626}:8025"
+    volumes:
+      - maildata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8025/livez"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # A pretend BillPay, for testing while the real one is down. Starts only when .env has
+  # BILLPAY_SANDBOX_BASE_URL=http://fake-billpay:8080 (deploy-server.sh turns the profile on). Its "checkout page" is the
+  # shop's own return page; nothing is paid until you run ./deploy/deploy-server.sh pay <order number>.
+  # Remove it when BillPay works: point BILLPAY_SANDBOX_BASE_URL back at https://sandbox.api.billpay.et and deploy.
+  fake-billpay:
+    <<: *base
+    image: wiremock/wiremock:3.9.1
+    profiles: [fake-billpay]
+    mem_limit: 256m
+    environment:
+      JAVA_OPTS: -Xmx160m
+    command: ["--global-response-templating", "--disable-banner", "--no-request-journal"]
+    volumes:
+      - ./fakebillpay/mappings:/home/wiremock/mappings:ro
+
+  backend:
+    <<: *base
+    build: ../backend
+    # The image already starts Java with -XX:MaxRAMPercentage=75, so the heap follows this limit.
+    mem_limit: 768m
+    env_file:
+      - path: ${BILLPAY_ENV_FILE:-../.env}
+        required: true
+    environment:
+      # These point at this stack's own containers, whatever .env says (it has the laptop's localhost values).
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tenashop}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MEDIA_S3_ENDPOINT: http://media:8333
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      BACKEND_PORT: 8181
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+
+  frontend:
+    <<: *base
+    build: ../frontend
+    mem_limit: 64m
+    networks:
+      default: {}
+      edge:
+        # The name Blink's Caddy uses (reverse_proxy billpay-frontend:80). Unique on the shared network.
+        aliases: [billpay-frontend]
+    depends_on:
+      - backend
+
+networks:
+  # Made once with `docker network create edge` (deploy-server.sh does it). Shared with Blink's Caddy only.
+  edge:
+    external: true
+    name: edge
+
+volumes:
+  pgdata: {}
+  kafkadata: {}
+  mediadata: {}
+  maildata: {}

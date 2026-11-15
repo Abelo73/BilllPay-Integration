@@ -1,0 +1,10 @@
+{
+  "name": "Payment status: always still open. A payment is captured or failed only by the webhook from deploy-server.sh pay",
+  "request": { "method": "GET", "urlPathPattern": "/api/v1/checkout/payments/[^/]+" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "transformers": ["response-template"],
+    "body": "{\"statusCode\":200,\"message\":\"Payment fetched successfully\",\"body\":{\"id\":\"{{request.pathSegments.[4]}}\",\"status\":\"CREATED\",\"attempts\":[]}}"
+  }
+}
