@@ -19,7 +19,7 @@ final class EmailTemplates {
 
 	enum Kind {
 		ORDER_PLACED, CASH_ORDERED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
-		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE
+		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE
 	}
 
 	record Email(String subject, String html, String text) {
@@ -75,7 +75,7 @@ final class EmailTemplates {
 					o, "Order again");
 			case REFUNDED -> build("Refund issued for " + o.orderNumber(), "Refund issued",
 					"We've sent a refund through BillPay to the method you paid with.", o, "View your order");
-			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE -> throw new IllegalArgumentException("not an order email");
+			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE -> throw new IllegalArgumentException("not an order email");
 		};
 	}
 
@@ -94,6 +94,16 @@ final class EmailTemplates {
 		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
 				+ esc(code) + "</p>");
 		return new Email("Sodo Gebeya admin sign-in code: " + code, html, title + "\n\n" + body + "\n\n— Sodo Gebeya");
+	}
+
+	/** No code in the subject: subjects are stored in the notifications table and shown in the admin. */
+	static Email signUpCode(String code) {
+		String title = "Confirm your email";
+		String body = "Your Sodo Gebeya code is below. Type it on the sign-up page to create your account. It works for 5 minutes."
+				+ " Never share it, not even with our staff. If you didn't just sign up, you can ignore this email.";
+		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
+				+ esc(code) + "</p>");
+		return new Email("Your Sodo Gebeya sign-up code", html, title + "\n\n" + body + "\n\n" + code + "\n\n— Sodo Gebeya");
 	}
 
 	private static Email build(String subject, String title, String intro, OrderView o, String cta) {

@@ -136,8 +136,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-tenashop}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       MEDIA_S3_ENDPOINT: http://media:8333
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
+      # The test inbox, unless .env names a real mail server (SMTP_HOST, e.g. Brevo; see deploy/README.md)
+      MAIL_HOST: ${SMTP_HOST:-mailpit}
+      MAIL_PORT: ${SMTP_PORT:-1025}
       BACKEND_PORT: 8181
     depends_on:
       postgres:

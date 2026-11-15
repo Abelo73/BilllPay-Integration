@@ -21,6 +21,8 @@ import lombok.RequiredArgsConstructor;
 public class AuthController {
 
 	private final AuthService auth;
+	private final EmailCodeService emailCodes;
+	private final et.tenapay.shop.config.AppProperties app;
 	private final PhoneAuthService phoneAuth;
 	private final StaffTwoStepService twoStep;
 	private final UserRepository users;
@@ -33,12 +35,53 @@ public class AuthController {
 			@NotBlank @Size(max = 200) String fullName,
 			@NotBlank @Email @Size(max = 200) String email,
 			@Pattern(regexp = "^$|^\\+?[0-9 ()-]{9,20}$", message = "must be a valid phone number") String phone,
-			@NotBlank @Size(max = 200) String password) {
+			@NotBlank @Size(max = 200) String password,
+			/** The 6-digit code emailed for this address (only with app.sign-up-email-code on). */
+			@Size(max = 12) String code) {
 	}
 
+	/**
+	 * Sign-up. With app.sign-up-email-code on, the first call (no code) checks the form, emails a 6-digit code and
+	 * answers 422 EMAIL_CODE_SENT with where it went; the same form sent again with the code makes the account.
+	 */
 	@PostMapping("/api/auth/register")
 	public Session register(@Valid @RequestBody RegisterRequest req, HttpServletRequest http) {
+		if (app.signUpEmailCode()) {
+			String email = AuthService.normalizeEmail(req.email());
+			if (req.code() == null || req.code().isBlank()) {
+				auth.checkCanRegister(email, req.password());
+				EmailCodeService.CodeSent sent = emailCodes.send(email, client(http));
+				java.util.Map<String, Object> details = new java.util.HashMap<>();
+				details.put("maskedEmail", sent.maskedEmail());
+				details.put("expiresInSeconds", sent.expiresInSeconds());
+				details.put("resendInSeconds", sent.resendInSeconds());
+				details.put("testMode", sent.testMode());
+				if (sent.devCode() != null) {
+					details.put("devCode", sent.devCode());
+				}
+				throw new et.tenapay.shop.common.ApiException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT,
+						"EMAIL_CODE_SENT", "We emailed you a 6-digit code. Type it to create your account.", details);
+			}
+			emailCodes.consume(email, req.code());
+		}
 		return auth.register(req.fullName(), req.email(), req.phone(), req.password(), client(http));
+	}
+
+	public record EmailCodeRequest(@NotBlank @Email @Size(max = 200) String email) {
+	}
+
+	/** "Send a new code" on the sign-up page (with app.sign-up-email-code on). */
+	@PostMapping("/api/auth/email/resend")
+	public EmailCodeService.CodeSent emailResend(@Valid @RequestBody EmailCodeRequest req, HttpServletRequest http) {
+		if (!app.signUpEmailCode()) {
+			throw et.tenapay.shop.common.ApiException.notFound("Email codes");
+		}
+		String email = AuthService.normalizeEmail(req.email());
+		if (users.existsByEmail(email)) {
+			throw new et.tenapay.shop.common.ApiException(org.springframework.http.HttpStatus.CONFLICT, "EMAIL_TAKEN",
+					"An account with this email already exists. Try signing in.");
+		}
+		return emailCodes.send(email, client(http));
 	}
 
 	@PostMapping("/api/auth/login")

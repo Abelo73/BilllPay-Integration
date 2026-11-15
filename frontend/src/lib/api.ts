@@ -192,6 +192,15 @@ export type OrderStatusView = {
 }
 
 /** Reply to "text me a code". devCode is only filled in local test mode (no SMS provider). */
+/** Where a sign-up code went (from 422 EMAIL_CODE_SENT, or a resend). devCode only on a test setup with mail off. */
+export type EmailCodeSent = {
+  maskedEmail: string
+  expiresInSeconds: number
+  resendInSeconds: number
+  testMode: boolean
+  devCode?: string | null
+}
+
 export type PhoneCodeSent = {
   phone: string
   maskedPhone: string
@@ -294,8 +303,11 @@ export const api = {
     request<Address[]>(`/me/addresses/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteAddress: (id: number) => request<Address[]>(`/me/addresses/${id}`, { method: 'DELETE' }),
 
-  register: (body: { fullName: string; email: string; phone: string; password: string }) =>
+  /** With email codes on, the first call answers 422 EMAIL_CODE_SENT; send the same form again with `code`. */
+  register: (body: { fullName: string; email: string; phone: string; password: string; code?: string }) =>
     request<Session>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
+  emailResend: (email: string) =>
+    request<EmailCodeSent>('/auth/email/resend', { method: 'POST', body: JSON.stringify({ email }) }),
   login: (email: string, password: string) =>
     request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   phoneStart: (phone: string) =>

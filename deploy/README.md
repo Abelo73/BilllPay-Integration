@@ -87,6 +87,29 @@ fake BillPay stops being started; remove the leftover container with
 too (type `DELETE`; a last backup is saved to `~/billpay-backups` before). Blink keeps running throughout. Then remove
 `SHOP_DOMAIN` from Blink's `.env.staging` and deploy Blink, so Caddy forgets the domain. Nothing else of Blink changes.
 
+## Sign-up codes and real email (Brevo)
+
+With `SIGN_UP_EMAIL_CODE=true` in `.env`, email + password sign-up sends a 6-digit code to the email first; the
+account is made only with it (5 minutes, 5 tries, a new code after 1 minute). Phone sign-up is unchanged.
+
+Without a mail server, the codes land in the test inbox (see "The test inbox"). For real inboxes, add to `.env`:
+
+```
+SMTP_HOST=smtp-relay.brevo.com
+SMTP_PORT=587
+MAIL_USERNAME=<Brevo SMTP login, Settings → SMTP & API>
+MAIL_PASSWORD=<an SMTP key made for the shop alone: sodogebeya-staging>
+MAIL_SMTP_AUTH=true
+MAIL_STARTTLS=true
+MAIL_FROM=Sodo Gebeya <sodogebeya@blinkethio.com>
+MAIL_INBOX_URL=
+```
+
+Then `./deploy/deploy-server.sh`. Order emails and staff sign-in codes go out for real too. The sender
+`sodogebeya@blinkethio.com` is verified in Brevo (DKIM and DMARC on blinkethio.com). This shares Blink staging's
+Brevo account (300 emails a day): fine for staging; real customers need the shop's own account and domain.
+To go back to the test inbox, empty `SMTP_HOST` and set `MAIL_SMTP_AUTH=false`, `MAIL_STARTTLS=false`.
+
 ## Every deploy
 
 ```bash

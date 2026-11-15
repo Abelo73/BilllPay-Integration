@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { IconInput, PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
-import { api, ApiError, type PhoneCodeSent } from '@/lib/api'
+import { api, ApiError, type EmailCodeSent, type PhoneCodeSent } from '@/lib/api'
 import { useT } from '@/lib/i18n'
 import { type Session, useSession } from '@/store/session'
 
@@ -324,14 +324,104 @@ function EmailRegister({ onDone }: { onDone: (s: Session) => void }) {
   const t = useT()
   const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirm: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  // Set once the shop has emailed a code (sign-up with email codes on): the form then asks for the code
+  const [sent, setSent] = useState<(EmailCodeSent & { at: number }) | null>(null)
+  const [code, setCode] = useState('')
+  const codeRef = useRef<HTMLInputElement>(null)
+  const resendIn = useCountdown(sent ? sent.at + sent.resendInSeconds * 1000 : 0)
+
+  const codeSent = (s: EmailCodeSent) => {
+    setSent({ ...s, at: Date.now() })
+    setCode('')
+    setTimeout(() => codeRef.current?.focus(), 50)
+  }
   const register = useMutation({
-    mutationFn: () => api.register({ fullName: form.fullName, email: form.email, phone: form.phone, password: form.password }),
+    mutationFn: () =>
+      api.register({ fullName: form.fullName, email: form.email, phone: form.phone, password: form.password, code: sent ? code : undefined }),
     onSuccess: onDone,
     onError: (e) => {
       if (e instanceof ApiError && e.code === 'VALIDATION_FAILED') setErrors((e.body.errors as Record<string, string>) ?? {})
+      if (e instanceof ApiError && e.code === 'EMAIL_CODE_SENT') codeSent(e.body as unknown as EmailCodeSent)
+      if (e instanceof ApiError && (e.code === 'CODE_EXPIRED' || e.code === 'TOO_MANY_TRIES')) setCode('')
     },
   })
+  const resend = useMutation({ mutationFn: () => api.emailResend(form.email), onSuccess: codeSent })
+
+  // fill the 6 digits → create the account right away
+  useEffect(() => {
+    if (code.length === 6 && sent && !register.isPending && !register.isSuccess) register.mutate()
+  }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value })
+
+  if (sent) {
+    const [sentBefore, sentAfter] = t('Enter the code we emailed to {email}').split('{email}')
+    const [codeBefore, codeAfter] = t('Your code is {code}.').split('{code}')
+    return (
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          register.mutate()
+        }}
+      >
+        <p className="text-center text-sm">
+          {sentBefore}<strong className="break-all">{sent.maskedEmail}</strong>{sentAfter}
+        </p>
+        {sent.testMode && (
+          <div className="flex gap-2 rounded-lg bg-warning/20 p-3 text-sm">
+            <FlaskConical className="mt-0.5 size-4 shrink-0" />
+            <span>
+              {t('Email test mode: no email was sent.')}
+              {sent.devCode ? <> {codeBefore}<strong className="font-mono tracking-widest">{sent.devCode}</strong>{codeAfter}</> : ` ${t('The code is in the backend log.')}`}
+            </span>
+          </div>
+        )}
+        <div className="space-y-2">
+          <Label htmlFor="email-code">{t('6-digit code')}</Label>
+          <Input
+            ref={codeRef}
+            id="email-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="\d{6}"
+            maxLength={6}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            className="h-14 text-center font-mono text-2xl font-bold tracking-[0.5em]"
+          />
+        </div>
+        {register.error && !(register.error instanceof ApiError && register.error.code === 'EMAIL_CODE_SENT') && <ErrorBox error={register.error} />}
+        <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={register.isPending || code.length !== 6}>
+          {register.isPending && <Loader2 className="animate-spin" />} {t('Create my account')}
+        </Button>
+        <p className="text-center text-xs text-muted-foreground">{t("Can't find it? Check your spam folder.")}</p>
+        <div className="flex items-center justify-between text-sm">
+          <button
+            type="button"
+            className="flex min-h-11 items-center gap-1 font-semibold text-brand hover:underline"
+            onClick={() => {
+              setSent(null)
+              register.reset()
+              resend.reset()
+            }}
+          >
+            <ArrowLeft className="size-4" /> {t('Change email')}
+          </button>
+          {resendIn > 0 ? (
+            <span className="text-muted-foreground">{t('Resend in {time}', { time: `0:${String(resendIn).padStart(2, '0')}` })}</span>
+          ) : (
+            <button type="button" className="min-h-11 font-semibold text-brand hover:underline" disabled={resend.isPending} onClick={() => resend.mutate()}>
+              {t('Send a new code')}
+            </button>
+          )}
+        </div>
+        <ErrorBox error={resend.error} />
+      </form>
+    )
+  }
+
   return (
     <form
       className="space-y-4"
@@ -350,7 +440,7 @@ function EmailRegister({ onDone }: { onDone: (s: Session) => void }) {
       <Field id="phone" label={t('Phone (optional)')} type="tel" inputMode="tel" autoComplete="tel" placeholder="0911 234 567" value={form.phone} onChange={set('phone')} error={errors.phone} />
       <Field id="password" label={t('Password')} type="password" autoComplete="new-password" required value={form.password} onChange={set('password')} error={errors.password} />
       <Field id="confirm" label={t('Confirm password')} type="password" autoComplete="new-password" required value={form.confirm} onChange={set('confirm')} error={errors.confirm} />
-      {register.error && !(register.error instanceof ApiError && register.error.code === 'VALIDATION_FAILED') && <ErrorBox error={register.error} />}
+      {register.error && !(register.error instanceof ApiError && ['VALIDATION_FAILED', 'EMAIL_CODE_SENT'].includes(register.error.code ?? '')) && <ErrorBox error={register.error} />}
       <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={register.isPending}>
         {register.isPending && <Loader2 className="animate-spin" />} {t('Create account')}
       </Button>

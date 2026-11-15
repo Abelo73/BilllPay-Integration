@@ -110,6 +110,14 @@ public class AuthService {
 		return result;
 	}
 
+	/** What sign-up would refuse, checked before a code is emailed: a weak password or an email already in use. */
+	public void checkCanRegister(String email, String password) {
+		PasswordPolicy.check(password);
+		if (users.existsByEmail(normalizeEmail(email))) {
+			throw new ApiException(HttpStatus.CONFLICT, "EMAIL_TAKEN", "An account with this email already exists. Try signing in.");
+		}
+	}
+
 	public Session register(String fullName, String email, String phone, String password, ClientInfo client) {
 		PasswordPolicy.check(password);
 		String normalized = normalizeEmail(email);

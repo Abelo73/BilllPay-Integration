@@ -98,6 +98,14 @@ public class NotificationService {
 		send(Kind.STAFF_SIGN_IN_CODE, "STAFF_SIGN_IN_CODE:" + codeId, null, email, EmailTemplates.staffSignInCode(fullName, code));
 	}
 
+	/**
+	 * The 6-digit code that confirms an email before the account is made. Sent at once (the person is waiting).
+	 * SENT, SKIPPED (mail turned off) or FAILED. The code is in the email only, never in the stored subject.
+	 */
+	public Notification.Status onSignUpCode(long codeId, String email, String code) {
+		return send(Kind.SIGN_UP_CODE, "SIGN_UP_CODE:" + codeId, null, email, EmailTemplates.signUpCode(code));
+	}
+
 	private EmailTemplates.OrderView view(Order o) {
 		String base = app.publicBaseUrl().replaceAll("/+$", "");
 		String reason = attempts.findFirstByOrderIdOrderByAttemptNoDesc(o.getId()).map(a -> a.getReasonCode())
@@ -112,9 +120,9 @@ public class NotificationService {
 				TIME.format(o.getCreatedAt().plus(app.paymentExpiry())));
 	}
 
-	private void send(Kind kind, String key, String orderNumber, String recipient, Email email) {
+	private Notification.Status send(Kind kind, String key, String orderNumber, String recipient, Email email) {
 		if (recipient == null || recipient.isBlank()) {
-			return;
+			return Notification.Status.SKIPPED;
 		}
 		Notification n = new Notification();
 		n.setKind(kind.name());
@@ -128,11 +136,11 @@ public class NotificationService {
 			notifications.saveAndFlush(n);
 		} catch (DataIntegrityViolationException duplicate) {
 			log.debug("Email {} already handled (race)", key);
-			return;
+			return Notification.Status.SKIPPED;
 		}
 		if (sender == null) {
 			log.info("Email '{}' to {} not sent: mail is turned off", email.subject(), recipient);
-			return;
+			return Notification.Status.SKIPPED;
 		}
 		try {
 			MimeMessage message = sender.createMimeMessage();
@@ -151,5 +159,6 @@ public class NotificationService {
 			log.warn("Could not email {} '{}': {}", recipient, email.subject(), e.getMessage());
 		}
 		notifications.save(n);
+		return n.getStatus();
 	}
 }

@@ -19,7 +19,9 @@ public record AppProperties(
 		String adminPassword,
 		String jwtSecret,
 		Delivery delivery,
-		Mail mail) {
+		Mail mail,
+		/** Email + password sign-up first sends a 6-digit code to the email; the account is made only with it. */
+		boolean signUpEmailCode) {
 
 	/** Customer emails: on/off, sender, and the dev inbox link for the admin. */
 	public record Mail(boolean enabled, String from, String inboxUrl) {

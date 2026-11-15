@@ -57,6 +57,8 @@ import tools.jackson.databind.ObjectMapper;
 		"app.redirect-base-url=https://shop.test",
 		"app.public-base-url=http://localhost:5280",
 		"app.scheduling.enabled=false",
+		// sign-up makes the account at once in the tests that just need a customer (EmailSignUpIntegrationTest turns codes on)
+		"app.sign-up-email-code=false",
 		// Telegram stays in test mode (no token); the webhook needs this secret
 		"telegram.webhook-secret=" + IntegrationTest.TELEGRAM_SECRET,
 		"telegram.channel-id=@sodo-test",
