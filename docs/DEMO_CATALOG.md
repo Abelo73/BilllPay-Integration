@@ -65,6 +65,6 @@ python3 scripts/demo_catalog/expand_demo_catalog.py --check  # check only
 - **Photo mismatches:** see the photo section above.
 - **Prices are demo prices**, not market research. Check against real listings before any pricing decision.
 - **Specs are empty** for the new listings. Category fields (brand, RAM, size) need filling if we want the filters to show them.
-- **Not covered here:** Property, Services, Jobs and Seeking Work. These are not goods. They map to other modules (`pro_profiles`, `job_posts`, `talent_profiles`). Property has no module yet, so it needs a decision first.
-- **Size:** the 609 placeholder photos add about 9 MB to the repository.
+- **Services, jobs and talent** (10 services, 10 job posts, 8 talent profiles) are in `demo/marketplace.json`, loaded with the catalog. **Property** has no module yet, so it is not seeded.
+- **Size:** the new photos add about 34 MB to the repository (about 22 MB of it from the photo folder as a whole).
 - The loader was not run against a live database in this change. Test it once through **Admin → Demo data** on the dev stack before relying on it.
