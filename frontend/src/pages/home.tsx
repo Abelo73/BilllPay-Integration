@@ -27,6 +27,7 @@ import { toast } from 'sonner'
 
 import { HeartButton } from '@/components/heart-button'
 import { HomeBanners, TopListings } from '@/components/home-promos'
+import { HeroSlider } from '@/components/hero-slider'
 import { ProductCard } from '@/components/product-card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
@@ -47,10 +48,8 @@ import { useSession } from '@/store/session'
  * photos, "Picked for you" (from this visitor's own activity, on this device), recently listed next to local services,
  * paid top listings, "Why Sodo Gebeya?", questions.
  *
- * The hero photo is /brand/hero-sodo.jpg (frontend/public/brand/): a real photo of Sodo, landscape 4:3 or wider, at
- * least 1600 px wide. Until it exists, a drawn Sodo landscape in the brand colours stands in.
+ * The hero shows a sliding advert (components/hero-slider.tsx): admin banners when there are any, otherwise built-in slides.
  */
-const HERO_PHOTO = '/brand/hero-sodo.jpg'
 
 /** Fades a section up the first time it scrolls into view (no motion for people who ask for less). */
 function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
@@ -142,41 +141,6 @@ function SearchBox({ compact = false }: { compact?: boolean }) {
   )
 }
 
-/** The photo of Sodo, or a drawn landscape in the brand colours until the photo is added. */
-function HeroPicture({ className }: { className?: string }) {
-  const [broken, setBroken] = useState(false)
-  if (!broken) {
-    return <img src={HERO_PHOTO} alt="" onError={() => setBroken(true)} className={cn('size-full object-cover', className)} />
-  }
-  return (
-    <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" className={cn('size-full', className)} aria-hidden>
-      <defs>
-        <linearGradient id="hero-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#BFE3F2" />
-          <stop offset="1" stopColor="#EAF6EF" />
-        </linearGradient>
-      </defs>
-      <rect width="800" height="600" fill="url(#hero-sky)" />
-      <circle cx="640" cy="130" r="54" fill="#F7C873" opacity="0.9" />
-      <path d="M0 330 C140 250 260 300 380 250 S640 200 800 260 V600 H0Z" fill="#9CCFAE" />
-      <path d="M0 400 C160 330 300 380 450 330 S700 300 800 350 V600 H0Z" fill="#4FA57A" />
-      <path d="M0 470 C180 420 330 470 500 420 S720 400 800 430 V600 H0Z" fill="#1F7A56" />
-      <path d="M0 540 C200 500 380 540 560 505 S740 490 800 510 V600 H0Z" fill="#0E5A43" />
-      {/* the town: rows of little roofs on the hills */}
-      {Array.from({ length: 26 }).map((_, i) => {
-        const x = 40 + (i % 13) * 58 + (i > 12 ? 24 : 0)
-        const y = (i > 12 ? 440 : 380) + Math.sin(i) * 12
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width="26" height="18" rx="2" fill="#F5F1E8" />
-            <path d={`M${x - 3} ${y} L${x + 13} ${y - 11} L${x + 29} ${y}Z`} fill={i % 3 ? '#C0532F' : '#8C6A4A'} />
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
 function QuickActions({ jobsOn }: { jobsOn: boolean }) {
   const t = useT()
   const actions: { icon: LucideIcon; title: string; note: string; to: string }[] = [
@@ -229,7 +193,7 @@ function Hero({ jobsOn }: { jobsOn: boolean }) {
     <section className="relative isolate overflow-hidden">
       {/* phone: the photo first, edge to edge, with the orange and green wave under it */}
       <div className="relative aspect-[16/10] w-full sm:hidden">
-        <HeroPicture />
+        <HeroSlider />
         <svg viewBox="0 0 400 60" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-12 w-full" aria-hidden>
           <path d="M0 30 C120 0 260 70 400 20 V60 H0Z" className="fill-market" />
           <path d="M0 42 C130 14 270 76 400 34 V60 H0Z" className="fill-primary" />
@@ -266,7 +230,7 @@ function Hero({ jobsOn }: { jobsOn: boolean }) {
             <span className="ml-1 h-1.5 w-6 rotate-[20deg] rounded-full bg-market" />
           </span>
           <div className="relative aspect-[4/3] overflow-hidden shadow-2xl shadow-primary/20 [border-radius:58%_42%_38%_62%/52%_40%_60%_48%]">
-            <HeroPicture />
+            <HeroSlider />
             <svg viewBox="0 0 400 80" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-16 w-full" aria-hidden>
               <path d="M0 60 C140 20 260 90 400 30 V80 H0Z" className="fill-primary" />
             </svg>
