@@ -25,12 +25,14 @@ public final class ShopViews {
 
 	/** The public shop page. */
 	public record PublicShopDto(String name, String slug, String kind, String description, String area,
-			String logoUrl, String coverUrl, Instant memberSince, long productCount, boolean verified, boolean pro) {
+			String logoUrl, String coverUrl, Instant memberSince, long productCount, boolean verified, boolean pro,
+			java.util.List<String> photos, ShopSocialController.Socials socials) {
 
-		public static PublicShopDto of(Shop s, MediaProperties media, long productCount) {
+		public static PublicShopDto of(Shop s, MediaProperties media, long productCount, java.util.List<String> photos) {
 			return new PublicShopDto(s.getName(), s.getSlug(), s.getKind().name(), s.getDescription(), s.getArea(),
 					url(s.getLogoKey(), media), url(s.getCoverKey(), media), s.getCreatedAt(), productCount,
-					s.getVerifiedAt() != null, s.pro());
+					s.getVerifiedAt() != null, s.pro(), photos,
+					new ShopSocialController.Socials(s.getInstagram(), s.getFacebook(), s.getTelegram()));
 		}
 	}
 

@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 
 import { ProductCard } from '@/components/product-card'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export function ShopPage() {
   const minPrice = params.get('minPrice') ?? ''
   const maxPrice = params.get('maxPrice') ?? ''
   const area = params.get('area') ?? ''
+  const condition = params.get('condition') ?? ''
   const [near, setNear] = useMyArea()
   const areas = useQuery({ queryKey: ['areas'], queryFn: publicTrustApi.areas, staleTime: 10 * 60_000 })
   const [search, setSearch] = useState(q)
@@ -62,8 +63,8 @@ export function ShopPage() {
     staleTime: 60_000,
   })
   const products = useQuery({
-    queryKey: ['products', category, q, sort, page, filterKey, minPrice, maxPrice, area, near],
-    queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, area, near, ...specFilters }),
+    queryKey: ['products', category, q, sort, page, filterKey, minPrice, maxPrice, area, near, condition],
+    queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, area, near, condition, ...specFilters }),
     placeholderData: keepPreviousData,
   })
   // "For you" (on this device only): an opened category counts at once; a search counts once its results are in and
@@ -143,6 +144,16 @@ export function ShopPage() {
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <PriceRange min={minPrice} max={maxPrice} onChange={(a, b) => update({ minPrice: a || null, maxPrice: b || null })} />
         <label className="space-y-1 text-xs font-medium text-muted-foreground">
+          {t('Condition')}
+          <select value={condition} onChange={(e) => update({ condition: e.target.value || null })}
+            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', condition && 'border-primary')}>
+            <option value="">{t('Any condition')}</option>
+            <option value="NEW">{t('New')}</option>
+            <option value="LIKE_NEW">{t('Like new')}</option>
+            <option value="USED">{t('Used')}</option>
+          </select>
+        </label>
+        <label className="space-y-1 text-xs font-medium text-muted-foreground">
           {t('Area')}
           <select value={area} onChange={(e) => update({ area: e.target.value || null })}
             className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', area && 'border-primary')}>
@@ -210,9 +221,15 @@ export function ShopPage() {
         </p>
       )}
       {products.data && products.data.content.length === 0 && (
-        <p className="mt-8 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {t('No products match your filters.')}
-        </p>
+        <div className="mt-8 space-y-3 rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+          <p>{q ? t('Nothing matches "{q}".', { q }) : t('No products match your filters.')}</p>
+          <ul className="space-y-1">
+            {q && <li>{t('Check the spelling, or use fewer words.')}</li>}
+            {(minPrice || maxPrice || area || condition) && <li>{t('Try removing a filter, such as the price or the area.')}</li>}
+            <li>{t('Browse the categories instead.')}</li>
+          </ul>
+          <Link to="/categories" className="inline-block font-semibold text-brand hover:underline">{t('All categories')}</Link>
+        </div>
       )}
 
       {products.data && products.data.totalPages > 1 && (

@@ -23,12 +23,13 @@ public class ShopPublicController {
 	private final ShopRepository shops;
 	private final ProductRepository products;
 	private final MediaProperties media;
+	private final ShopGalleryController gallery;
 
 	@GetMapping("/{slug}")
 	public PublicShopDto get(@PathVariable String slug) {
 		Shop shop = shops.findBySlug(slug).filter(s -> s.getStatus().selling())
 				.orElseThrow(() -> ApiException.notFound("Shop"));
 		long count = products.search(null, null, shop.getId(), PageRequest.of(0, 1)).getTotalElements();
-		return PublicShopDto.of(shop, media, count);
+		return PublicShopDto.of(shop, media, count, gallery.publicUrls(shop.getId()));
 	}
 }

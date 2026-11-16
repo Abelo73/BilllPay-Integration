@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   BriefcaseBusiness,
   ChevronRight,
+  LogOut,
   FlaskConical,
   Heart,
   Home,
@@ -17,7 +18,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
+import { Link, NavLink, Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router'
 
 import { CartSheet } from '@/components/cart-sheet'
 import { CategoryMegaMenu } from '@/components/category-menu'
@@ -35,6 +36,8 @@ import { useFeatures } from '@/lib/features'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { cartTotals, useCart } from '@/store/cart'
+import { toast } from 'sonner'
+
 import { useSession } from '@/store/session'
 
 /** Shown only while payments go to BillPay's sandbox; with live keys real money moves, so it must not claim otherwise. */
@@ -128,6 +131,9 @@ function MobileMenu() {
   const t = useT()
   const { payments } = useFeatures()
   const session = useSession((s) => s.session)
+  const clear = useSession((s) => s.clear)
+  const qc = useQueryClient()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const links = [
     { to: '/shop', label: 'Marketplace', icon: Store },
@@ -167,6 +173,28 @@ function MobileMenu() {
             </Link>
           ))}
         </nav>
+        {/* account and sign-out: on phones this is the only place for them (the desktop menu is hidden there) */}
+        {session && (
+          <div className="mt-4 grid gap-1 border-t px-3 pt-3">
+            <Link to="/account" onClick={() => setOpen(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-3 font-semibold hover:bg-accent">
+              <User className="size-5 text-primary" /> {t('My account')}
+              <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                clear()
+                qc.removeQueries({ queryKey: ['my-orders'] })
+                toast.success(t('Signed out'))
+                navigate('/')
+              }}
+              className="flex min-h-12 items-center gap-3 rounded-xl px-3 text-left font-semibold text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="size-5" /> {t('Sign out')}
+            </button>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   )

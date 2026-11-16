@@ -117,11 +117,21 @@ async function upload<T>(path: string, file: File): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export type GalleryPhoto = { id: number; position: number; url: string }
+
+/** Handles only (no @, no web address), or null when not set. */
+export type ShopSocials = { instagram: string | null; facebook: string | null; telegram: string | null }
+
 export const sellerApi = {
   shop: () => request<MyShop>('/seller/shop'),
   open: (body: ShopInput) => request<MyShop>('/seller/shop', json('POST', body)),
   updateShop: (body: ShopInput) => request<MyShop>('/seller/shop', json('PUT', body)),
   uploadShopImage: (kind: 'logo' | 'cover', file: File) => upload<MyShop>(`/seller/shop/${kind}`, file),
+  shopSocial: () => request<ShopSocials>('/seller/shop/social'),
+  saveShopSocial: (body: ShopSocials) => request<ShopSocials>('/seller/shop/social', json('PUT', body)),
+  shopGallery: () => request<GalleryPhoto[]>('/seller/shop/photos'),
+  addShopPhoto: (file: File) => upload<GalleryPhoto[]>('/seller/shop/photos', file),
+  removeShopPhoto: (id: number) => request<GalleryPhoto[]>(`/seller/shop/photos/${id}`, { method: 'DELETE' }),
   summary: () => request<SellerSummary>('/seller/summary'),
 
   orders: (p: { tab: SellerOrderTab; q?: string; page?: number }) =>

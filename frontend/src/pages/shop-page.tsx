@@ -44,6 +44,13 @@ export function ShopPublicPage() {
           ) : (
             <div className="h-20 bg-primary/10 sm:h-28" aria-hidden />
           )}
+          {(s.photos?.length ?? 0) > 0 && (
+            <div className="grid grid-cols-3 gap-2 px-5 pt-5 sm:grid-cols-6 sm:px-6" aria-label={t('Shop photos')}>
+              {s.photos!.map((url, i) => (
+                <img key={url} src={url} alt={`${s.name} ${i + 1}`} loading="lazy" className="aspect-[4/3] w-full rounded-xl object-cover" />
+              ))}
+            </div>
+          )}
           <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:p-6">
             {s.logoUrl ? (
               <img src={s.logoUrl} alt="" className="-mt-14 size-24 rounded-2xl border-4 border-card object-cover sm:-mt-20" />
@@ -68,6 +75,28 @@ export function ShopPublicPage() {
             </div>
           </div>
           {s.description && <p className="max-w-3xl whitespace-pre-line px-5 pb-6 text-sm text-pretty sm:px-6">{s.description}</p>}
+          {s.socials && (s.socials.instagram || s.socials.facebook || s.socials.telegram) && (
+            <div className="space-y-2 px-5 pb-6 sm:px-6">
+              <div className="flex flex-wrap gap-2">
+                {s.socials.instagram && (
+                  <a href={`https://instagram.com/${s.socials.instagram}`} target="_blank" rel="noopener noreferrer nofollow" className="rounded-full border px-3 py-1.5 text-sm font-semibold hover:bg-accent">
+                    Instagram · @{s.socials.instagram}
+                  </a>
+                )}
+                {s.socials.facebook && (
+                  <a href={`https://facebook.com/${s.socials.facebook}`} target="_blank" rel="noopener noreferrer nofollow" className="rounded-full border px-3 py-1.5 text-sm font-semibold hover:bg-accent">
+                    Facebook · {s.socials.facebook}
+                  </a>
+                )}
+                {s.socials.telegram && (
+                  <a href={`https://t.me/${s.socials.telegram}`} target="_blank" rel="noopener noreferrer nofollow" className="rounded-full border px-3 py-1.5 text-sm font-semibold hover:bg-accent">
+                    Telegram · @{s.socials.telegram}
+                  </a>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{t('Pay and order inside Sodo Gebeya. Never send money to a social account.')}</p>
+            </div>
+          )}
         </div>
       )}
 

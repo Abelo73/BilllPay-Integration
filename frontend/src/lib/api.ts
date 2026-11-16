@@ -49,6 +49,10 @@ export type PublicShop = {
   area: string | null
   logoUrl: string | null
   coverUrl: string | null
+  /** the shop's gallery, in order (up to six); empty when none */
+  photos?: string[]
+  /** social handles; each is shown as a link only when set */
+  socials?: { instagram: string | null; facebook: string | null; telegram: string | null }
   memberSince: string
   productCount: number
   verified: boolean
@@ -265,7 +269,7 @@ export type PublicProfile = { id: string; firstName: string; avatarUrl: string |
 
 export const api = {
   /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
-  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; area?: string; near?: string; [spec: `spec.${string}`]: string }) => {
+  products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; area?: string; near?: string; condition?: string; [spec: `spec.${string}`]: string }) => {
     const qs = new URLSearchParams()
     for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== '') qs.set(k, String(v))
     return request<Page<Product>>(`/products?${qs}`)

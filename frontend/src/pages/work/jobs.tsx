@@ -124,6 +124,7 @@ function SideCard({ title, text, to, cta, amber }: { title: string; text: string
 
 function JobCard({ job }: { job: JobView }) {
   const t = useT()
+  const [quick, setQuick] = useState(false)
   return (
     <Link to={`/work/jobs/${job.id}`}
       className={cn('group block rounded-2xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-5', job.featured && 'border-market/60 ring-1 ring-market/30')}>
@@ -144,8 +145,45 @@ function JobCard({ job }: { job: JobView }) {
             <span className="inline-flex items-center gap-1"><Wallet className="size-3.5" />{salaryLabel(job)}</span>
             <span className="inline-flex items-center gap-1"><CalendarClock className="size-3.5" />{daysLeft(job.deadline)}</span>
           </div>
+          <div className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setQuick(true) }}
+            >
+              {t('Quick look')}
+            </Button>
+          </div>
         </div>
       </div>
+      <Dialog open={quick} onOpenChange={setQuick}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{job.title}</DialogTitle>
+            <DialogDescription>{job.employerName} · {job.place}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            <span className="inline-flex items-center gap-1"><BriefcaseBusiness className="size-4" /> {t(JOB_TYPE_LABEL[job.type])}{job.field ? ` · ${job.field}` : ''}</span>
+            <span className="inline-flex items-center gap-1"><Wallet className="size-4" /> {salaryLabel(job)}</span>
+            <span className="inline-flex items-center gap-1"><CalendarClock className="size-4" /> {t('Apply by {date} ({left})', { date: shortDate(job.deadline), left: daysLeft(job.deadline) })}</span>
+            <span className="inline-flex items-center gap-1"><MapPin className="size-4" /> {job.place}</span>
+          </div>
+          <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
+            <p className="whitespace-pre-line text-sm leading-relaxed">{job.description}</p>
+            {job.requirements && (
+              <div>
+                <p className="text-sm font-semibold">{t('What you need')}</p>
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{job.requirements}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button asChild className="rounded-full"><Link to={`/work/jobs/${job.id}`}>{t('Open the full job')}</Link></Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Link>
   )
 }

@@ -45,6 +45,11 @@ public class Shop {
 
 	private String area;
 
+	/** Social handles (no @, no web address); see ShopSocialController. */
+	private String instagram;
+	private String facebook;
+	private String telegram;
+
 	private String addressLine;
 
 	private String logoKey;

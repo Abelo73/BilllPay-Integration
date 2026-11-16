@@ -96,6 +96,7 @@ public class CatalogController {
 			@RequestParam(required = false) BigDecimal maxPrice,
 			@RequestParam(required = false) String area,
 			@RequestParam(required = false) String near,
+			@RequestParam(required = false) String condition,
 			@RequestParam Map<String, String> params) {
 		Sort order = switch (sort) {
 			case "price_asc" -> Sort.by("price").ascending();
@@ -119,7 +120,7 @@ public class CatalogController {
 		});
 		String specFilter = cat == null || wanted.isEmpty() ? null
 				: categories.findBySlug(cat).map(c -> specs.filterJson(c.getId(), wanted)).orElse(null);
-		return PageDto.of(products.search(cat, query, shopId, specFilter, minPrice, maxPrice, 0L, blank(area), blank(near), PageRequest.of(page, Math.min(size, 48), order))
+		return PageDto.of(products.search(cat, query, shopId, specFilter, minPrice, maxPrice, 0L, blank(area), blank(near), condition(condition), PageRequest.of(page, Math.min(size, 48), order))
 				.map(ProductDto::from));
 	}
 
@@ -133,6 +134,18 @@ public class CatalogController {
 	public CategoryFields fieldsById(@PathVariable Long id) {
 		Category c = categories.findById(id).orElseThrow(() -> ApiException.notFound("Category"));
 		return new CategoryFields(dto(c), specs.views(c.getId(), false), List.of());
+	}
+
+	/** "NEW", "LIKE_NEW" or "USED"; anything else means no condition filter. */
+	private static ItemCondition condition(String s) {
+		if (s == null || s.isBlank()) {
+			return null;
+		}
+		try {
+			return ItemCondition.valueOf(s.trim().toUpperCase(java.util.Locale.ROOT));
+		} catch (IllegalArgumentException unknown) {
+			return null;
+		}
 	}
 
 	private static String blank(String s) {

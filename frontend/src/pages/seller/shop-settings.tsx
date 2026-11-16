@@ -1,9 +1,10 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ImagePlus, Loader2 } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ImagePlus, Loader2, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useOutletContext } from 'react-router'
 import { toast } from 'sonner'
 
+import { Button } from '@/components/ui/button'
 import { ImageCropDialog } from '@/components/image-crop'
 import { Card, CardContent } from '@/components/ui/card'
 import { useT } from '@/lib/i18n'
@@ -75,6 +76,135 @@ function PhotoPicker({ kind, shop }: { kind: 'logo' | 'cover'; shop: MyShop }) {
   )
 }
 
+/** Instagram, Facebook and Telegram: the name only. Buyers see them as links, with a warning about paying outside the app. */
+function SocialCard() {
+  const t = useT()
+  const qc = useQueryClient()
+  const current = useQuery({ queryKey: ['shop-social'], queryFn: sellerApi.shopSocial })
+  const [form, setForm] = useState<{ instagram: string; facebook: string; telegram: string } | null>(null)
+  const value = form ?? { instagram: current.data?.instagram ?? '', facebook: current.data?.facebook ?? '', telegram: current.data?.telegram ?? '' }
+  const save = useMutation({
+    mutationFn: () => sellerApi.saveShopSocial({
+      instagram: value.instagram.trim() || null,
+      facebook: value.facebook.trim() || null,
+      telegram: value.telegram.trim() || null,
+    }),
+    onSuccess: (s) => {
+      qc.setQueryData(['shop-social'], s)
+      setForm(null)
+      toast.success(t('Links saved'))
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const set = (k: keyof typeof value, v: string) => setForm({ ...value, [k]: v })
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-5">
+        <div className="space-y-1">
+          <h2 className="text-base font-bold">{t('Social links')}</h2>
+          <p className="text-sm text-muted-foreground">{t('Type only the name, for example @marta_boutique. Buyers see the links on your shop page.')}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="space-y-1 text-sm font-medium">Instagram
+            <input className="block h-10 w-full rounded-lg border bg-card px-3 text-sm" value={value.instagram} onChange={(e) => set('instagram', e.target.value)} placeholder="@name" maxLength={60} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Facebook
+            <input className="block h-10 w-full rounded-lg border bg-card px-3 text-sm" value={value.facebook} onChange={(e) => set('facebook', e.target.value)} placeholder={t('Page name')} maxLength={80} />
+          </label>
+          <label className="space-y-1 text-sm font-medium">Telegram
+            <input className="block h-10 w-full rounded-lg border bg-card px-3 text-sm" value={value.telegram} onChange={(e) => set('telegram', e.target.value)} placeholder="@name" maxLength={40} />
+          </label>
+        </div>
+        <p className="rounded-lg bg-amber-soft px-3 py-2 text-xs text-amber-ink">
+          {t('Buyers are told to pay and order inside Sodo Gebeya, never to a social account. Do not ask for money in your posts.')}
+        </p>
+        <div>
+          <Button onClick={() => save.mutate()} disabled={save.isPending || !form}>{save.isPending && <Loader2 className="animate-spin" />} {t('Save links')}</Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** The shop gallery: up to six photos of the shop, its stock and its front. Each one is cropped to 4:3 first. */
+function GalleryCard() {
+  const t = useT()
+  const qc = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  const [picking, setPicking] = useState<File | null>(null)
+  const photos = useQuery({ queryKey: ['shop-gallery'], queryFn: sellerApi.shopGallery })
+  const add = useMutation({
+    mutationFn: (f: File) => sellerApi.addShopPhoto(f),
+    onSuccess: (list) => {
+      qc.setQueryData(['shop-gallery'], list)
+      setPicking(null)
+      toast.success(t('Photo added'))
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const remove = useMutation({
+    mutationFn: (id: number) => sellerApi.removeShopPhoto(id),
+    onSuccess: (list) => qc.setQueryData(['shop-gallery'], list),
+    onError: (e) => toast.error(e.message),
+  })
+  const list = photos.data ?? []
+  const full = list.length >= 6
+  return (
+    <Card>
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold">{t('Shop gallery')}</h2>
+          <span className="text-xs text-muted-foreground">{list.length}/6</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {t('Up to six photos of your shop, your stock and your front. Only photos of things and places, never of customers without their consent.')}
+        </p>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {list.map((p) => (
+            <div key={p.id} className="relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
+              <img src={p.url} alt="" loading="lazy" className="size-full object-cover" />
+              <button
+                type="button"
+                onClick={() => remove.mutate(p.id)}
+                disabled={remove.isPending}
+                className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                aria-label={t('Remove photo')}
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ))}
+          {!full && (
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              disabled={add.isPending}
+              className="grid aspect-[4/3] place-items-center rounded-xl border-2 border-dashed text-muted-foreground hover:border-primary"
+              aria-label={t('Add a photo')}
+            >
+              {add.isPending ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-5" />}
+            </button>
+          )}
+        </div>
+        <input
+          ref={input}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) setPicking(f)
+            e.target.value = ''
+          }}
+        />
+      </CardContent>
+      {picking && (
+        <ImageCropDialog file={picking} aspect={4 / 3} outWidth={1200} title={t('Crop your photo')} onCancel={() => setPicking(null)} onDone={(f) => add.mutate(f)} />
+      )}
+    </Card>
+  )
+}
+
 export function SellerShopPage() {
   const shop = useOutletContext<MyShop>()
   const qc = useQueryClient()
@@ -101,6 +231,8 @@ export function SellerShopPage() {
           </div>
         </CardContent>
       </Card>
+      <GalleryCard />
+      <SocialCard />
       <Card>
         <CardContent className="p-5">
           <ShopForm

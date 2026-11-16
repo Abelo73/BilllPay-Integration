@@ -133,7 +133,8 @@ final class EmailTemplates {
 					+ ", " + esc(o.deliveryCity()) + "</p>";
 			text.append("\nDeliver to: ").append(o.deliveryAddress()).append(", ").append(o.deliveryCity()).append("\n");
 		}
-		text.append("\n").append(cta).append(": ").append(o.trackUrl()).append("\n\n— Sodo Gebeya");
+		text.append("\n").append(cta).append(": ").append(o.trackUrl())
+				.append("\n\n— Sodo Gebeya\nThis is an automated message. Please don't reply to it.");
 
 		String body = "<p style=\"margin:0 0 16px\">" + esc(intro) + "</p>"
 				+ "<p style=\"margin:0 0 8px;color:#6b7280;font-size:13px\">Order <span style=\"font-family:monospace\">"
@@ -141,7 +142,7 @@ final class EmailTemplates {
 				+ "<table role=\"presentation\" width=\"100%\" style=\"border-collapse:collapse;font-size:14px\">" + rows
 				+ "</table>" + delivery
 				+ "<p style=\"margin:24px 0 0\"><a href=\"" + esc(o.trackUrl()) + "\" style=\"background:" + BRAND
-				+ ";color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:10px;display:inline-block;font-weight:600\">"
+				+ ";color:#ffffff;text-decoration:none;padding:14px 24px;border-radius:12px;display:inline-block;font-weight:700;font-size:15px\">"
 				+ esc(cta) + "</a></p>";
 		return new Email(subject, frame(title, body), text.toString());
 	}
@@ -152,15 +153,31 @@ final class EmailTemplates {
 				+ "</td></tr>";
 	}
 
+	/**
+	 * The shared layout of every email: brand header, a hidden preview line, the content in a card, and a footer that
+	 * says plainly that the message is automated. Tables and inline styles only, so mail apps show it the same way.
+	 */
 	private static String frame(String title, String body) {
-		return "<!doctype html><html><body style=\"margin:0;background:#f3f4f6;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827\">"
-				+ "<table role=\"presentation\" width=\"100%\" style=\"padding:24px 12px\"><tr><td align=\"center\">"
-				+ "<table role=\"presentation\" width=\"100%\" style=\"max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden\">"
-				+ "<tr><td style=\"background:" + BRAND + ";padding:18px 24px;color:#ffffff;font-size:18px;font-weight:700\">Sodo Gebeya</td></tr>"
-				+ "<tr><td style=\"padding:24px\"><h1 style=\"margin:0 0 12px;font-size:22px\">" + esc(title) + "</h1>" + body
-				+ "</td></tr>"
-				+ "<tr><td style=\"padding:16px 24px;background:#f9fafb;color:#6b7280;font-size:12px\">Sodo Gebeya · Wolaita Sodo · Payments by BillPay</td></tr>"
-				+ "</table></td></tr></table></body></html>";
+		return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+				+ "<meta name=\"color-scheme\" content=\"light\"><title>" + esc(title) + "</title></head>"
+				+ "<body style=\"margin:0;padding:0;background:#eef4f1;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827\">"
+				+ "<div style=\"display:none;max-height:0;overflow:hidden;opacity:0\">" + esc(title) + " · Sodo Gebeya</div>"
+				+ "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#eef4f1\"><tr><td align=\"center\" style=\"padding:28px 12px\">"
+				+ "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:580px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 8px 30px rgba(14,90,67,.10)\">"
+				// header band
+				+ "<tr><td style=\"background:" + BRAND + ";background-image:linear-gradient(135deg,#0E5A43,#14734F);padding:22px 28px\">"
+				+ "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr>"
+				+ "<td style=\"color:#ffffff;font-size:20px;font-weight:800;letter-spacing:.2px\">Sodo <span style=\"color:#F2B65A\">Gebeya</span></td>"
+				+ "<td align=\"right\" style=\"color:#CFE8DC;font-size:12px\">Wolaita Sodo</td></tr></table></td></tr>"
+				// content
+				+ "<tr><td style=\"padding:28px 28px 8px\"><h1 style=\"margin:0 0 14px;font-size:24px;line-height:1.25;color:#0B3F2F\">" + esc(title) + "</h1>"
+				+ body + "</td></tr>"
+				// footer
+				+ "<tr><td style=\"padding:20px 28px 26px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.6\">"
+				+ "<p style=\"margin:0 0 6px\"><strong style=\"color:#374151\">This is an automated message. Please don't reply to it.</strong></p>"
+				+ "<p style=\"margin:0\">For help, open <strong>Help</strong> on the Sodo Gebeya website. Payments are handled by BillPay; we never ask for your PIN or password by email.</p>"
+				+ "<p style=\"margin:12px 0 0;color:#9ca3af\">© Sodo Gebeya · Wolaita Sodo, Ethiopia</p>"
+				+ "</td></tr></table></td></tr></table></body></html>";
 	}
 
 	private static String reason(String code) {

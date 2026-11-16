@@ -30,24 +30,26 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 			  and (:category is null or p.category.slug = :category
 			       or p.category.parentId in (select c.id from Category c where c.slug = :category))
 			  and (:shopId is null or s.id = :shopId)
-			  and (:q is null or lower(p.name) like lower(concat('%', cast(:q as string), '%'))
+			  and (:q is null or function('search_match', p.name, p.description, s.name, cast(:q as string)) = true
 			       or function('specs_has_text', p.specs, cast(:q as string)) = true)
 			  and function('specs_match', p.specs, coalesce(cast(:specs as string), '{}')) = true
 			  and (:minPrice is null or p.price >= :minPrice)
 			  and (:maxPrice is null or p.price <= :maxPrice)
 			  and p.id > :afterId
 			  and (:area is null or lower(coalesce(p.area, s.area)) = lower(cast(:area as string)))
+			  and (:condition is null or p.condition = :condition)
 			order by case when p.boostedUntil > current_timestamp then 0 else 1 end,
 			  case when lower(coalesce(p.area, s.area)) = lower(coalesce(cast(:near as string), '')) then 0 else 1 end
 			""")
 	Page<Product> search(@Param("category") String category, @Param("q") String q, @Param("shopId") Long shopId,
 			@Param("specs") String specs, @Param("minPrice") java.math.BigDecimal minPrice, @Param("maxPrice") java.math.BigDecimal maxPrice,
-			@Param("afterId") long afterId, @Param("area") String area, @Param("near") String near, Pageable pageable);
+			@Param("afterId") long afterId, @Param("area") String area, @Param("near") String near,
+			@Param("condition") ItemCondition condition, Pageable pageable);
 
 	/** Without the area filter and "near me first" (saved-search alerts). */
 	default Page<Product> search(String category, String q, Long shopId, String specs, java.math.BigDecimal minPrice,
 			java.math.BigDecimal maxPrice, long afterId, Pageable pageable) {
-		return search(category, q, shopId, specs, minPrice, maxPrice, afterId, null, null, pageable);
+		return search(category, q, shopId, specs, minPrice, maxPrice, afterId, null, null, (ItemCondition) null, pageable);
 	}
 
 	/** Store listing with detail filters (no price range). */

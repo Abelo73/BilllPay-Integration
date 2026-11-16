@@ -163,7 +163,8 @@ app:
   phone-sign-in: ${PHONE_SIGN_IN:false}
   mail:
     enabled: ${MAIL_ENABLED:true}
-    from: ${MAIL_FROM:Sodo Gebeya <orders@sodogebeya.local>}
+    # A no-reply sender: replies to these emails are not read. The domain must be verified in Brevo (SPF and DKIM).
+    from: ${MAIL_FROM:Sodo Gebeya <no-reply@sodogebeya.blinkethio.com>}
     # shown in the admin as "Open test inbox" (Mailpit); leave empty with a real mail server
     inbox-url: ${MAIL_INBOX_URL:http://localhost:8626}
 
