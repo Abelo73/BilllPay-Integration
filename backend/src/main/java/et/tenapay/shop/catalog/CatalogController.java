@@ -69,7 +69,11 @@ public class CatalogController {
 	}
 
 	/** {@code parentId}: the main category this one sits under; null = a main category. */
-	public record CategoryDto(Long id, String name, String slug, Long parentId) {
+	/**
+	 * {@code listingCount}: listings the store shows in it; a main category's includes its sub-categories'. Only in
+	 * the /api/categories list (null elsewhere).
+	 */
+	public record CategoryDto(Long id, String name, String slug, Long parentId, Long listingCount) {
 	}
 
 	/** A category's detail fields (for the listing form) and filters with counts (for the shop page). */
@@ -132,7 +136,7 @@ public class CatalogController {
 	}
 
 	static CategoryDto dto(Category c) {
-		return new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId());
+		return new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId(), null);
 	}
 
 	/** M16: listings boosted right now, for the home page. */
@@ -160,7 +164,22 @@ public class CatalogController {
 
 	@GetMapping("/categories")
 	public List<CategoryDto> categories() {
-		return categories.findByActiveTrueOrderBySortOrderAscIdAsc().stream()
-				.map(CatalogController::dto).toList();
+		List<Category> shown = categories.findByActiveTrueOrderBySortOrderAscIdAsc();
+		java.util.Map<Long, Long> own = new java.util.HashMap<>();
+		for (Object[] row : categories.visibleCounts()) {
+			own.put((Long) row[0], ((Number) row[1]).longValue());
+		}
+		// a main category counts its own listings and its shown sub-categories'
+		java.util.Map<Long, Long> total = new java.util.HashMap<>();
+		for (Category c : shown) {
+			long n = own.getOrDefault(c.getId(), 0L);
+			total.merge(c.getId(), n, Long::sum);
+			if (c.getParentId() != null) {
+				total.merge(c.getParentId(), n, Long::sum);
+			}
+		}
+		return shown.stream()
+				.map(c -> new CategoryDto(c.getId(), c.getName(), c.getSlug(), c.getParentId(), total.getOrDefault(c.getId(), 0L)))
+				.toList();
 	}
 }

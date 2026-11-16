@@ -20,6 +20,18 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 	@Query("select coalesce(max(c.sortOrder), 0) from Category c")
 	int maxSortOrder();
 
+	/**
+	 * [categoryId, listings the store shows] with the store's visibility rule (ProductRepository.search): switched on,
+	 * not taken down, from an approved seller (or Sodo Gebeya itself).
+	 */
+	@Query("""
+			select p.category.id, count(p) from Product p left join p.shop s
+			where p.active = true and p.blockedReason is null
+			  and (s is null or s.status = et.tenapay.shop.seller.ShopStatus.APPROVED)
+			group by p.category.id
+			""")
+	List<Object[]> visibleCounts();
+
 	/** [categoryId, product count, active product count] */
 	@Query("select p.category.id, count(p), sum(case when p.active = true then 1 else 0 end) from Product p group by p.category.id")
 	List<Object[]> productCounts();
