@@ -29,6 +29,7 @@ import { OrderReceiptPage } from '@/pages/order-receipt'
 import { OrderStatusPage } from '@/pages/order-status'
 import { OrderTrackingPage } from '@/pages/order-tracking'
 import { ProductPage } from '@/pages/product'
+import { PublicProfilePage } from '@/pages/people'
 import { ShopPage } from '@/pages/shop'
 import { CategoriesPage } from '@/pages/categories'
 import { ShopPublicPage } from '@/pages/shop-page'
@@ -69,6 +70,7 @@ const router = createBrowserRouter([
       { path: '/shop', element: <ShopPage /> },
       { path: '/categories', element: <CategoriesPage /> },
       { path: '/product/:slug', element: <ProductPage /> },
+      { path: '/people/:id', element: <PublicProfilePage /> },
       { path: '/shops/:slug', element: <ShopPublicPage /> },
       { path: '/sell', element: <Suspense fallback={spinner}><SellPage /></Suspense> },
       { path: '/seller/*', element: <Suspense fallback={spinner}><SellerApp /></Suspense> },

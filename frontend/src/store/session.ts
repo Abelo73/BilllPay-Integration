@@ -16,6 +16,10 @@ export type SessionUser = {
   hasPassword?: boolean
   /** the profile picture (a square), or null when none is set */
   avatarUrl?: string | null
+  /** the public profile: off until the person switches it on */
+  profilePublic?: boolean
+  bio?: string | null
+  area?: string | null
 }
 
 /** What to show for "signed in as …": the email, else the phone. */

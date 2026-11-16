@@ -44,13 +44,13 @@ public class AuthService {
 
 	/** phoneVerified: signs in with this phone; hasPassword: false for phone-only accounts (no password to change). */
 	public record UserView(UUID id, String email, String fullName, String phone, Role role, boolean phoneVerified,
-			boolean hasPassword, String avatarUrl) {
+			boolean hasPassword, String avatarUrl, boolean profilePublic, String bio, String area) {
 
 		/** The public media route is /api/media (see MediaProperties.publicPath). */
 		public static UserView of(User u) {
 			String avatar = u.getAvatarKey() == null ? null : "/api/media/" + u.getAvatarKey();
 			return new UserView(u.getId(), u.getEmail(), u.getFullName(), u.getPhone(), u.getRole(), u.isPhoneVerified(),
-					u.hasPassword(), avatar);
+					u.hasPassword(), avatar, u.isProfilePublic(), u.getBio(), u.getArea());
 		}
 	}
 

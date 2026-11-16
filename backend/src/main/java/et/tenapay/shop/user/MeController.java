@@ -111,6 +111,21 @@ public class MeController {
 		return UserView.of(u);
 	}
 
+	/** What others see on the public profile. Bio and area are optional; the switch decides whether anyone sees it. */
+	public record PublicProfileUpdate(boolean profilePublic, @jakarta.validation.constraints.Size(max = 300) String bio,
+			@jakarta.validation.constraints.Size(max = 120) String area) {
+	}
+
+	@org.springframework.web.bind.annotation.PutMapping("/public-profile")
+	@Transactional
+	public UserView publicProfile(@jakarta.validation.Valid @RequestBody PublicProfileUpdate req) {
+		User u = load();
+		u.setProfilePublic(req.profilePublic());
+		u.setBio(req.bio() == null || req.bio().isBlank() ? null : req.bio().trim());
+		u.setArea(req.area() == null || req.area().isBlank() ? null : req.area().trim());
+		return UserView.of(u);
+	}
+
 	public record LanguageUpdate(@NotBlank @Pattern(regexp = "en|am", message = "must be en or am") String language) {
 	}
 

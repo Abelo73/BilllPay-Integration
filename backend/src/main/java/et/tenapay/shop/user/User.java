@@ -38,6 +38,11 @@ public class User {
 	/** Profile picture key in media storage (avatars/...); null until the person adds one. */
 	private String avatarKey;
 
+	/** Shown to others on /people/<id> when on; phone, email and the full name are never shown. */
+	private boolean profilePublic;
+	private String bio;
+	private String area;
+
 	private String phone;
 
 	/** Set once the owner proved the phone with an SMS code; only then can it be used to sign in. */

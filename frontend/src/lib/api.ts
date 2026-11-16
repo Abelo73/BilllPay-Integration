@@ -261,6 +261,8 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
   return res.json() as Promise<T>
 }
 
+export type PublicProfile = { id: string; firstName: string; avatarUrl: string | null; bio: string | null; area: string | null; joinedAt: string }
+
 export const api = {
   /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
   products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; area?: string; near?: string; [spec: `spec.${string}`]: string }) => {
@@ -320,6 +322,11 @@ export const api = {
   me: () => request<SessionUser>('/me'),
   updateMe: (body: { fullName: string; phone: string }) =>
     request<SessionUser>('/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  /** What others see: switch, bio and area. The name, phone and email are never shown. */
+  publicProfile: (body: { profilePublic: boolean; bio: string; area: string }) =>
+    request<SessionUser>('/me/public-profile', { method: 'PUT', body: JSON.stringify(body) }),
+  /** Another person's public profile (404 when it is off). */
+  person: (id: string) => request<PublicProfile>(`/people/${id}`),
   /** The profile picture (square). The server keeps one per person; uploading again replaces it. */
   avatar: {
     upload: (file: File) => {

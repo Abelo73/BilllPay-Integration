@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -276,6 +278,82 @@ function ProfilePicture({ user }: { user: SessionUser }) {
   )
 }
 
+/**
+ * Your public profile. Others see the first name, picture, bio and area, and only when the switch is on.
+ * The preview is live: it changes as you type, before anything is saved.
+ */
+function PublicProfileCard({ user }: { user: SessionUser }) {
+  const t = useT()
+  const { setUser } = useSession()
+  const [form, setForm] = useState({
+    profilePublic: user.profilePublic ?? false,
+    bio: user.bio ?? '',
+    area: user.area ?? '',
+  })
+  const firstName = user.fullName.trim().split(/\s+/)[0] ?? ''
+  const save = useMutation({
+    mutationFn: () => api.publicProfile(form),
+    onSuccess: (u) => {
+      setUser(u)
+      toast.success(t('Public profile saved'))
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const dirty =
+    form.profilePublic !== (user.profilePublic ?? false) || form.bio !== (user.bio ?? '') || form.area !== (user.area ?? '')
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><UserRound className="size-4" /> {t('Public profile')}</CardTitle>
+        <CardDescription>{t('Choose what others see when they open your name. Your phone, email and surname are never shown.')}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-6 lg:grid-cols-2">
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
+          <label className="flex items-center justify-between gap-4 rounded-xl border p-3">
+            <span>
+              <span className="block text-sm font-semibold">{t('Show my public profile')}</span>
+              <span className="block text-xs text-muted-foreground">{form.profilePublic ? t('On: others can open it.') : t('Off: only you can see it.')}</span>
+            </span>
+            <Switch checked={form.profilePublic} onCheckedChange={(v) => setForm({ ...form, profilePublic: v })} aria-label={t('Show my public profile')} />
+          </label>
+          <div className="space-y-2">
+            <Label htmlFor="pp-bio">{t('About you')}</Label>
+            <Textarea id="pp-bio" rows={3} maxLength={300} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} placeholder={t('A line about you: what you buy, sell or like')} />
+            <p className="text-xs text-muted-foreground">{form.bio.length}/300</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="pp-area">{t('Area in Sodo')}</Label>
+            <Input id="pp-area" className="h-10" maxLength={120} value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} placeholder={t('e.g. Arada')} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={!dirty || save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} {t('Save')}</Button>
+            {user.profilePublic && (
+              <Button asChild variant="outline"><Link to={`/people/${user.id}`}>{t('Open my public page')}</Link></Button>
+            )}
+          </div>
+        </form>
+
+        <div className="space-y-2">
+          <p className="text-sm font-semibold">{t('Live preview: how others see you')}</p>
+          <div className="rounded-2xl border bg-muted/30 p-5 text-center">
+            {form.profilePublic ? (
+              <div className="space-y-3">
+                <Avatar user={user} size={80} />
+                <p className="text-lg font-bold">{firstName}</p>
+                {form.area && <p className="text-sm text-muted-foreground">{form.area}</p>}
+                {form.bio && <p className="text-sm leading-relaxed text-muted-foreground">{form.bio}</p>}
+              </div>
+            ) : (
+              <p className="py-6 text-sm text-muted-foreground">{t('Your profile is off. Switch it on to show this to others.')}</p>
+            )}
+          </div>
+          {dirty && <p className="text-xs text-amber-ink">{t('Not saved yet. Press Save to publish these changes.')}</p>}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function Profile() {
   const t = useT()
   const { session, setUser } = useSession()
@@ -292,6 +370,7 @@ function Profile() {
   return (
     <div className="space-y-6">
       <ProfilePicture user={user} />
+      <PublicProfileCard user={user} />
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base"><UserRound className="size-4" /> {t('Profile')}</CardTitle>
