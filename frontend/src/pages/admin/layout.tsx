@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   Bike,
+  ChevronDown,
   ArrowLeftRight,
   BarChart3,
   Gauge,
@@ -60,25 +61,25 @@ type Item = { to: string; label: string; icon: typeof Package; end?: boolean; ad
 
 const GROUPS: { label: string; items: Item[] }[] = [
   {
-    label: 'Overview',
+    label: 'Today',
     items: [
       { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-      { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
-      { to: '/admin/features', label: 'Features', icon: ToggleRight },
+      { to: '/admin/orders', label: 'Orders', icon: Package, badge: 'review' },
+      { to: '/admin/problems', label: 'Problems', icon: AlertTriangle, badge: 'problems' },
+      { to: '/admin/verifications', label: 'Verifications', icon: BadgeCheck, badge: 'verifications' },
+      { to: '/admin/banners', label: 'Banners', icon: GalleryHorizontal },
     ],
   },
   {
     label: 'Sales',
     items: [
-      { to: '/admin/orders', label: 'Orders', icon: Package, badge: 'review' },
       { to: '/admin/payments', label: 'Payments', icon: ArrowLeftRight },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw },
-      { to: '/admin/problems', label: 'Problems', icon: AlertTriangle, badge: 'problems' },
       { to: '/admin/discounts', label: 'Discounts', icon: TicketPercent },
       { to: '/admin/payouts', label: 'Payouts', icon: Wallet, badge: 'payouts' },
       { to: '/admin/fees', label: 'Fees', icon: Percent },
       { to: '/admin/promo', label: 'Boosts & plans', icon: Rocket, badge: 'promo' },
-      { to: '/admin/banners', label: 'Banners', icon: GalleryHorizontal },
+      { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
   {
@@ -87,15 +88,14 @@ const GROUPS: { label: string; items: Item[] }[] = [
       { to: '/admin/products', label: 'Products', icon: ShoppingBag },
       { to: '/admin/categories', label: 'Categories', icon: FolderTree },
       { to: '/admin/areas', label: 'Areas', icon: MapPin },
-      { to: '/admin/riders', label: 'Riders', icon: Bike },
+      { to: '/admin/riders', label: 'Delivery riders', icon: Bike },
     ],
   },
   {
     label: 'Marketplace',
     items: [
       { to: '/admin/shops', label: 'Sellers', icon: Store, badge: 'sellers' },
-      { to: '/admin/pros', label: 'Pros', icon: Wrench },
-      { to: '/admin/verifications', label: 'Verifications', icon: BadgeCheck, badge: 'verifications' },
+      { to: '/admin/pros', label: 'Service providers', icon: Wrench },
       { to: '/admin/listing-reports', label: 'Listing reports', icon: Flag, badge: 'listings' },
       { to: '/admin/chat-reports', label: 'Chat reports', icon: MessageSquareWarning },
       { to: '/admin/reviews', label: 'Reviews', icon: Star },
@@ -110,22 +110,23 @@ const GROUPS: { label: string; items: Item[] }[] = [
     ],
   },
   {
-    label: 'Integration',
+    label: 'Settings',
     items: [
+      { to: '/admin/features', label: 'Features on or off', icon: ToggleRight },
       { to: '/admin/setup', label: 'BillPay setup', icon: Settings2 },
-      { to: '/admin/billpay-lab', label: 'BillPay lab', icon: FlaskConical },
       { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook, badge: 'webhooks' },
       { to: '/admin/emails', label: 'Emails', icon: Mail },
       { to: '/admin/sms', label: 'SMS', icon: MessageSquareText },
-      { to: '/admin/load-tests', label: 'Load tests', icon: Gauge, adminOnly: true },
-      { to: '/admin/demo-data', label: 'Demo data', icon: Database },
+      { to: '/admin/users', label: 'Staff accounts', icon: Users, adminOnly: true },
+      { to: '/admin/login-history', label: 'Sign-in history', icon: ShieldCheck, adminOnly: true },
     ],
   },
   {
-    label: 'Admin',
+    label: 'Developer',
     items: [
-      { to: '/admin/users', label: 'Users', icon: Users, adminOnly: true },
-      { to: '/admin/login-history', label: 'Login history', icon: ShieldCheck, adminOnly: true },
+      { to: '/admin/billpay-lab', label: 'BillPay test lab', icon: FlaskConical },
+      { to: '/admin/demo-data', label: 'Demo data', icon: Database },
+      { to: '/admin/load-tests', label: 'Load tests', icon: Gauge, adminOnly: true },
     ],
   },
 ]
@@ -140,21 +141,55 @@ function readCollapsed() {
   }
 }
 
+const FOLDED_KEY = 'tenashop-admin-folded'
+
+function readFolded(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(FOLDED_KEY) ?? '[]') as string[]
+  } catch {
+    return []
+  }
+}
+
 function Nav({ collapsed = false, counts, onNavigate }: { collapsed?: boolean; counts: Record<string, number>; onNavigate?: () => void }) {
   const isAdmin = adminToken.session()?.user.role === 'ADMIN'
+  const location = useLocation()
+  const [folded, setFolded] = useState<string[]>(readFolded)
+  const toggle = (label: string) => {
+    setFolded((f) => {
+      const next = f.includes(label) ? f.filter((x) => x !== label) : [...f, label]
+      try {
+        localStorage.setItem(FOLDED_KEY, JSON.stringify(next))
+      } catch {
+        // private window: the choice just lasts this visit
+      }
+      return next
+    })
+  }
   return (
-    <nav className="flex flex-col gap-2">
+    <nav className="flex flex-col gap-3">
       {GROUPS.map((g) => {
         const items = g.items.filter((n) => isAdmin || !n.adminOnly)
         if (items.length === 0) return null
+        // the group you are in always opens, so you never lose the page you are on
+        const inThisGroup = items.some((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)))
+        const isOpen = !folded.includes(g.label) || inThisGroup
         return (
           <div key={g.label} className="flex flex-col gap-0.5">
             {collapsed ? (
               <div className="mx-auto my-1 h-px w-6 bg-border" aria-hidden />
             ) : (
-              <p className="px-2.5 pb-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">{g.label}</p>
+              <button
+                type="button"
+                onClick={() => toggle(g.label)}
+                aria-expanded={isOpen}
+                className="flex items-center justify-between rounded-md px-2.5 pb-0.5 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 hover:text-foreground"
+              >
+                {g.label}
+                <ChevronDown className={cn('size-3.5 transition-transform', !isOpen && '-rotate-90')} />
+              </button>
             )}
-            {items.map((n) => {
+            {(collapsed || isOpen) && items.map((n) => {
               const count = n.badge ? counts[n.badge] ?? 0 : 0
               return (
                 <NavLink
@@ -406,7 +441,7 @@ export function AdminLayout() {
             </Button>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1680px] flex-1 space-y-4 px-3 py-4 sm:px-4 lg:px-5">
+        <main className="mx-auto w-full max-w-[1680px] flex-1 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>
