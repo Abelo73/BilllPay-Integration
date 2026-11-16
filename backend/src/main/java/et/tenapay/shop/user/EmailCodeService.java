@@ -81,6 +81,15 @@ public class EmailCodeService {
 
 	/** Emails a new code to this (already normalized) address. */
 	public CodeSent send(String email, ClientInfo client) {
+		return issue(email, client, false);
+	}
+
+	/** A code for a password reset (its own email, same limits). */
+	public CodeSent sendReset(String email, ClientInfo client) {
+		return issue(email, client, true);
+	}
+
+	private CodeSent issue(String email, ClientInfo client, boolean reset) {
 		Instant now = Instant.now();
 		String code = String.format("%06d", RANDOM.nextInt(1_000_000));
 		Long savedId = tx.execute(s -> {
@@ -104,7 +113,7 @@ public class EmailCodeService {
 			c.setIp(client == null ? null : client.ip());
 			return codes.save(c).getId();
 		});
-		Notification.Status status = notifications.onSignUpCode(savedId, email, code);
+		Notification.Status status = reset ? notifications.onResetCode(savedId, email, code) : notifications.onSignUpCode(savedId, email, code);
 		if (status == Notification.Status.FAILED) {
 			// the code never left: forget it, so the person can try again at once (no "wait 60 seconds")
 			tx.executeWithoutResult(s -> codes.deleteById(savedId));

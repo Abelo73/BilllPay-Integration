@@ -326,6 +326,11 @@ export const api = {
   me: () => request<SessionUser>('/me'),
   updateMe: (body: { fullName: string; phone: string }) =>
     request<SessionUser>('/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  /** Forgot password: a code is emailed. The answer is the same whether or not the account exists. */
+  forgotPassword: (email: string) =>
+    request<{ message: string; maskedEmail?: string; expiresInSeconds: number; devCode?: string }>('/auth/password/forgot', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (body: { email: string; code: string; newPassword: string }) =>
+    request<{ reset: boolean; message: string }>('/auth/password/reset', { method: 'POST', body: JSON.stringify(body) }),
   /** What others see: switch, bio and area. The name, phone and email are never shown. */
   publicProfile: (body: { profilePublic: boolean; bio: string; area: string }) =>
     request<SessionUser>('/me/public-profile', { method: 'PUT', body: JSON.stringify(body) }),

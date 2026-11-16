@@ -93,6 +93,9 @@ function EmailSignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
     >
       <Field id="email" label={t('Email')} type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
       <Field id="password" label={t('Password')} type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+      <div className="-mt-2 text-right">
+        <Link to={`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ''}`} className="text-sm font-semibold text-brand hover:underline">{t('Forgot password?')}</Link>
+      </div>
       <ErrorBox error={login.error} />
       <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={login.isPending}>
         {login.isPending && <Loader2 className="animate-spin" />} {t('Sign in')}

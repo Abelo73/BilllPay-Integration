@@ -1,5 +1,8 @@
 package et.tenapay.shop.user;
 
+import java.util.Map;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -84,6 +87,46 @@ public class AuthController {
 					"An account with this email already exists. Try signing in.");
 		}
 		return emailCodes.send(email, client(http));
+	}
+
+	public record PasswordResetRequest(@NotBlank @Email @Size(max = 200) String email, @NotBlank @Size(max = 12) String code,
+			@NotBlank @Size(max = 200) String newPassword) {
+	}
+
+	/**
+	 * Forgot password: emails a 6-digit code. The answer is the same whether or not the account exists, so this form
+	 * cannot be used to find out who has an account.
+	 */
+	@PostMapping("/api/auth/password/forgot")
+	public Map<String, Object> forgotPassword(@Valid @RequestBody EmailCodeRequest req, HttpServletRequest http) {
+		String email = AuthService.normalizeEmail(req.email());
+		Map<String, Object> answer = new java.util.HashMap<>();
+		answer.put("message", "If an account uses this email, we've sent a 6-digit code to it. The code works for 5 minutes.");
+		answer.put("expiresInSeconds", EmailCodeService.CODE_TTL.toSeconds());
+		if (users.findByEmail(email).filter(User::isEnabled).isEmpty()) {
+			return answer;
+		}
+		try {
+			EmailCodeService.CodeSent sent = emailCodes.sendReset(email, client(http));
+			if (sent.devCode() != null) {
+				answer.put("devCode", sent.devCode());
+			}
+			answer.put("maskedEmail", sent.maskedEmail());
+		} catch (et.tenapay.shop.common.ApiException limited) {
+			// too soon or too many: the same answer, so the limit does not show who has an account
+		}
+		return answer;
+	}
+
+	/** Sets the new password with the emailed code. Every other device is signed out. */
+	@PostMapping("/api/auth/password/reset")
+	public Map<String, Object> resetPassword(@Valid @RequestBody PasswordResetRequest req, HttpServletRequest http) {
+		String email = AuthService.normalizeEmail(req.email());
+		emailCodes.consume(email, req.code());
+		User user = users.findByEmail(email).filter(User::isEnabled)
+				.orElseThrow(() -> new et.tenapay.shop.common.ApiException(HttpStatus.BAD_REQUEST, "CODE_EXPIRED", "This code has expired. Ask for a new one."));
+		auth.setPasswordAfterReset(user.getId(), req.newPassword());
+		return Map.of("reset", true, "message", "Your password is changed. Sign in with the new password.");
 	}
 
 	@PostMapping("/api/auth/login")

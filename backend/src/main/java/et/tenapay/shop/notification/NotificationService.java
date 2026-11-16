@@ -102,6 +102,10 @@ public class NotificationService {
 	 * The 6-digit code that confirms an email before the account is made. Sent at once (the person is waiting).
 	 * SENT, SKIPPED (mail turned off) or FAILED. The code is in the email only, never in the stored subject.
 	 */
+	public Notification.Status onResetCode(long codeId, String email, String code) {
+		return send(Kind.PASSWORD_RESET_CODE, "PASSWORD_RESET_CODE:" + codeId, null, email, EmailTemplates.resetCode(code));
+	}
+
 	public Notification.Status onSignUpCode(long codeId, String email, String code) {
 		return send(Kind.SIGN_UP_CODE, "SIGN_UP_CODE:" + codeId, null, email, EmailTemplates.signUpCode(code));
 	}

@@ -30,6 +30,7 @@ import { OrderStatusPage } from '@/pages/order-status'
 import { OrderTrackingPage } from '@/pages/order-tracking'
 import { ProductPage } from '@/pages/product'
 import { PublicProfilePage } from '@/pages/people'
+import { ForgotPasswordPage } from '@/pages/forgot-password'
 import { ShopPage } from '@/pages/shop'
 import { CategoriesPage } from '@/pages/categories'
 import { ShopPublicPage } from '@/pages/shop-page'
@@ -82,6 +83,7 @@ const router = createBrowserRouter([
       { path: '/orders/tracking', element: <OrderTrackingPage /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
       { path: '/account', element: <AccountPage /> },
       { path: '/chats', element: <ChatsPage /> },
       { path: '/chats/:id', element: <ChatPage /> },

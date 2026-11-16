@@ -143,6 +143,19 @@ public class AuthService {
 	}
 
 	/** Changes the password, signs out every other session, and returns a fresh token for this one. */
+	/** After a reset code was checked: sets the new password and ends every other session. */
+	public void setPasswordAfterReset(UUID userId, String newPassword) {
+		PasswordPolicy.check(newPassword);
+		User user = tx.execute(s -> {
+			User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("User"));
+			u.setPasswordHash(passwords.encode(newPassword));
+			u.revokeSessions();
+			return u;
+		});
+		java.util.concurrent.CompletableFuture.runAsync(() -> notifications.onPasswordChanged(user.getId(),
+				user.getTokenVersion(), user.getEmail(), user.getFullName()));
+	}
+
 	public Session changePassword(UUID userId, String currentPassword, String newPassword) {
 		PasswordPolicy.check(newPassword);
 		User user = tx.execute(s -> {

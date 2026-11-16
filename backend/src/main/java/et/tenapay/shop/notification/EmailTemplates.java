@@ -19,7 +19,7 @@ final class EmailTemplates {
 
 	enum Kind {
 		ORDER_PLACED, CASH_ORDERED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
-		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE
+		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE
 	}
 
 	record Email(String subject, String html, String text) {
@@ -75,7 +75,7 @@ final class EmailTemplates {
 					o, "Order again");
 			case REFUNDED -> build("Refund issued for " + o.orderNumber(), "Refund issued",
 					"We've sent a refund through BillPay to the method you paid with.", o, "View your order");
-			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE -> throw new IllegalArgumentException("not an order email");
+			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE -> throw new IllegalArgumentException("not an order email");
 		};
 	}
 
@@ -94,6 +94,16 @@ final class EmailTemplates {
 		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
 				+ esc(code) + "</p>");
 		return new Email("Sodo Gebeya admin sign-in code: " + code, html, title + "\n\n" + body + "\n\n— Sodo Gebeya");
+	}
+
+	/** Forgot password: a code to type on the reset page. Only the person who owns the email gets it. */
+	static Email resetCode(String code) {
+		String title = "Reset your password";
+		String body = "Use this code to set a new password for your Sodo Gebeya account. It works for 5 minutes. If you didn't ask"
+				+ " for this, ignore this email: your password stays the same. Never share the code, not even with our staff.";
+		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
+				+ esc(code) + "</p>");
+		return new Email("Your Sodo Gebeya password reset code", html, title + "\n\n" + body + "\n\n" + code + "\n\n— Sodo Gebeya");
 	}
 
 	/** No code in the subject: subjects are stored in the notifications table and shown in the admin. */
