@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
 import { publicTrustApi } from '@/lib/trust-api'
 import { useT } from '@/lib/i18n'
+import { recordInterest } from '@/lib/interests'
 import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
 import { PriceRange, SaveSearchButton } from '@/components/save-search'
@@ -65,6 +66,29 @@ export function ShopPage() {
     queryFn: () => api.products({ category, q, sort, page, size: 12, minPrice, maxPrice, area, near, ...specFilters }),
     placeholderData: keepPreviousData,
   })
+  // "For you" (on this device only): an opened category counts at once; a search counts once its results are in and
+  // the words have stayed the same for 2 seconds, so half-typed words ("lap", "lapt") don't count
+  useEffect(() => {
+    if (current) recordInterest({ kind: 'category', category: current.slug, categoryName: current.name })
+  }, [current])
+  const results = products.data?.content
+  useEffect(() => {
+    if (!q || !results) return
+    const timer = setTimeout(() => {
+      const counts = new Map<string, { slug: string; name: string; n: number }>()
+      for (const r of results) {
+        const c = counts.get(r.categorySlug) ?? { slug: r.categorySlug, name: r.categoryName, n: 0 }
+        c.n++
+        counts.set(r.categorySlug, c)
+      }
+      // the category most results are in, when it's at least half of them
+      const top = [...counts.values()].sort((a, b) => b.n - a.n)[0]
+      const clear = top && top.n * 2 >= results.length ? top : undefined
+      recordInterest({ kind: 'search', term: q, category: clear?.slug, categoryName: clear?.name })
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [q, results])
+
   /** Picking another category clears the detail filters (they belong to the old one). */
   const pickCategory = (slug: string | null) => {
     const changes: Record<string, string | null> = { category: slug }

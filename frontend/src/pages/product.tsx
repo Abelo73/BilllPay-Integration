@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Lock, MapPin, Minus, Plus, RotateCcw, Store, Truck } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 
 import { ChatWithSeller } from '@/components/chat-with-seller'
@@ -18,6 +18,7 @@ import { api, ApiError, CONDITION_LABEL } from '@/lib/api'
 import { useFeatures } from '@/lib/features'
 import { formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
+import { brandOf, recordInterest } from '@/lib/interests'
 import { MAX_QTY, useCart } from '@/store/cart'
 import { NotFoundPage } from './not-found'
 
@@ -58,6 +59,11 @@ export function ProductPage() {
   const add = useCart((s) => s.add)
   const { data: p, isLoading, error } = useQuery({ queryKey: ['product', slug], queryFn: () => api.product(slug) })
 
+  // "For you" on the home page: this visitor looked at this kind of listing (kept on this device only)
+  useEffect(() => {
+    if (p) recordInterest({ kind: 'view', category: p.categorySlug, categoryName: p.categoryName, brand: brandOf(p.specs), productSlug: p.slug })
+  }, [p])
+
   if (error instanceof ApiError && error.status === 404) return <NotFoundPage />
 
   return (
@@ -87,7 +93,7 @@ export function ProductPage() {
               <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{p.name}</h1>
               <p className="text-2xl font-semibold">{formatETB(p.price)}</p>
               <div className="flex flex-wrap gap-2">
-                <HeartButton productId={p.id} withLabel />
+                <HeartButton productId={p.id} withLabel product={{ ...p, brand: brandOf(p.specs) }} />
                 <ShareButton slug={p.slug} title={`${p.name} · ${formatETB(p.price)}`} />
               </div>
               {p.available > 0 ? (

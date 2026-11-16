@@ -1,17 +1,16 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import {
   Armchair,
   ArrowRight,
   BadgeCheck,
-  Bike,
   BriefcaseBusiness,
-  Coffee,
-  CookingPot,
-  Droplet,
   FileText,
-  Footprints,
   GraduationCap,
   Handshake,
+  Eraser,
+  History,
+  Info,
+  LayoutGrid,
   type LucideIcon,
   MessageCircle,
   Phone,
@@ -19,16 +18,16 @@ import {
   Send,
   ShieldCheck,
   Shirt,
-  ShoppingBag,
+  Sparkles,
   Smartphone,
   Store,
   Tag,
   Truck,
-  Wheat,
   Wrench,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { toast } from 'sonner'
 
 import { LogoSymbol } from '@/components/logo'
 import { HomeBanners, TopListings } from '@/components/home-promos'
@@ -36,6 +35,10 @@ import { ProductCard } from '@/components/product-card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
+import { categoryLook, countLabel, type MainCategory, topChildren, useCategoryTree } from '@/lib/category-tree'
+import { clearInterests, setInterestsOn, useInterests } from '@/lib/interests'
+import { rowsFor, type Row } from '@/lib/interests-core'
 import { api, type Product } from '@/lib/api'
 import { useFeatures } from '@/lib/features'
 import { useT } from '@/lib/i18n'
@@ -43,20 +46,6 @@ import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
-/** Category icon by slug keyword; categories are managed in the admin, so unknown ones get a tag. */
-const ICONS: [RegExp, LucideIcon][] = [
-  [/cloth|fashion|dress|wear|kemis/, Shirt],
-  [/shoe|sandal|boot/, Footprints],
-  [/phone|electronic|gadget|computer/, Smartphone],
-  [/furniture|sofa|home|living/, Armchair],
-  [/kitchen|cook/, CookingPot],
-  [/beauty|cosmetic|hair/, Droplet],
-  [/vehicle|bike|motor|car|part|bajaj/, Bike],
-  [/coffee|tea/, Coffee],
-  [/food|pantry|spice|grain/, Wheat],
-  [/used|second/, Tag],
-]
-const iconFor = (slug: string) => ICONS.find(([re]) => re.test(slug))?.[1] ?? ShoppingBag
 
 /** Fades a section up the first time it scrolls into view (no motion for people who ask for less). */
 function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
@@ -309,6 +298,8 @@ function HeroPhone({ products, payments }: { products: Product[]; payments: bool
 function Hero({ payments }: { payments: boolean }) {
   const t = useT()
   const featured = useQuery({ queryKey: ['featured'], queryFn: api.featured })
+  // this visitor's last searches (on this device) come first, as one-tap chips
+  const recent = useInterests().summary.searches.slice(0, 3)
   const chips = [
     { label: 'Phones', to: '/shop?q=phone', icon: Smartphone },
     { label: 'Clothes', to: '/shop?q=cloth', icon: Shirt },
@@ -347,6 +338,11 @@ function Hero({ payments }: { payments: boolean }) {
             <SearchBox />
             {/* one swipeable row on phones, wrapping on wider screens */}
             <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+              {recent.map((term) => (
+                <Link key={term} to={`/shop?q=${encodeURIComponent(term)}`} className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition hover:-translate-y-0.5 hover:border-primary">
+                  <History className="size-4" /> {term}
+                </Link>
+              ))}
               {chips.map((c) => (
                   <Link key={c.label} to={c.to} className="glass flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
                     <c.icon className="size-4 text-primary" /> {t(c.label)}
@@ -376,6 +372,111 @@ function Hero({ payments }: { payments: boolean }) {
   )
 }
 
+/**
+ * "Picked for you": up to 3 rows from what this visitor searched for, opened and saved on this device (never sent to
+ * the server), then their recently viewed listings. Hidden on a first visit; "Why these?" explains it and has the
+ * off switch; "Clear my history" forgets everything.
+ */
+function ForYou() {
+  const t = useT()
+  const { on, summary } = useInterests()
+  const [why, setWhy] = useState(false)
+  const rows = rowsFor(summary)
+  if (!on) {
+    return (
+      <p className="mx-auto max-w-7xl px-4 pt-4 text-xs text-muted-foreground sm:px-6">
+        {t('Suggestions from your activity are off.')}{' '}
+        <button type="button" onClick={() => setInterestsOn(true)} className="font-semibold text-primary hover:underline">{t('Turn on')}</button>
+      </p>
+    )
+  }
+  if (rows.length === 0 && summary.viewed.length < 2) return null
+  return (
+    <section className="mx-auto max-w-7xl space-y-8 px-4 pb-6 pt-10 sm:px-6" aria-labelledby="for-you-title">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <Eyebrow><Sparkles className="size-3.5" /> {t('Picked for you')}</Eyebrow>
+          <h2 id="for-you-title" className="text-3xl sm:text-4xl">{t('Based on what you looked at')}</h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button variant="ghost" size="sm" className="rounded-full" aria-expanded={why} onClick={() => setWhy(!why)}>
+            <Info /> {t('Why these?')}
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={() => { clearInterests(); toast.success(t('Your history on this device is cleared.')) }}>
+            <Eraser /> {t('Clear my history')}
+          </Button>
+        </div>
+      </div>
+      {why && (
+        <div className="space-y-3 rounded-2xl border bg-muted/40 p-4 text-sm">
+          <p>{t('These come from what you searched for, opened and saved on this phone or computer in the last 30 days. It stays on this device: Sodo Gebeya never receives it.')}</p>
+          <label className="flex w-fit items-center gap-3 font-medium">
+            <Switch checked={on} onCheckedChange={setInterestsOn} />
+            {t('Use my activity to suggest listings')}
+          </label>
+        </div>
+      )}
+      {rows.map((r) => <ForYouRow key={r.kind === 'category' ? `c-${r.slug}` : r.kind === 'brand' ? `b-${r.name}` : `s-${r.term}`} row={r} />)}
+      <RecentlyViewed slugs={summary.viewed} />
+    </section>
+  )
+}
+
+/** One sideways-scrolling row of 8 listings; hidden when fewer than 4 are found. */
+function ForYouRow({ row }: { row: Row }) {
+  const t = useT()
+  const params = row.kind === 'category' ? { category: row.slug } : { q: row.kind === 'brand' ? row.name : row.term }
+  const { data, isLoading } = useQuery({
+    queryKey: ['for-you', row],
+    queryFn: () => api.products({ ...params, size: 8 }),
+    staleTime: 60_000,
+  })
+  const items = data?.content ?? []
+  if (!isLoading && items.length < 4) return null
+  const title =
+    row.kind === 'category' ? t('Because you looked at {name}', { name: t(row.name) })
+      : row.kind === 'brand' ? t('More from {name}', { name: row.name })
+        : t('You searched for "{term}"', { term: row.term })
+  const to = row.kind === 'category' ? `/shop?category=${row.slug}` : `/shop?q=${encodeURIComponent(row.kind === 'brand' ? row.name : row.term)}`
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-lg font-bold">{title}</h3>
+        <Link to={to} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline">{t('See all')} <ArrowRight className="size-4" /></Link>
+      </div>
+      <ScrollRow>
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4] rounded-2xl" />)
+          : items.map((p) => <div key={p.id} className="snap-start"><ProductCard product={p} /></div>)}
+      </ScrollRow>
+    </div>
+  )
+}
+
+/** The last listings this visitor opened that are still in the store (a sold or removed one just drops out). */
+function RecentlyViewed({ slugs }: { slugs: string[] }) {
+  const t = useT()
+  const results = useQueries({
+    queries: slugs.map((slug) => ({ queryKey: ['product', slug], queryFn: () => api.product(slug), staleTime: 60_000, retry: false })),
+  })
+  const items = results.map((r) => r.data).filter((p): p is Product => !!p)
+  if (items.length < 2) return null
+  return (
+    <div className="space-y-3">
+      <h3 className="flex items-center gap-2 text-lg font-bold"><History className="size-5 text-primary" /> {t('Recently viewed')}</h3>
+      <ScrollRow>{items.map((p) => <div key={p.id} className="snap-start"><ProductCard product={p} /></div>)}</ScrollRow>
+    </div>
+  )
+}
+
+function ScrollRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="-mx-4 grid snap-x snap-mandatory auto-cols-[minmax(10rem,46%)] grid-flow-col gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:auto-cols-[31%] sm:px-0 lg:auto-cols-[23.5%]">
+      {children}
+    </div>
+  )
+}
+
 /** A slow, endless strip of what people trade in Sodo. */
 function Marquee() {
   const t = useT()
@@ -391,9 +492,29 @@ function Marquee() {
   )
 }
 
+/**
+ * "Shop by category": main categories with listings, as cards with a count and their 3 biggest sub-categories. The
+ * visitor's own top categories come first (from what they looked at on this device), then the admin's order.
+ * Phones scroll sideways in two rows; wider screens get a grid with the big "All categories" tile first.
+ */
 function Categories({ jobsOn }: { jobsOn: boolean }) {
   const t = useT()
-  const { data, isLoading } = useQuery({ queryKey: ['categories'], queryFn: api.categories, staleTime: 5 * 60_000 })
+  const { tree, isLoading } = useCategoryTree()
+  const { summary } = useInterests()
+  const mainOf = new Map<string, number>()
+  for (const m of tree) {
+    mainOf.set(m.slug, m.id)
+    for (const c of m.children) mainOf.set(c.slug, m.id)
+  }
+  const interest = new Map<number, number>()
+  for (const c of summary.categories) {
+    const id = mainOf.get(c.slug)
+    if (id != null) interest.set(id, (interest.get(id) ?? 0) + c.score)
+  }
+  const mains = tree
+    .filter((m) => (m.listingCount ?? 0) > 0)
+    .map((m, i) => ({ m, i, score: interest.get(m.id) ?? 0 }))
+    .sort((a, b) => b.score - a.score || a.i - b.i)
   const extra = [
     { name: 'Skilled workers', note: 'Electricians, tailors, tutors', to: '/services', icon: Wrench },
     ...(jobsOn ? [{ name: 'Jobs', note: 'Local employers hiring', to: '/work', icon: BriefcaseBusiness }] : []),
@@ -403,56 +524,95 @@ function Categories({ jobsOn }: { jobsOn: boolean }) {
       <Reveal className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
           <Eyebrow>{t('Everything in Sodo')}</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">{t('One market, every need.')}</h2>
+          <h2 className="text-3xl sm:text-4xl">{t('Shop by category')}</h2>
           <p className="max-w-xl text-muted-foreground">{t('New goods from local shops, used items from people near you, and skilled workers ready for the job.')}</p>
         </div>
-        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">{t('Browse all')} <ArrowRight /></Link></Button>
+        <Button asChild variant="outline" className="rounded-full"><Link to="/categories">{t('All categories')} <ArrowRight /></Link></Button>
       </Reveal>
-      {/* bento: one big "everything" tile, then categories, then workers and jobs in amber */}
-      <div className="grid auto-rows-[minmax(7.5rem,auto)] grid-cols-2 gap-3 sm:grid-cols-4">
-        <Reveal className="col-span-2 row-span-2">
+      <div className="-mx-4 grid snap-x snap-mandatory auto-cols-[minmax(9.75rem,46%)] grid-flow-col grid-rows-2 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:auto-rows-[minmax(9.5rem,auto)] sm:grid-flow-row sm:grid-cols-3 sm:grid-rows-none sm:overflow-visible sm:px-0 lg:grid-cols-4">
+        <Reveal className="hidden sm:col-span-2 sm:row-span-2 sm:block">
           <Link
-            to="/shop"
-            className="bento-tile group relative isolate flex h-full min-h-60 flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] p-6 text-white"
+            to="/categories"
+            className="bento-tile group relative isolate flex h-full min-h-64 flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] p-6 text-white"
           >
             <span className="absolute -right-10 -top-10 -z-10 size-56 rounded-full bg-[#F2C77E]/25 blur-3xl" aria-hidden />
             <span className="absolute -bottom-16 -left-10 -z-10 size-56 rounded-full bg-emerald-300/20 blur-3xl" aria-hidden />
-            <ShoppingBag className="size-10 text-[#F2C77E]" strokeWidth={1.6} />
+            <span className="flex flex-wrap gap-2">
+              {mains.slice(0, 8).map(({ m }) => {
+                const Icon = categoryLook(m.slug).icon
+                return (
+                  <span key={m.id} className="grid size-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur transition group-hover:bg-white/15">
+                    <Icon className="size-5 text-[#F2C77E]" strokeWidth={1.8} />
+                  </span>
+                )
+              })}
+            </span>
             <span className="space-y-2">
-              <span className="block text-2xl font-extrabold tracking-tight sm:text-3xl">{t('Browse all')}</span>
-              <span className="block max-w-xs text-sm text-white/75">{t('Every listing in Sodo, in one place.')}</span>
+              <span className="block text-2xl font-extrabold tracking-tight sm:text-3xl">{t('{n} categories', { n: tree.length || '…' })}</span>
+              <span className="block max-w-xs text-sm text-white/75">{t('From phones and sofas to cement, goats and solar panels.')}</span>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold backdrop-blur transition group-hover:bg-white/25">
-                {t('See everything')} <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+                {t('See all categories')} <ArrowRight className="size-4 transition group-hover:translate-x-1" />
               </span>
             </span>
           </Link>
         </Reveal>
-        {isLoading && Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="rounded-3xl" />)}
-        {data?.slice(0, jobsOn ? 6 : 7).map((c, i) => {
-          const Icon = iconFor(c.slug)
-          return (
-            <Reveal key={c.id} delay={i * 50}>
-              <Link to={`/shop?category=${c.slug}`} className="bento-tile group relative flex h-full flex-col justify-between gap-3 rounded-3xl border bg-card p-4 hover:border-primary/50">
-                <span className="grid size-11 place-items-center rounded-2xl bg-gradient-to-br from-accent to-primary/15 text-primary transition group-hover:from-primary group-hover:to-[#13785A] group-hover:text-primary-foreground">
-                  <Icon className="size-5" />
-                </span>
-                <span className="text-sm font-bold">{c.name}</span>
-                <ArrowRight className="absolute right-4 top-4 size-4 -translate-x-1 text-primary opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
-              </Link>
-            </Reveal>
-          )
-        })}
+        {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="min-h-36 rounded-3xl" />)}
+        {mains.slice(0, jobsOn ? 10 : 11).map(({ m, score }, i) => (
+          <Reveal key={m.id} delay={i * 40} className="snap-start">
+            <CategoryCard main={m} forYou={score > 0} />
+          </Reveal>
+        ))}
         {extra.map((c, i) => (
-          <Reveal key={c.name} delay={(i + 6) * 50}>
-            <Link to={c.to} className="bento-tile group relative flex h-full flex-col justify-between gap-3 rounded-3xl border border-market/30 bg-gradient-to-br from-amber-soft to-card p-4 hover:border-market dark:from-market/10">
+          <Reveal key={c.name} delay={(i + 10) * 40} className="snap-start">
+            <Link to={c.to} className="bento-tile group relative flex h-full min-h-36 flex-col justify-between gap-3 rounded-3xl border border-market/30 bg-gradient-to-br from-amber-soft to-card p-4 hover:border-market dark:from-market/10">
               <span className="grid size-11 place-items-center rounded-2xl bg-market/20 text-market-deep transition group-hover:bg-market group-hover:text-[#13201A] dark:text-market"><c.icon className="size-5" /></span>
               <span><span className="block text-sm font-bold">{t(c.name)}</span><span className="block text-xs text-muted-foreground">{t(c.note)}</span></span>
               <ArrowRight className="absolute right-4 top-4 size-4 -translate-x-1 text-market-deep opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100 dark:text-market" aria-hidden />
             </Link>
           </Reveal>
         ))}
+        {/* phones: the last card in the scroll opens the full list */}
+        <Link to="/categories" className="flex min-h-36 snap-start flex-col items-center justify-center gap-2 rounded-3xl border border-dashed text-sm font-semibold text-primary sm:hidden">
+          <LayoutGrid className="size-6" /> {t('All categories')}
+        </Link>
       </div>
     </section>
+  )
+}
+
+function CategoryCard({ main, forYou }: { main: MainCategory; forYou: boolean }) {
+  const t = useT()
+  const { icon: Icon, tint } = categoryLook(main.slug)
+  const chips = topChildren(main, 3).filter((c) => (c.listingCount ?? 0) > 0)
+  return (
+    <Link
+      to={`/shop?category=${main.slug}`}
+      className="bento-tile group relative flex h-full min-h-36 flex-col justify-between gap-3 overflow-hidden rounded-3xl border bg-card p-4 hover:border-primary/50"
+    >
+      <span className="flex items-start justify-between gap-2">
+        <span className={cn('grid size-11 place-items-center rounded-2xl bg-gradient-to-br transition group-hover:scale-105', tint)}>
+          <Icon className="size-5" />
+        </span>
+        {forYou ? (
+          <span className="rounded-full bg-market/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-market-deep dark:text-market">{t('For you')}</span>
+        ) : (
+          <ArrowRight className="size-4 -translate-x-1 text-primary opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
+        )}
+      </span>
+      <span className="space-y-1.5">
+        <span className="block">
+          <span className="block text-sm font-bold leading-tight">{t(main.name)}</span>
+          <span className="block text-xs text-muted-foreground">{countLabel(main.listingCount, t)}</span>
+        </span>
+        {chips.length > 0 && (
+          <span className="hidden flex-wrap gap-1 sm:flex">
+            {chips.map((c) => (
+              <span key={c.id} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{t(c.name)}</span>
+            ))}
+          </span>
+        )}
+      </span>
+    </Link>
   )
 }
 
@@ -736,6 +896,7 @@ export function HomePage() {
   return (
     <>
       <Hero payments={features.payments} />
+      <ForYou />
       <Marquee />
       <HomeBanners />
       <Categories jobsOn={jobsOn} />

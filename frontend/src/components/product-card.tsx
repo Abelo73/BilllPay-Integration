@@ -59,7 +59,7 @@ export function ProductCard({ product }: { product: Product }) {
         )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <span className="text-base font-extrabold tabular-nums">{formatETB(product.price)}</span>
-          <HeartButton productId={product.id} className="ml-auto size-9" />
+          <HeartButton productId={product.id} product={product} className="ml-auto size-9" />
           {payments && <Button
             size="icon"
             variant={soldOut ? 'outline' : 'default'}

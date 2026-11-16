@@ -30,6 +30,7 @@ import { OrderStatusPage } from '@/pages/order-status'
 import { OrderTrackingPage } from '@/pages/order-tracking'
 import { ProductPage } from '@/pages/product'
 import { ShopPage } from '@/pages/shop'
+import { CategoriesPage } from '@/pages/categories'
 import { ShopPublicPage } from '@/pages/shop-page'
 
 const AdminApp = lazy(() => import('@/pages/admin/routes'))
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <HomePage /> },
       { path: '/shop', element: <ShopPage /> },
+      { path: '/categories', element: <CategoriesPage /> },
       { path: '/product/:slug', element: <ProductPage /> },
       { path: '/shops/:slug', element: <ShopPublicPage /> },
       { path: '/sell', element: <Suspense fallback={spinner}><SellPage /></Suspense> },

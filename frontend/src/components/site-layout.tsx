@@ -3,6 +3,7 @@ import { FlaskConical, Home, Search, ShoppingCart, Store, User, Wrench } from 'l
 import { Link, NavLink, Outlet, ScrollRestoration, useLocation } from 'react-router'
 
 import { CartSheet } from '@/components/cart-sheet'
+import { CategoryMegaMenu, CategorySheet } from '@/components/category-menu'
 import { ChatsNavLink } from '@/components/chat-nav'
 import { InboxBell } from '@/components/inbox-bell'
 import { InstallApp } from '@/components/install-app'
@@ -76,6 +77,7 @@ function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
         <Logo withPlace />
         <nav aria-label="Main" className="hidden items-center gap-6 md:flex">
+          <CategoryMegaMenu />
           {NAV.filter((n) => payments || n.to !== '/orders/track').map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className={linkClass}>
               {t(n.label)}
@@ -83,6 +85,7 @@ function Header() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <CategorySheet />
           <Button asChild variant="ghost" size="icon" className="size-11 md:hidden" aria-label={t('Search')}>
             <Link to="/shop">
               <Search className="size-5" />
