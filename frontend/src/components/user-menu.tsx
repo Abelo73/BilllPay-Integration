@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { Bookmark, Heart, LogOut, Package, UserRound } from 'lucide-react'
+import { Bookmark, ChevronDown, Heart, LogOut, Package, UserRound } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
@@ -24,8 +24,8 @@ export function UserMenu() {
 
   if (!session) {
     return (
-      <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-        <Link to="/login">{t('Sign in')}</Link>
+      <Button asChild size="sm" className="hidden h-10 rounded-full px-5 font-semibold sm:inline-flex">
+        <Link to="/login"><UserRound /> {t('Sign in')}</Link>
       </Button>
     )
   }
@@ -40,10 +40,12 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t('Account menu')}>
-          <span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+        <Button className="h-10 gap-2 rounded-full pl-1.5 pr-3 font-semibold" aria-label={t('Account menu')}>
+          <span className="grid size-7 place-items-center rounded-full bg-primary-foreground/20 text-xs font-bold">
             {session.user.fullName[0]?.toUpperCase()}
           </span>
+          <span className="hidden lg:inline">{t('My Account')}</span>
+          <ChevronDown className="size-4 opacity-80" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

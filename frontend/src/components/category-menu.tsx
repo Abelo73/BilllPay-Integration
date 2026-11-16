@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const opened = (c: { slug: string; name: string }) => recordInterest({ kind: 'category', category: c.slug, categoryName: c.name })
 
 /** Desktop: "Categories" opens a panel, main categories on the left, the pointed-at one's sub-categories on the right. */
-export function CategoryMegaMenu() {
+export function CategoryMegaMenu({ label = 'Categories', triggerClassName }: { label?: string; triggerClassName?: string }) {
   const t = useT()
   const { tree } = useCategoryTree()
   const mains = tree.filter((m) => (m.listingCount ?? 0) > 0 || m.children.length > 0)
@@ -23,8 +23,8 @@ export function CategoryMegaMenu() {
   return (
     <DropdownMenu onOpenChange={(o) => !o && setActiveId(null)}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-10 gap-1.5 rounded-full px-3 text-sm font-semibold text-muted-foreground hover:text-foreground">
-          <LayoutGrid className="size-4" /> {t('Categories')} <ChevronDown className="size-3.5" />
+        <Button variant="ghost" className={cn('h-10 gap-1.5 rounded-full px-3 text-sm font-semibold text-muted-foreground hover:text-foreground', triggerClassName)}>
+          {label === 'Categories' && <LayoutGrid className="size-4" />} {t(label)} <ChevronDown className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" sideOffset={10} className="w-[min(46rem,calc(100vw-2rem))] rounded-3xl p-0">

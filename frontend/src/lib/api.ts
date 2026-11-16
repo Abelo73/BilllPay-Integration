@@ -28,6 +28,8 @@ export type Product = {
   area: string | null
   /** product page only: the details table (brand, RAM, storage, ...) */
   specs?: SpecLine[]
+  /** when it went up (ISO time) */
+  listedAt?: string | null
 }
 
 export type ItemCondition = 'NEW' | 'LIKE_NEW' | 'USED'

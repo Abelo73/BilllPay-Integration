@@ -1,51 +1,56 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 import {
-  Armchair,
   ArrowRight,
   BadgeCheck,
   BriefcaseBusiness,
-  FileText,
-  GraduationCap,
-  Handshake,
+  ChevronRight,
   Eraser,
+  Handshake,
+  Heart,
   History,
   Info,
-  LayoutGrid,
-  type LucideIcon,
-  MessageCircle,
-  Phone,
+  MapPin,
+  Scissors,
   Search,
-  Send,
   ShieldCheck,
-  Shirt,
+  ShoppingCart,
   Sparkles,
-  Smartphone,
   Store,
-  Tag,
-  Truck,
+  Users,
   Wrench,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 
-import { LogoSymbol } from '@/components/logo'
+import { HeartButton } from '@/components/heart-button'
 import { HomeBanners, TopListings } from '@/components/home-promos'
 import { ProductCard } from '@/components/product-card'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { categoryLook, countLabel, type MainCategory, topChildren, useCategoryTree } from '@/lib/category-tree'
+import { api, type Product } from '@/lib/api'
+import { categoryLook, type MainCategory, useCategoryTree } from '@/lib/category-tree'
+import { useFeatures } from '@/lib/features'
+import { formatETB } from '@/lib/format'
+import { useT } from '@/lib/i18n'
 import { clearInterests, setInterestsOn, useInterests } from '@/lib/interests'
 import { rowsFor, type Row } from '@/lib/interests-core'
-import { api, type Product } from '@/lib/api'
-import { useFeatures } from '@/lib/features'
-import { useT } from '@/lib/i18n'
-import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
 
+/*
+ * Home page, design of 16 November 2026: hero (headline, search, Buy / Sell / Find work), popular categories with
+ * photos, "Picked for you" (from this visitor's own activity, on this device), recently listed next to local services,
+ * paid top listings, "Why Sodo Gebeya?", questions.
+ *
+ * The hero photo is /brand/hero-sodo.jpg (frontend/public/brand/): a real photo of Sodo, landscape 4:3 or wider, at
+ * least 1600 px wide. Until it exists, a drawn Sodo landscape in the brand colours stands in.
+ */
+const HERO_PHOTO = '/brand/hero-sodo.jpg'
 
 /** Fades a section up the first time it scrolls into view (no motion for people who ask for less). */
 function Reveal({ children, className, delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
@@ -74,303 +79,300 @@ function Reveal({ children, className, delay = 0 }: { children: ReactNode; class
   )
 }
 
-/** Section label: a small pill with a dot. */
-function Eyebrow({ children, light = false }: { children: ReactNode; light?: boolean }) {
+/** Section heading with the orange bar, and a "Browse all" style link on the right. */
+function SectionTitle({ title, to, link, id }: { title: string; to?: string; link?: string; id?: string }) {
   return (
-    <p
-      className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em]',
-        light ? 'border-white/20 bg-white/10 text-[#F2C77E]' : 'border-market/30 bg-amber-soft/70 text-market-deep dark:bg-market/10 dark:text-market',
+    <div className="flex items-end justify-between gap-3">
+      <h2 id={id} className="flex items-center gap-2.5 text-xl font-extrabold tracking-tight sm:text-2xl">
+        <span className="h-6 w-1.5 shrink-0 rounded-full bg-market sm:h-7" aria-hidden />
+        {title}
+      </h2>
+      {to && link && (
+        <Link to={to} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline">
+          {link} <ArrowRight className="size-4" />
+        </Link>
       )}
-    >
-      <span className={cn('size-1.5 rounded-full', light ? 'bg-[#F2C77E]' : 'bg-market')} />
-      {children}
-    </p>
-  )
-}
-
-/** Soft moving glow behind a section (Sodo green and market amber). The section needs `relative isolate overflow-hidden`. */
-function Aurora({ dark = false }: { dark?: boolean }) {
-  return (
-    <div className="aurora" aria-hidden>
-      <span className={cn('-left-24 -top-32 size-[26rem] sm:size-[32rem]', dark ? 'bg-emerald-400/30' : 'bg-primary/35 dark:bg-primary/30')} />
-      <span className={cn('-right-24 top-16 size-[22rem] sm:size-[28rem]', dark ? 'bg-[#F2C77E]/25' : 'bg-market/30 dark:bg-market/20')} />
-      <span className={cn('-bottom-40 left-1/3 size-[24rem] sm:size-[30rem]', dark ? 'bg-teal-300/20' : 'bg-emerald-300/30 dark:bg-emerald-500/15')} />
     </div>
   )
 }
 
-/** Real numbers from the store (never invented): listings on sale now and categories. Hidden until there are some. */
-function Stats() {
+/** "5 min ago", "2h ago", "3 days ago". */
+function useAgo() {
   const t = useT()
-  const listings = useQuery({ queryKey: ['home-listing-count'], queryFn: () => api.products({ size: 1 }), staleTime: 60_000 })
-  const cats = useQuery({ queryKey: ['categories'], queryFn: api.categories, staleTime: 5 * 60_000 })
-  const count = listings.data?.totalElements ?? 0
-  if (!count) return null
-  const items = [
-    { value: count.toLocaleString(), label: t('Listings now') },
-    { value: String(cats.data?.length ?? '–'), label: t('Categories') },
-    { value: t('Free'), label: t('for buyers') },
-  ]
-  return (
-    <dl className="glass grid max-w-xl grid-cols-3 divide-x rounded-2xl border shadow-sm">
-      {items.map((s) => (
-        <div key={s.label} className="flex flex-col px-3 py-3 text-center sm:px-5">
-          <dt className="order-2 text-[11px] font-medium text-muted-foreground sm:text-xs">{s.label}</dt>
-          <dd className="text-xl font-extrabold tracking-tight sm:text-2xl">{s.value}</dd>
-        </div>
-      ))}
-    </dl>
-  )
+  return (iso?: string | null) => {
+    if (!iso) return null
+    const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60_000))
+    if (mins < 60) return mins <= 1 ? t('just now') : t('{n} min ago', { n: mins })
+    const hours = Math.round(mins / 60)
+    if (hours < 24) return t('{n}h ago', { n: hours })
+    const days = Math.round(hours / 24)
+    return days === 1 ? t('1 day ago') : t('{n} days ago', { n: days })
+  }
 }
 
-function SearchBox() {
+// ------------------------------------------------------------------ hero
+
+function SearchBox({ compact = false }: { compact?: boolean }) {
   const t = useT()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   return (
     <form
       role="search"
-      className="glass flex h-14 items-center gap-2 rounded-2xl border pl-4 pr-1.5 shadow-xl shadow-primary/10 ring-1 ring-white/50 transition focus-within:border-primary focus-within:shadow-primary/20 dark:ring-white/5 sm:h-16"
+      className="flex h-14 items-center gap-2 rounded-full border bg-card pl-5 pr-1.5 shadow-lg shadow-primary/5 transition focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/10"
       onSubmit={(e) => {
         e.preventDefault()
         navigate(q.trim() ? `/shop?q=${encodeURIComponent(q.trim())}` : '/shop')
       }}
     >
       <Search className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-      <label htmlFor="home-search" className="sr-only">{t('Search Sodo Gebeya')}</label>
+      <label htmlFor={compact ? 'home-search-phone' : 'home-search'} className="sr-only">{t('Search Sodo Gebeya')}</label>
       <input
-        id="home-search"
+        id={compact ? 'home-search-phone' : 'home-search'}
         type="search"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder={t('Search phones, sofas, tailors, jobs…')}
+        placeholder={compact ? t('Search…') : t('Search for products, services or jobs…')}
         className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground"
       />
-      <Button type="submit" size="lg" className="h-11 rounded-xl px-5">{t('Search')}</Button>
+      <Button type="submit" className={cn('h-11 rounded-full', compact ? 'w-11 px-0' : 'px-7 text-base')} aria-label={t('Search')}>
+        {compact ? <Search className="size-5" /> : t('Search')}
+      </Button>
     </form>
   )
 }
 
-/** Sample listings for the hero phone while the store is empty or still loading. */
-const SAMPLE_LISTINGS: { name: string; price: string; icon: LucideIcon; tint: string }[] = [
-  { name: 'Samsung A15, like new', price: '14,500 ETB', icon: Smartphone, tint: 'from-emerald-100 to-emerald-200 text-emerald-800' },
-  { name: 'Habesha kemis', price: '3,800 ETB', icon: Shirt, tint: 'from-amber-100 to-amber-200 text-amber-800' },
-  { name: '3-seat sofa', price: '22,000 ETB', icon: Armchair, tint: 'from-sky-100 to-sky-200 text-sky-800' },
-  { name: 'Electrician, Arada', price: 'From 300 ETB', icon: Wrench, tint: 'from-rose-100 to-rose-200 text-rose-800' },
-]
-
-/** Phone status bar: time on the left, signal, Wi-Fi and battery on the right, the camera island in the middle. */
-function StatusBar() {
+/** The photo of Sodo, or a drawn landscape in the brand colours until the photo is added. */
+function HeroPicture({ className }: { className?: string }) {
+  const [broken, setBroken] = useState(false)
+  if (!broken) {
+    return <img src={HERO_PHOTO} alt="" onError={() => setBroken(true)} className={cn('size-full object-cover', className)} />
+  }
   return (
-    <div className="relative flex h-11 items-center justify-between px-7 pt-1 text-[11px] font-semibold text-foreground">
-      <span className="tabular-nums">9:41</span>
-      <span className="absolute left-1/2 top-2.5 h-[22px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
-      <span className="flex items-center gap-1">
-        {/* signal bars */}
-        <span className="flex items-end gap-[1.5px]">
-          {[4, 6, 8, 10].map((h) => <span key={h} className="w-[3px] rounded-[1px] bg-current" style={{ height: h }} />)}
-        </span>
-        <svg viewBox="0 0 16 12" className="h-[10px] w-[14px] fill-current"><path d="M8 11.5 10.6 8.4a3.6 3.6 0 0 0-5.2 0zM3.6 6.6l1.3 1.5a4.7 4.7 0 0 1 6.2 0l1.3-1.5a6.7 6.7 0 0 0-8.8 0zM.8 3.4l1.3 1.5a8.9 8.9 0 0 1 11.8 0l1.3-1.5a10.9 10.9 0 0 0-14.4 0z" /></svg>
-        {/* battery */}
-        <span className="relative ml-0.5 flex h-[11px] w-[22px] items-center rounded-[3px] border border-current/50 p-[1.5px]">
-          <span className="h-full w-[80%] rounded-[1.5px] bg-current" />
-          <span className="absolute -right-[3px] h-[4px] w-[1.5px] rounded-r bg-current/50" />
-        </span>
-      </span>
-    </div>
+    <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice" className={cn('size-full', className)} aria-hidden>
+      <defs>
+        <linearGradient id="hero-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#BFE3F2" />
+          <stop offset="1" stopColor="#EAF6EF" />
+        </linearGradient>
+      </defs>
+      <rect width="800" height="600" fill="url(#hero-sky)" />
+      <circle cx="640" cy="130" r="54" fill="#F7C873" opacity="0.9" />
+      <path d="M0 330 C140 250 260 300 380 250 S640 200 800 260 V600 H0Z" fill="#9CCFAE" />
+      <path d="M0 400 C160 330 300 380 450 330 S700 300 800 350 V600 H0Z" fill="#4FA57A" />
+      <path d="M0 470 C180 420 330 470 500 420 S720 400 800 430 V600 H0Z" fill="#1F7A56" />
+      <path d="M0 540 C200 500 380 540 560 505 S740 490 800 510 V600 H0Z" fill="#0E5A43" />
+      {/* the town: rows of little roofs on the hills */}
+      {Array.from({ length: 26 }).map((_, i) => {
+        const x = 40 + (i % 13) * 58 + (i > 12 ? 24 : 0)
+        const y = (i > 12 ? 440 : 380) + Math.sin(i) * 12
+        return (
+          <g key={i}>
+            <rect x={x} y={y} width="26" height="18" rx="2" fill="#F5F1E8" />
+            <path d={`M${x - 3} ${y} L${x + 13} ${y - 11} L${x + 29} ${y}Z`} fill={i % 3 ? '#C0532F' : '#8C6A4A'} />
+          </g>
+        )
+      })}
+    </svg>
   )
 }
 
-/** The phone in the hero: a realistic handset showing the real app with live listings, plus two floating cards. */
-function HeroPhone({ products, payments }: { products: Product[]; payments: boolean }) {
+function QuickActions({ jobsOn }: { jobsOn: boolean }) {
   const t = useT()
-  const shown = products.filter((p) => p.imageUrl).slice(0, 4)
-  const tabs: [LucideIcon, string][] = [[Store, 'Home'], [Wrench, 'Services'], [Tag, 'Sell'], [MessageCircle, 'Chats'], [GraduationCap, 'Jobs']]
-  return (
-    <div className="relative mx-auto w-[min(290px,78vw)] sm:w-[310px]" aria-hidden>
-      {/* soft green glow behind the phone */}
-      <div className="absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(closest-side,rgba(19,120,90,0.28),transparent)] blur-2xl" />
-
-      <div className="drift-slow relative">
-        {/* side buttons */}
-        <span className="absolute -left-[3px] top-[18%] h-6 w-[3px] rounded-l bg-[#2a3a33]" />
-        <span className="absolute -left-[3px] top-[27%] h-11 w-[3px] rounded-l bg-[#2a3a33]" />
-        <span className="absolute -left-[3px] top-[37%] h-11 w-[3px] rounded-l bg-[#2a3a33]" />
-        <span className="absolute -right-[3px] top-[30%] h-16 w-[3px] rounded-r bg-[#2a3a33]" />
-
-        {/* frame: a metal edge around a black bezel */}
-        <div className="rounded-[3rem] bg-gradient-to-b from-[#4a5a52] via-[#1e2a24] to-[#3a4a42] p-[3px] shadow-[0_40px_80px_-20px_rgba(14,90,67,0.45),0_20px_40px_-20px_rgba(0,0,0,0.5)]">
-          <div className="rounded-[2.85rem] bg-black p-[9px]">
-            <div className="relative aspect-[9/19.5] overflow-hidden rounded-[2.35rem] bg-background">
-              <StatusBar />
-
-              {/* the app */}
-              <div className="space-y-2.5 px-3.5 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <LogoSymbol className="h-5 w-auto" />
-                    <span className="text-[13px] font-extrabold">Sodo <span className="text-market-deep dark:text-market">Gebeya</span></span>
-                  </span>
-                  <span className="relative grid size-7 place-items-center rounded-full bg-muted">
-                    <MessageCircle className="size-3.5" />
-                    <span className="absolute -right-0.5 -top-0.5 grid size-3.5 place-items-center rounded-full bg-destructive text-[8px] font-bold text-white">2</span>
-                  </span>
-                </div>
-                <div className="flex h-8 items-center gap-1.5 rounded-xl border bg-card px-2.5 text-[11px] text-muted-foreground shadow-sm">
-                  <Search className="size-3.5" /> {t('Search in Sodo…')}
-                </div>
-                <div className="flex gap-1.5 text-[10px] font-semibold">
-                  {['All', 'Phones', 'Clothes', 'Workers'].map((c, i) => (
-                    <span key={c} className={cn('rounded-full px-2.5 py-1', i === 0 ? 'bg-primary text-primary-foreground' : 'border bg-card')}>{t(c)}</span>
-                  ))}
-                </div>
-                <p className="pt-0.5 text-[11px] font-bold">{t('New near you')}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {shown.length >= 4
-                    ? shown.map((p) => (
-                        <div key={p.id} className="overflow-hidden rounded-xl border bg-card shadow-sm">
-                          <img src={p.imageUrl!} alt="" className="aspect-[4/3.4] w-full object-cover" loading="lazy" />
-                          <div className="p-1.5">
-                            <p className="truncate text-[10px] font-semibold">{p.name}</p>
-                            <p className="text-[10.5px] font-extrabold text-market-deep dark:text-market">{formatETB(p.price)}</p>
-                          </div>
-                        </div>
-                      ))
-                    : SAMPLE_LISTINGS.map((s) => (
-                        <div key={s.name} className="overflow-hidden rounded-xl border bg-card shadow-sm">
-                          <div className={cn('grid aspect-[4/3.4] place-items-center bg-gradient-to-br', s.tint)}>
-                            <s.icon className="size-8" strokeWidth={1.6} />
-                          </div>
-                          <div className="p-1.5">
-                            <p className="truncate text-[10px] font-semibold">{t(s.name)}</p>
-                            <p className="text-[10.5px] font-extrabold text-market-deep dark:text-market">{s.price.replace('From', t('From')).replace('ETB', t('ETB'))}</p>
-                          </div>
-                        </div>
-                      ))}
-                </div>
-              </div>
-
-              {/* bottom tabs, like the real app */}
-              <div className="absolute inset-x-0 bottom-0 border-t bg-card/95 pb-4 pt-1.5 backdrop-blur">
-                <div className="grid grid-cols-5 text-[8.5px] font-medium text-muted-foreground">
-                  {tabs.map(([Icon, label], i) => (
-                    <span key={label} className={cn('flex flex-col items-center gap-0.5', i === 0 && 'font-bold text-primary')}>
-                      <Icon className="size-4" />
-                      {t(label)}
-                    </span>
-                  ))}
-                </div>
-                {/* home indicator */}
-                <span className="absolute bottom-1.5 left-1/2 h-1 w-24 -translate-x-1/2 rounded-full bg-foreground/80" />
-              </div>
-
-              {/* glass reflection */}
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(255,255,255,0.18)_0%,rgba(255,255,255,0)_35%)]" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* floating cards: kept inside the screen width on phones */}
-      <div className="drift absolute -left-6 top-[30%] w-44 rounded-2xl border bg-card/95 p-3 text-xs shadow-xl backdrop-blur sm:-left-20 sm:w-48">
-        <p className="mb-1.5 flex items-center gap-1.5 font-semibold"><MessageCircle className="size-3.5 text-primary" /> {t('Chat with the seller')}</p>
-        <p className="w-fit rounded-xl rounded-bl-sm bg-muted px-2.5 py-1.5">{t('Is it still available?')}</p>
-        <p className="ml-auto mt-1 w-fit rounded-xl rounded-br-sm bg-primary px-2.5 py-1.5 text-primary-foreground">{t('Yes! Like new.')}</p>
-      </div>
-      <div className="drift absolute -right-5 bottom-[16%] w-40 rounded-2xl border bg-card/95 p-3 text-xs shadow-xl backdrop-blur [animation-delay:1.5s] sm:-right-16 sm:w-44">
-        {payments ? (
-          <>
-            <p className="flex items-center gap-1.5 font-semibold"><ShieldCheck className="size-3.5 text-primary" /> {t('Money held safely')}</p>
-            <p className="mt-1 text-muted-foreground">{t('Paid to the seller only when you confirm.')}</p>
-          </>
-        ) : (
-          <>
-            <p className="flex items-center gap-1.5 font-semibold"><Phone className="size-3.5 text-primary" /> {t('Call the seller')}</p>
-            <p className="mt-1 text-muted-foreground">{t('Agree, meet in town, check it, then pay.')}</p>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Hero({ payments }: { payments: boolean }) {
-  const t = useT()
-  const featured = useQuery({ queryKey: ['featured'], queryFn: api.featured })
-  // this visitor's last searches (on this device) come first, as one-tap chips
-  const recent = useInterests().summary.searches.slice(0, 3)
-  const chips = [
-    { label: 'Phones', to: '/shop?q=phone', icon: Smartphone },
-    { label: 'Clothes', to: '/shop?q=cloth', icon: Shirt },
-    { label: 'Furniture', to: '/shop?q=sofa', icon: Armchair },
-    { label: 'Electricians', to: '/services', icon: Wrench },
-    { label: 'Jobs', to: '/work', icon: BriefcaseBusiness },
+  const actions: { icon: LucideIcon; title: string; note: string; to: string }[] = [
+    { icon: ShoppingCart, title: 'Buy', note: 'Find products', to: '/shop' },
+    { icon: Store, title: 'Sell', note: 'List your items', to: '/sell' },
+    jobsOn
+      ? { icon: BriefcaseBusiness, title: 'Find Work', note: 'Explore local jobs', to: '/work' }
+      : { icon: Wrench, title: 'Hire', note: 'Skilled workers', to: '/services' },
   ]
-  const trust = payments
-    ? [{ icon: ShieldCheck, text: 'Money held safely' }, { icon: BadgeCheck, text: 'Verified sellers' }, { icon: Truck, text: 'Pick up or delivery' }]
-    : [{ icon: MessageCircle, text: 'Chat before you buy' }, { icon: BadgeCheck, text: 'Verified sellers' }, { icon: Handshake, text: 'Free for buyers' }]
+  return (
+    <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+      {actions.map((a) => (
+        <Link
+          key={a.title}
+          to={a.to}
+          className="group flex flex-col items-center gap-1.5 rounded-2xl border border-primary/10 bg-accent/70 px-2 py-3 text-center transition hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent sm:flex-row sm:gap-3 sm:px-4 sm:text-left"
+        >
+          <a.icon className="size-7 shrink-0 text-primary transition group-hover:scale-110" strokeWidth={1.8} />
+          <span>
+            <span className="block text-sm font-bold">{t(a.title)}</span>
+            <span className="hidden text-xs text-muted-foreground sm:block">{t(a.note)}</span>
+          </span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function Headline() {
+  const t = useT()
+  return (
+    <h1 className="text-[2.35rem] font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+      {t('Discover. Buy. Sell.')}
+      <br />
+      {t('All in')}{' '}
+      <span className="relative whitespace-nowrap text-market">
+        {t('Sodo.')}
+        {/* the hand-drawn swoosh after "Sodo." */}
+        <svg viewBox="0 0 120 20" className="absolute -right-24 top-1/2 hidden w-20 text-market sm:block" aria-hidden>
+          <path d="M4 14 C40 4 80 4 116 10" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      </span>
+    </h1>
+  )
+}
+
+function Hero({ jobsOn }: { jobsOn: boolean }) {
+  const t = useT()
   return (
     <section className="relative isolate overflow-hidden">
-      <Aurora />
-      <div className="absolute inset-0 -z-10 bg-grid opacity-30 [mask-image:radial-gradient(ellipse_at_top,black,transparent_65%)]" />
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:pb-24 lg:pt-20">
-        <div className="min-w-0 space-y-7">
-          <Reveal>
-            <span className="glass inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm">
-              <span className="live-dot size-2 rounded-full bg-primary" aria-hidden />
-              {t("Wolaita Sodo's own online market")}
+      {/* phone: the photo first, edge to edge, with the orange and green wave under it */}
+      <div className="relative aspect-[16/10] w-full sm:hidden">
+        <HeroPicture />
+        <svg viewBox="0 0 400 60" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-12 w-full" aria-hidden>
+          <path d="M0 30 C120 0 260 70 400 20 V60 H0Z" className="fill-market" />
+          <path d="M0 42 C130 14 270 76 400 34 V60 H0Z" className="fill-primary" />
+          <path d="M0 52 C140 30 280 80 400 46 V60 H0Z" className="fill-background" />
+        </svg>
+      </div>
+
+      <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 pb-8 pt-3 sm:px-6 sm:pb-14 sm:pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:pb-16">
+        <div className="min-w-0 space-y-5 sm:space-y-6">
+          <Reveal className="hidden sm:block">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-semibold text-primary">
+              <MapPin className="size-4" /> {t('Wolaita Sodo')}
             </span>
           </Reveal>
-          <Reveal delay={80}>
-            <h1 className="text-[2.6rem] leading-[1.02] tracking-tight text-balance sm:text-6xl lg:text-7xl">
-              {t('Buy, sell, hire and')} <span className="text-gradient-market">{t('get hired')}</span>{t(', all in Sodo.')}
-            </h1>
-          </Reveal>
-          <Reveal delay={160}>
-            <p className="max-w-xl text-base text-muted-foreground text-pretty sm:text-lg">
-              {t('Find shops, used items and skilled workers near you.')}{' '}
-              {payments ? t('Chat before you buy, pay safely, and pick up for free.') : t('Chat or call the seller, meet in town, and pay when you see it.')}
-              <span className="hidden sm:inline"> {t('Students and graduates can build a free profile and send their CV in one tap.')}</span>
+          <Reveal delay={60}><Headline /></Reveal>
+          <Reveal delay={120}>
+            <p className="max-w-lg text-base text-muted-foreground sm:text-lg">
+              {t('Your local marketplace for products, services and job opportunities.')}
             </p>
           </Reveal>
-          <Reveal delay={240} className="max-w-xl space-y-3">
-            <SearchBox />
-            {/* one swipeable row on phones, wrapping on wider screens */}
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-              {recent.map((term) => (
-                <Link key={term} to={`/shop?q=${encodeURIComponent(term)}`} className="flex shrink-0 items-center gap-1.5 rounded-full border border-primary/30 bg-accent px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition hover:-translate-y-0.5 hover:border-primary">
-                  <History className="size-4" /> {term}
-                </Link>
-              ))}
-              {chips.map((c) => (
-                  <Link key={c.label} to={c.to} className="glass flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium shadow-sm transition hover:-translate-y-0.5 hover:border-primary hover:text-primary">
-                    <c.icon className="size-4 text-primary" /> {t(c.label)}
-                  </Link>
-              ))}
-            </div>
-          </Reveal>
-          <Reveal delay={320}>
-            <ul className="grid grid-cols-3 gap-2 text-xs font-medium sm:flex sm:flex-wrap sm:gap-x-6 sm:gap-y-2 sm:text-sm">
-              {trust.map((x) => (
-                <li key={x.text} className="flex flex-col items-center gap-1.5 rounded-xl border bg-card/70 px-2 py-2.5 text-center sm:flex-row sm:border-0 sm:bg-transparent sm:p-0 sm:text-left">
-                  <span className="grid size-8 place-items-center rounded-full bg-accent sm:size-auto sm:bg-transparent"><x.icon className="size-4 text-primary" /></span>
-                  {t(x.text)}
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-          <Reveal delay={400}>
-            <Stats />
+          <Reveal delay={180} className="max-w-xl space-y-4">
+            <div className="sm:hidden"><SearchBox compact /></div>
+            <div className="hidden sm:block"><SearchBox /></div>
+            <RecentSearches />
+            <QuickActions jobsOn={jobsOn} />
           </Reveal>
         </div>
-        <div className="pin-drop min-w-0">
-          <HeroPhone products={featured.data ?? []} payments={payments} />
+
+        {/* wide screens: the photo in a soft blob, the orange marks and the "Support local" note */}
+        <div className="relative hidden lg:block">
+          <span className="absolute -left-3 top-8 z-10 flex flex-col gap-2" aria-hidden>
+            <span className="h-1.5 w-7 -rotate-[35deg] rounded-full bg-market" />
+            <span className="ml-3 h-1.5 w-8 -rotate-[10deg] rounded-full bg-market" />
+            <span className="ml-1 h-1.5 w-6 rotate-[20deg] rounded-full bg-market" />
+          </span>
+          <div className="relative aspect-[4/3] overflow-hidden shadow-2xl shadow-primary/20 [border-radius:58%_42%_38%_62%/52%_40%_60%_48%]">
+            <HeroPicture />
+            <svg viewBox="0 0 400 80" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-16 w-full" aria-hidden>
+              <path d="M0 60 C140 20 260 90 400 30 V80 H0Z" className="fill-primary" />
+            </svg>
+          </div>
+          <Reveal delay={400} className="absolute -bottom-2 right-6">
+            <p className="flex rotate-[-6deg] items-center gap-2 rounded-2xl bg-card px-5 py-3 text-lg font-bold italic leading-tight text-primary shadow-xl">
+              <span>{t('Support Local')}<br />{t('Grow Together')}</span>
+              <Heart className="size-5 fill-market text-market" />
+            </p>
+          </Reveal>
         </div>
       </div>
     </section>
   )
 }
+
+/** This visitor's last searches (on this device), as one-tap chips under the search box. */
+function RecentSearches() {
+  const recent = useInterests().summary.searches.slice(0, 3)
+  if (recent.length === 0) return null
+  return (
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+      {recent.map((term) => (
+        <Link key={term} to={`/shop?q=${encodeURIComponent(term)}`} className="flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-medium transition hover:border-primary hover:text-primary">
+          <History className="size-3.5 text-primary" /> {term}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------ popular categories
+
+/** Chosen photos for main categories whose newest listing may not show them well (e.g. a black phone screen). */
+const CATEGORY_PHOTOS: Record<string, string> = {
+  electronics: '/demo/demo-surface-laptop-5.jpg',
+}
+
+/** A real photo for a category: a chosen one, else the newest listing in it that has one. */
+function useCategoryPhoto(slug: string) {
+  const { data } = useQuery({
+    queryKey: ['category-photo', slug],
+    queryFn: () => api.products({ category: slug, size: 6 }),
+    staleTime: 10 * 60_000,
+  })
+  return CATEGORY_PHOTOS[slug] ?? data?.content.find((p) => p.imageUrl)?.imageUrl ?? null
+}
+
+function CategoryTile({ to, name, photo, icon: Icon, tint }: { to: string; name: string; photo: string | null; icon: LucideIcon; tint: string }) {
+  return (
+    <Link to={to} className="group block overflow-hidden rounded-2xl border bg-card transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl hover:shadow-primary/10">
+      <span className={cn('relative block aspect-[4/3] overflow-hidden bg-gradient-to-br', tint)}>
+        {photo ? (
+          <img src={photo} alt="" loading="lazy" className="size-full object-cover transition duration-500 group-hover:scale-105" />
+        ) : (
+          <span className="grid size-full place-items-center"><Icon className="size-10" strokeWidth={1.6} /></span>
+        )}
+      </span>
+      <span className="block truncate px-2 py-2.5 text-center text-sm font-bold sm:text-[15px]">{name}</span>
+    </Link>
+  )
+}
+
+function MainCategoryTile({ main }: { main: MainCategory }) {
+  const t = useT()
+  const look = categoryLook(main.slug)
+  return <CategoryTile to={`/shop?category=${main.slug}`} name={t(main.name)} photo={useCategoryPhoto(main.slug)} {...look} />
+}
+
+/** Six tiles: the visitor's own top categories first (then the ones with most listings), then Services and Jobs. */
+function PopularCategories({ jobsOn }: { jobsOn: boolean }) {
+  const t = useT()
+  const { tree, isLoading } = useCategoryTree()
+  const { summary } = useInterests()
+  const mainOf = new Map<string, number>()
+  for (const m of tree) {
+    mainOf.set(m.slug, m.id)
+    for (const c of m.children) mainOf.set(c.slug, m.id)
+  }
+  const interest = new Map<number, number>()
+  for (const c of summary.categories) {
+    const id = mainOf.get(c.slug)
+    if (id != null) interest.set(id, (interest.get(id) ?? 0) + c.score)
+  }
+  const mains = tree
+    .filter((m) => (m.listingCount ?? 0) > 0)
+    .sort((a, b) => (interest.get(b.id) ?? 0) - (interest.get(a.id) ?? 0) || (b.listingCount ?? 0) - (a.listingCount ?? 0))
+    .slice(0, jobsOn ? 4 : 5)
+  return (
+    <section className="mx-auto max-w-7xl space-y-5 px-4 py-8 sm:px-6 sm:py-10">
+      <SectionTitle title={t('Popular Categories')} to="/categories" link={t('Browse all')} />
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4 lg:grid-cols-6">
+        {isLoading && Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="aspect-[4/3.9] rounded-2xl" />)}
+        {mains.map((m) => <MainCategoryTile key={m.id} main={m} />)}
+        {!isLoading && (
+          <>
+            <CategoryTile to="/services" name={t('Services')} photo="/demo/demo-cordless-drill-18-v.jpg" icon={Wrench} tint="from-amber-500/15 to-amber-500/5 text-amber-700" />
+            {jobsOn && <CategoryTile to="/work" name={t('Jobs')} photo={null} icon={BriefcaseBusiness} tint="from-amber-500/25 to-amber-200/40 text-amber-800" />}
+          </>
+        )}
+      </div>
+    </section>
+  )
+}
+
+// ------------------------------------------------------------------ picked for you
 
 /**
  * "Picked for you": up to 3 rows from what this visitor searched for, opened and saved on this device (never sent to
@@ -384,7 +386,7 @@ function ForYou() {
   const rows = rowsFor(summary)
   if (!on) {
     return (
-      <p className="mx-auto max-w-7xl px-4 pt-4 text-xs text-muted-foreground sm:px-6">
+      <p className="mx-auto max-w-7xl px-4 text-xs text-muted-foreground sm:px-6">
         {t('Suggestions from your activity are off.')}{' '}
         <button type="button" onClick={() => setInterestsOn(true)} className="font-semibold text-primary hover:underline">{t('Turn on')}</button>
       </p>
@@ -392,23 +394,20 @@ function ForYou() {
   }
   if (rows.length === 0 && summary.viewed.length < 2) return null
   return (
-    <section className="mx-auto max-w-7xl space-y-8 px-4 pb-6 pt-10 sm:px-6" aria-labelledby="for-you-title">
+    <section className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6" aria-labelledby="for-you-title">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-2">
-          <Eyebrow><Sparkles className="size-3.5" /> {t('Picked for you')}</Eyebrow>
-          <h2 id="for-you-title" className="text-3xl sm:text-4xl">{t('Based on what you looked at')}</h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+        <SectionTitle id="for-you-title" title={t('Picked for you')} />
+        <div className="flex flex-wrap items-center gap-1 text-sm">
           <Button variant="ghost" size="sm" className="rounded-full" aria-expanded={why} onClick={() => setWhy(!why)}>
             <Info /> {t('Why these?')}
           </Button>
-          <Button variant="outline" size="sm" className="rounded-full" onClick={() => { clearInterests(); toast.success(t('Your history on this device is cleared.')) }}>
+          <Button variant="ghost" size="sm" className="rounded-full" onClick={() => { clearInterests(); toast.success(t('Your history on this device is cleared.')) }}>
             <Eraser /> {t('Clear my history')}
           </Button>
         </div>
       </div>
       {why && (
-        <div className="space-y-3 rounded-2xl border bg-muted/40 p-4 text-sm">
+        <div className="space-y-3 rounded-2xl border bg-accent/50 p-4 text-sm">
           <p>{t('These come from what you searched for, opened and saved on this phone or computer in the last 30 days. It stays on this device: Sodo Gebeya never receives it.')}</p>
           <label className="flex w-fit items-center gap-3 font-medium">
             <Switch checked={on} onCheckedChange={setInterestsOn} />
@@ -441,7 +440,7 @@ function ForYouRow({ row }: { row: Row }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-lg font-bold">{title}</h3>
+        <h3 className="flex items-center gap-2 text-base font-bold sm:text-lg"><Sparkles className="size-4 text-market" /> {title}</h3>
         <Link to={to} className="flex shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline">{t('See all')} <ArrowRight className="size-4" /></Link>
       </div>
       <ScrollRow>
@@ -463,7 +462,7 @@ function RecentlyViewed({ slugs }: { slugs: string[] }) {
   if (items.length < 2) return null
   return (
     <div className="space-y-3">
-      <h3 className="flex items-center gap-2 text-lg font-bold"><History className="size-5 text-primary" /> {t('Recently viewed')}</h3>
+      <h3 className="flex items-center gap-2 text-base font-bold sm:text-lg"><History className="size-4 text-primary" /> {t('Recently viewed')}</h3>
       <ScrollRow>{items.map((p) => <div key={p.id} className="snap-start"><ProductCard product={p} /></div>)}</ScrollRow>
     </div>
   )
@@ -477,360 +476,127 @@ function ScrollRow({ children }: { children: ReactNode }) {
   )
 }
 
-/** A slow, endless strip of what people trade in Sodo. */
-function Marquee() {
+// ------------------------------------------------------------------ recently listed + local services
+
+/** Phones: photo on the left, details on the right. Wider screens: photo on top (4:3). The heart sits on the photo. */
+function ListedCard({ p }: { p: Product }) {
   const t = useT()
-  const words = ['Phones', 'Habesha kemis', 'Sofas', 'Electricians', 'Tailors', 'Bajaj parts', 'Coffee', 'Tutors', 'Jobs', 'Used items', 'Shoes', 'Plumbers']
+  const ago = useAgo()
+  const when = ago(p.listedAt)
   return (
-    <div className="overflow-hidden border-y bg-primary py-3 text-primary-foreground" aria-hidden>
-      <div className="marquee flex w-max gap-10 whitespace-nowrap text-sm font-semibold">
-        {[...words, ...words].map((w, i) => (
-          <span key={i} className="flex items-center gap-10">{t(w)}<span className="size-1.5 rounded-full bg-market" /></span>
-        ))}
+    <div className="group relative overflow-hidden rounded-2xl border bg-card transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/10">
+      <Link to={`/product/${p.slug}`} className="flex items-center gap-3 p-2 sm:block sm:p-0">
+        <span className="relative block size-24 shrink-0 overflow-hidden rounded-xl bg-muted sm:aspect-[4/3] sm:size-auto sm:rounded-none">
+          {p.imageUrl ? (
+            <img src={p.imageUrl} alt="" loading="lazy" className="size-full object-cover transition duration-500 group-hover:scale-105" />
+          ) : (
+            <span className="grid size-full place-items-center text-muted-foreground"><Store className="size-8" /></span>
+          )}
+        </span>
+        <span className="block min-w-0 flex-1 space-y-1 pr-10 sm:p-4">
+          <span className="block truncate font-semibold">{p.name}</span>
+          <span className="block text-lg font-extrabold text-primary">{formatETB(p.price)}</span>
+          <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+            <MapPin className="size-3.5 shrink-0 text-primary" />
+            {p.area || t('Wolaita Sodo')}{when && ` · ${when}`}
+          </span>
+        </span>
+      </Link>
+      <span className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-card/90 shadow-sm backdrop-blur sm:top-2 sm:translate-y-0">
+        <HeartButton productId={p.id} product={p} />
+      </span>
+    </div>
+  )
+}
+
+function RecentlyListed() {
+  const t = useT()
+  const { data, isLoading } = useQuery({ queryKey: ['recently-listed'], queryFn: () => api.products({ size: 4, sort: 'newest' }), staleTime: 60_000 })
+  const items = data?.content ?? []
+  if (!isLoading && items.length === 0) return null
+  return (
+    <div className="space-y-4">
+      <SectionTitle title={t('Recently Listed')} to="/shop" link={t('View all')} />
+      <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+        {isLoading && Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl sm:aspect-[4/4.2] sm:h-auto" />)}
+        {items.slice(0, 2).map((p) => <ListedCard key={p.id} p={p} />)}
+        {/* phones get two more in the list */}
+        {items.slice(2, 4).map((p) => <div key={p.id} className="sm:hidden"><ListedCard p={p} /></div>)}
       </div>
     </div>
   )
 }
 
-/**
- * "Shop by category": main categories with listings, as cards with a count and their 3 biggest sub-categories. The
- * visitor's own top categories come first (from what they looked at on this device), then the admin's order.
- * Phones scroll sideways in two rows; wider screens get a grid with the big "All categories" tile first.
- */
-function Categories({ jobsOn }: { jobsOn: boolean }) {
+const SERVICES: { trade: string; title: string; note: string; icon: LucideIcon; tint: string }[] = [
+  { trade: 'ELECTRICIAN', title: 'Electricians', note: 'Professional & reliable', icon: Zap, tint: 'from-amber-400/30 to-amber-200/30 text-amber-700' },
+  { trade: 'TAILOR', title: 'Tailors', note: 'Quality tailoring services', icon: Scissors, tint: 'from-rose-400/25 to-rose-200/30 text-rose-700' },
+  { trade: 'PLUMBER', title: 'Plumbers', note: 'Fast and trusted service', icon: Wrench, tint: 'from-sky-400/25 to-sky-200/30 text-sky-700' },
+]
+
+function LocalServices() {
   const t = useT()
-  const { tree, isLoading } = useCategoryTree()
-  const { summary } = useInterests()
-  const mainOf = new Map<string, number>()
-  for (const m of tree) {
-    mainOf.set(m.slug, m.id)
-    for (const c of m.children) mainOf.set(c.slug, m.id)
-  }
-  const interest = new Map<number, number>()
-  for (const c of summary.categories) {
-    const id = mainOf.get(c.slug)
-    if (id != null) interest.set(id, (interest.get(id) ?? 0) + c.score)
-  }
-  const mains = tree
-    .filter((m) => (m.listingCount ?? 0) > 0)
-    .map((m, i) => ({ m, i, score: interest.get(m.id) ?? 0 }))
-    .sort((a, b) => b.score - a.score || a.i - b.i)
-  const extra = [
-    { name: 'Skilled workers', note: 'Electricians, tailors, tutors', to: '/services', icon: Wrench },
-    ...(jobsOn ? [{ name: 'Jobs', note: 'Local employers hiring', to: '/work', icon: BriefcaseBusiness }] : []),
-  ]
   return (
-    <section className="mx-auto max-w-7xl space-y-8 px-4 py-20 sm:px-6">
-      <Reveal className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <Eyebrow>{t('Everything in Sodo')}</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">{t('Shop by category')}</h2>
-          <p className="max-w-xl text-muted-foreground">{t('New goods from local shops, used items from people near you, and skilled workers ready for the job.')}</p>
-        </div>
-        <Button asChild variant="outline" className="rounded-full"><Link to="/categories">{t('All categories')} <ArrowRight /></Link></Button>
-      </Reveal>
-      <div className="-mx-4 grid snap-x snap-mandatory auto-cols-[minmax(9.75rem,46%)] grid-flow-col grid-rows-2 gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:auto-rows-[minmax(9.5rem,auto)] sm:grid-flow-row sm:grid-cols-3 sm:grid-rows-none sm:overflow-visible sm:px-0 lg:grid-cols-4">
-        <Reveal className="hidden sm:col-span-2 sm:row-span-2 sm:block">
-          <Link
-            to="/categories"
-            className="bento-tile group relative isolate flex h-full min-h-64 flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] p-6 text-white"
-          >
-            <span className="absolute -right-10 -top-10 -z-10 size-56 rounded-full bg-[#F2C77E]/25 blur-3xl" aria-hidden />
-            <span className="absolute -bottom-16 -left-10 -z-10 size-56 rounded-full bg-emerald-300/20 blur-3xl" aria-hidden />
-            <span className="flex flex-wrap gap-2">
-              {mains.slice(0, 8).map(({ m }) => {
-                const Icon = categoryLook(m.slug).icon
-                return (
-                  <span key={m.id} className="grid size-11 place-items-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur transition group-hover:bg-white/15">
-                    <Icon className="size-5 text-[#F2C77E]" strokeWidth={1.8} />
-                  </span>
-                )
-              })}
-            </span>
-            <span className="space-y-2">
-              <span className="block text-2xl font-extrabold tracking-tight sm:text-3xl">{t('{n} categories', { n: tree.length || '…' })}</span>
-              <span className="block max-w-xs text-sm text-white/75">{t('From phones and sofas to cement, goats and solar panels.')}</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-semibold backdrop-blur transition group-hover:bg-white/25">
-                {t('See all categories')} <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+    <div className="space-y-4">
+      <SectionTitle title={t('Local Services')} to="/services" link={t('View all')} />
+      <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
+        {SERVICES.map((s) => (
+          <li key={s.trade}>
+            <Link to={`/services?trade=${s.trade}`} className="group flex items-center gap-4 p-3 transition hover:bg-accent/50 sm:p-4">
+              <span className={cn('grid size-14 shrink-0 place-items-center rounded-xl bg-gradient-to-br sm:h-16 sm:w-24', s.tint)}>
+                <s.icon className="size-7" strokeWidth={1.7} />
               </span>
-            </span>
-          </Link>
-        </Reveal>
-        {isLoading && Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="min-h-36 rounded-3xl" />)}
-        {mains.slice(0, jobsOn ? 10 : 11).map(({ m, score }, i) => (
-          <Reveal key={m.id} delay={i * 40} className="snap-start">
-            <CategoryCard main={m} forYou={score > 0} />
-          </Reveal>
-        ))}
-        {extra.map((c, i) => (
-          <Reveal key={c.name} delay={(i + 10) * 40} className="snap-start">
-            <Link to={c.to} className="bento-tile group relative flex h-full min-h-36 flex-col justify-between gap-3 rounded-3xl border border-market/30 bg-gradient-to-br from-amber-soft to-card p-4 hover:border-market dark:from-market/10">
-              <span className="grid size-11 place-items-center rounded-2xl bg-market/20 text-market-deep transition group-hover:bg-market group-hover:text-[#13201A] dark:text-market"><c.icon className="size-5" /></span>
-              <span><span className="block text-sm font-bold">{t(c.name)}</span><span className="block text-xs text-muted-foreground">{t(c.note)}</span></span>
-              <ArrowRight className="absolute right-4 top-4 size-4 -translate-x-1 text-market-deep opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100 dark:text-market" aria-hidden />
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">{t(s.title)}</span>
+                <span className="block truncate text-sm text-muted-foreground">{t(s.note)}</span>
+              </span>
+              <ChevronRight className="size-5 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
             </Link>
-          </Reveal>
+          </li>
         ))}
-        {/* phones: the last card in the scroll opens the full list */}
-        <Link to="/categories" className="flex min-h-36 snap-start flex-col items-center justify-center gap-2 rounded-3xl border border-dashed text-sm font-semibold text-primary sm:hidden">
-          <LayoutGrid className="size-6" /> {t('All categories')}
-        </Link>
-      </div>
-    </section>
+      </ul>
+    </div>
   )
 }
 
-function CategoryCard({ main, forYou }: { main: MainCategory; forYou: boolean }) {
-  const t = useT()
-  const { icon: Icon, tint } = categoryLook(main.slug)
-  const chips = topChildren(main, 3).filter((c) => (c.listingCount ?? 0) > 0)
-  return (
-    <Link
-      to={`/shop?category=${main.slug}`}
-      className="bento-tile group relative flex h-full min-h-36 flex-col justify-between gap-3 overflow-hidden rounded-3xl border bg-card p-4 hover:border-primary/50"
-    >
-      <span className="flex items-start justify-between gap-2">
-        <span className={cn('grid size-11 place-items-center rounded-2xl bg-gradient-to-br transition group-hover:scale-105', tint)}>
-          <Icon className="size-5" />
-        </span>
-        {forYou ? (
-          <span className="rounded-full bg-market/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-market-deep dark:text-market">{t('For you')}</span>
-        ) : (
-          <ArrowRight className="size-4 -translate-x-1 text-primary opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100" aria-hidden />
-        )}
-      </span>
-      <span className="space-y-1.5">
-        <span className="block">
-          <span className="block text-sm font-bold leading-tight">{t(main.name)}</span>
-          <span className="block text-xs text-muted-foreground">{countLabel(main.listingCount, t)}</span>
-        </span>
-        {chips.length > 0 && (
-          <span className="hidden flex-wrap gap-1 sm:flex">
-            {chips.map((c) => (
-              <span key={c.id} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{t(c.name)}</span>
-            ))}
-          </span>
-        )}
-      </span>
-    </Link>
-  )
-}
+// ------------------------------------------------------------------ why sodo gebeya
 
-function HowItWorks({ payments }: { payments: boolean }) {
+function WhySodo() {
   const t = useT()
-  const steps: { title: string; text: string; icon: LucideIcon }[] = [
-    { title: 'Find it', text: 'Search by price, compare items and read real reviews.', icon: Search },
-    { title: 'Chat & agree', text: payments ? 'Ask questions and make your offer in the app.' : 'Chat in the app or call the seller, and agree on the price.', icon: MessageCircle },
-    payments
-      ? { title: 'Pay safely', text: 'Online with BillPay. Your money waits until you confirm.', icon: ShieldCheck }
-      : { title: 'Meet & check', text: 'Meet in a public place in Sodo and check the item first.', icon: Handshake },
-    payments
-      ? { title: 'Pick up or deliver', text: 'Collect it, or get it delivered in town. Then confirm.', icon: Truck }
-      : { title: 'Pay your way', text: 'Cash or mobile money, only after you\'re happy with it.', icon: BadgeCheck },
+  const signedIn = useSession((s) => !!s.session)
+  const points: { icon: LucideIcon; text: string }[] = [
+    { icon: ShieldCheck, text: 'Safe & Trusted' },
+    { icon: Users, text: 'Local Community' },
+    { icon: Zap, text: 'Easy to Use' },
   ]
   return (
-    <section className="relative isolate overflow-hidden bg-[#0E5A43] text-white">
-      <Aurora dark />
-      <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:44px_44px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-      <div className="mx-auto max-w-7xl space-y-12 px-4 py-20 sm:px-6 lg:py-28">
-        <Reveal className="mx-auto max-w-2xl space-y-3 text-center">
-          <Eyebrow light>{t('How it works')}</Eyebrow>
-          <h2 className="text-3xl text-balance sm:text-5xl">{t('From "I need this" to "I got it" in four steps.')}</h2>
-        </Reveal>
-        <ol className="relative grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-          {/* the line joining the steps on wide screens */}
-          <span className="absolute left-[12%] right-[12%] top-12 hidden h-px bg-gradient-to-r from-transparent via-[#F2C77E]/50 to-transparent lg:block" aria-hidden />
-          {steps.map((s, i) => (
-            <li key={s.title} className="h-full">
-              <Reveal delay={i * 100} className="h-full">
-                <div className="relative h-full rounded-3xl border border-white/10 bg-white/[0.06] p-6 text-center backdrop-blur-md transition hover:-translate-y-1 hover:bg-white/10 lg:pt-8">
-                  <span className="relative mx-auto grid size-16 place-items-center rounded-2xl bg-gradient-to-br from-white/20 to-white/5 ring-1 ring-white/20">
-                    <s.icon className="size-7 text-[#F2C77E]" strokeWidth={1.8} />
-                    <span className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-[#F2C77E] text-[11px] font-extrabold text-[#13201A]">{i + 1}</span>
-                  </span>
-                  <p className="mt-5 text-lg font-bold">{t(s.title)}</p>
-                  <p className="mt-1.5 text-sm text-white/75">{t(s.text)}</p>
-                </div>
-              </Reveal>
-            </li>
-          ))}
-        </ol>
-        <Reveal>
-          <p className="flex items-start gap-3 rounded-2xl bg-white p-4 text-sm text-[#13201A]">
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[#0E5A43]" />
-            {payments ? (
-              <span><strong>{t('Your money waits until you say "I got it".')}</strong> {t('When you pay online, the seller is paid only after you confirm. No more lost deposits.')}</span>
-            ) : (
-              <span><strong>{t('Never pay before you see the item.')}</strong> {t('Prefer sellers with the Verified badge, and report anything suspicious; our team checks every report.')}</span>
-            )}
-          </p>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-function Fresh() {
-  const t = useT()
-  const { data, isLoading } = useQuery({ queryKey: ['featured'], queryFn: api.featured })
-  if (!isLoading && (!data || data.length === 0)) return null
-  return (
-    <section className="mx-auto max-w-7xl space-y-8 px-4 py-20 sm:px-6">
-      <Reveal className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-2">
-          <Eyebrow>{t('Fresh in Sodo')}</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">{t('Popular right now')}</h2>
-        </div>
-        <Button asChild variant="outline" className="rounded-full"><Link to="/shop">{t('See everything')} <ArrowRight /></Link></Button>
-      </Reveal>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-        {isLoading && Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4] rounded-2xl" />)}
-        {data?.slice(0, 8).map((p, i) => (
-          <Reveal key={p.id} delay={i * 60}><ProductCard product={p} /></Reveal>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function Workers() {
-  const t = useT()
-  const quotes = [
-    { initial: 'D', name: 'Dawit Electric', meta: t('{r} rating · {n} jobs', { r: '4.9', n: 86 }) + ' · ' + t('Verified'), price: 400, best: true },
-    { initial: 'A', name: 'Abebe & Sons', meta: t('{r} rating · {n} jobs', { r: '4.7', n: 52 }), price: 450 },
-    { initial: 'S', name: 'Samuel Fix', meta: t('{r} rating · {n} jobs', { r: '4.6', n: 23 }), price: 380 },
-  ]
-  return (
-    <section className="bg-card">
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2">
-        <Reveal className="space-y-5">
-          <Eyebrow>{t('Skilled workers')}</Eyebrow>
-          <h2 className="text-3xl sm:text-4xl">{t('Need a hand? Post the job, compare prices.')}</h2>
-          <p className="text-muted-foreground">{t('Electricians, plumbers, tailors, carpenters, tutors and phone repair, with real reviews and photos of past work.')}</p>
-          <ul className="space-y-2 text-sm">
-            {['Describe the job, and workers send you their price.', 'Pick the best one, then agree on how to pay.', 'Verified workers carry a badge after an ID check.'].map((x) => (
-              <li key={x} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t(x)}</li>
-            ))}
-          </ul>
-          <Button asChild size="lg" className="rounded-full"><Link to="/services">{t('Find a worker')} <ArrowRight /></Link></Button>
-        </Reveal>
-        <Reveal delay={150}>
-          <div className="mx-auto max-w-md space-y-3 rounded-3xl border bg-background p-5 shadow-xl">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('Your job')}</p>
-            <p className="text-lg font-bold">{t('Fix my kitchen lights')}</p>
-            <p className="text-sm text-muted-foreground">{t('3 electricians sent a price')}</p>
-            {quotes.map((q, i) => (
-              <div key={q.name} className={cn('drift flex items-center gap-3 rounded-2xl border bg-card p-3', q.best && 'border-primary ring-2 ring-primary/15')} style={{ animationDelay: `${i * 0.8}s` }}>
-                <span className="grid size-10 place-items-center rounded-full bg-primary font-bold text-primary-foreground">{q.initial}</span>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{q.name}</span><span className="block text-xs text-muted-foreground">{q.meta}</span></span>
-                <span className="text-sm font-extrabold">{q.price} {t('birr')}</span>
-              </div>
-            ))}
-            <p className="text-[11px] text-muted-foreground">{t('Example names and prices.')}</p>
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  )
-}
-
-function JobsAndCvs() {
-  const t = useT()
-  const f = useFeatures()
-  if (!f.on('talent_profiles') && !f.on('job_posts') && !f.on('cv_service')) return null
-  const packages = [
-    { name: 'Basic CV', price: f.number('cv_basic_price'), days: '2 days', points: ['One-page professional CV', 'English or Amharic', '1 round of changes'] },
-    { name: 'CV + cover letter', price: f.number('cv_cover_price'), days: '2 days', points: ['Everything in Basic', 'A cover letter you can adapt', 'PDF and Word files'], popular: true },
-    { name: 'Premium', price: f.number('cv_premium_price'), days: '3 days', points: ['English and Amharic versions', 'Cover letter and profile text', '2 rounds of changes'] },
-  ]
-  const free = [
-    { icon: GraduationCap, title: 'Free profile', text: 'Education, skills, languages and the work you want. You choose who can see it. Your phone number stays private.' },
-    { icon: FileText, title: 'Free CV, ready to download', text: 'Your profile becomes a clean one-page CV in English or Amharic, and it updates itself.' },
-    { icon: Send, title: 'Apply in one tap', text: 'Send your CV to employers in Sodo and follow every step: shortlisted, interview, hired.' },
-  ]
-  return (
-    <section className="mx-auto max-w-7xl space-y-10 px-4 py-20 sm:px-6">
-      <Reveal className="mx-auto max-w-2xl space-y-3 text-center">
-        <Eyebrow>{t('Jobs & CVs')}</Eyebrow>
-        <h2 className="text-3xl sm:text-4xl">{t('Students and graduates: get seen, get hired.')}</h2>
-        <p className="text-muted-foreground">{t('Build a free profile in five minutes, download your CV, and apply to jobs in Sodo with one tap. Or let our team write a professional CV for you.')}</p>
-      </Reveal>
-      <div className="grid gap-4 md:grid-cols-3">
-        {free.map((x, i) => (
-          <Reveal key={x.title} delay={i * 100}>
-            <div className="h-full rounded-2xl border bg-card p-5 transition hover:-translate-y-1 hover:shadow-lg">
-              <span className="grid size-11 place-items-center rounded-xl bg-accent text-primary"><x.icon className="size-5" /></span>
-              <p className="mt-4 font-bold">{t(x.title)}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{t(x.text)}</p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
-      {f.on('cv_service') && (
-        <Reveal>
-          <div className="space-y-6 rounded-3xl border bg-card p-5 sm:p-8">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="space-y-1">
-                <Eyebrow>{t('Professional CV service')}</Eyebrow>
-                <p className="text-2xl font-extrabold">{t('Send us your details. We write your CV.')}</p>
-                <p className="text-sm text-muted-foreground">{t('Written and designed by our team, in English or Amharic. PDF and Word.')} {t('{n}% off for verified students.', { n: f.number('student_discount') })}</p>
-              </div>
-              <Button asChild className="rounded-full bg-market text-[#13201A] hover:bg-market/90"><Link to="/work/cv">{t('Order my CV')}</Link></Button>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {packages.map((p) => (
-                <div key={p.name} className={cn('relative rounded-2xl border p-5', p.popular && 'border-primary ring-2 ring-primary/15')}>
-                  {p.popular && <span className="absolute -top-3 left-5 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold text-primary-foreground">{t('MOST CHOSEN')}</span>}
-                  <p className="font-bold">{t(p.name)}</p>
-                  <p className="mt-1"><span className="text-3xl font-extrabold">{p.price}</span> <span className="text-sm text-muted-foreground">{t('birr · ready in {days}', { days: t(p.days) })}</span></p>
-                  <ul className="mt-3 space-y-1.5 text-sm">
-                    {p.points.map((x) => <li key={x} className="flex gap-2"><BadgeCheck className="mt-0.5 size-4 shrink-0 text-primary" /> {t(x)}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {t('Need it fast? Add 24-hour express for {fee} birr.', { fee: f.number('cv_express_fee') })}{f.on('job_posts') && <> {t('Hiring?')} <Link to="/work/post" className="font-semibold text-primary hover:underline">{t('Post your first job free')}</Link>.</>}
-            </p>
-          </div>
-        </Reveal>
-      )}
-      <Reveal className="flex flex-wrap justify-center gap-3">
-        <Button asChild size="lg" className="rounded-full"><Link to="/work/profile">{t('Make my free profile')}</Link></Button>
-        <Button asChild size="lg" variant="outline" className="rounded-full"><Link to="/work">{t('See jobs in Sodo')}</Link></Button>
-      </Reveal>
-    </section>
-  )
-}
-
-function ForSellers() {
-  const t = useT()
-  return (
-    <section className="mx-auto max-w-7xl px-4 pb-20 sm:px-6">
+    <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <Reveal>
-        <div className="grid items-center gap-8 overflow-hidden rounded-3xl bg-amber-soft p-6 sm:p-10 lg:grid-cols-[1.2fr_1fr]">
-          <div className="space-y-4">
-            <Eyebrow>{t('For sellers')}</Eyebrow>
-            <h2 className="text-3xl sm:text-4xl">{t('Start free. Sell to all of Sodo.')}</h2>
-            <p className="text-muted-foreground">{t('Open your shop in a minute, or sell a few things of your own. Buyers find you, chat with you and call you.')}</p>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-full"><Link to="/sell"><Store /> {t('Start selling')}</Link></Button>
+        <div className="flex flex-col gap-6 rounded-3xl border border-primary/10 bg-gradient-to-r from-accent via-accent/60 to-accent p-6 sm:p-8 lg:flex-row lg:items-center">
+          <div className="flex items-center gap-4 lg:w-[34%]">
+            <Handshake className="size-14 shrink-0 text-primary" strokeWidth={1.5} />
+            <div>
+              <p className="text-xl font-extrabold">{t('Why Sodo Gebeya?')}</p>
+              <p className="text-sm text-muted-foreground">{t('A simple and trusted platform for our community.')}</p>
             </div>
           </div>
-          <ul className="grid gap-3 text-sm">
-            {[
-              ['Free to post', 'Add photos, a price and the area. Show your products to buyers across Sodo.'],
-              ['Verified badge', 'Send your ID once; buyers trust the badge.'],
-              ['Chats and calls', 'Buyers message you in the app or call you directly.'],
-            ].map(([x, d]) => (
-              <li key={x} className="rounded-2xl bg-card p-4"><p className="font-semibold">{t(x)}</p><p className="text-muted-foreground">{t(d)}</p></li>
+          <ul className="grid flex-1 grid-cols-3 gap-2 lg:divide-x lg:divide-primary/15">
+            {points.map((p) => (
+              <li key={p.text} className="flex flex-col items-center gap-1.5 text-center text-sm font-semibold">
+                <p.icon className="size-7 text-primary" strokeWidth={1.8} />
+                {t(p.text)}
+              </li>
             ))}
           </ul>
+          <Button asChild size="lg" className="h-12 rounded-full bg-market px-7 text-base font-bold text-white shadow-lg shadow-market/30 hover:bg-market-deep">
+            <Link to={signedIn ? '/sell' : '/register'}>{signedIn ? t('Start selling') : t('Join Now')} <ArrowRight /></Link>
+          </Button>
         </div>
       </Reveal>
     </section>
   )
 }
+
+// ------------------------------------------------------------------ questions
 
 function Faq({ payments }: { payments: boolean }) {
   const t = useT()
@@ -843,71 +609,39 @@ function Faq({ payments }: { payments: boolean }) {
     { q: 'Can employers see my phone number?', a: 'No. Your number stays private on your profile. Employers contact you in the app, and only see your number if you apply to their job.' },
   ]
   return (
-    <section id="faq" className="mx-auto max-w-3xl space-y-6 px-4 pb-20 sm:px-6">
-      <Reveal className="space-y-2 text-center">
-        <Eyebrow>{t('Questions')}</Eyebrow>
-        <h2 className="text-3xl sm:text-4xl">{t('Good to know')}</h2>
-      </Reveal>
-      <Reveal>
-        <Accordion type="single" collapsible className="rounded-2xl border bg-card px-5">
-          {items.map((f) => (
-            <AccordionItem key={f.q} value={f.q}>
-              <AccordionTrigger className="text-left font-semibold">{t(f.q)}</AccordionTrigger>
-              <AccordionContent className="text-muted-foreground">{t(f.a)}</AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </Reveal>
+    <section id="faq" className="mx-auto max-w-3xl space-y-5 px-4 pb-16 pt-6 sm:px-6">
+      <SectionTitle title={t('Good to know')} />
+      <Accordion type="single" collapsible className="rounded-2xl border bg-card px-5">
+        {items.map((f) => (
+          <AccordionItem key={f.q} value={f.q}>
+            <AccordionTrigger className="text-left font-semibold">{t(f.q)}</AccordionTrigger>
+            <AccordionContent className="text-muted-foreground">{t(f.a)}</AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+      <p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <BadgeCheck className="size-3.5 text-primary" /> {t('Prefer sellers with the Verified badge.')}
+      </p>
     </section>
   )
 }
 
-function FinalCall() {
-  const t = useT()
-  const signedIn = useSession((s) => !!s.session)
-  return (
-    <section className="px-4 pb-24 sm:px-6">
-      <Reveal>
-        <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#13785A] via-[#0E5A43] to-[#0B3F30] px-6 py-16 text-center text-white shadow-2xl shadow-primary/20 sm:py-24">
-          <Aurora dark />
-          <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]" />
-          <LogoSymbol onDark className="pointer-events-none absolute -right-10 -top-10 h-64 w-auto opacity-10" />
-          <p className="font-ethiopic text-sm text-white/70">ሶዶ ገበያ · ይግዙ · ይሽጡ · ይቅጠሩ</p>
-          <h2 className="mx-auto mt-3 max-w-3xl text-4xl text-balance sm:text-6xl">{t("Join Sodo's own market today. It's free.")}</h2>
-          <p className="mx-auto mt-4 max-w-xl text-white/75 sm:text-lg">{t("Sign up with your phone number. One SMS code, and you're in.")}</p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            {!signedIn && (
-              <Button asChild size="lg" className="h-12 rounded-full bg-market px-7 text-base text-[#13201A] shadow-lg shadow-black/20 hover:bg-[#F2C77E]"><Link to="/register">{t('Create free account')} <ArrowRight /></Link></Button>
-            )}
-            <Button asChild size="lg" variant="outline" className="h-12 rounded-full border-white/30 bg-white/10 px-7 text-base text-white backdrop-blur-md hover:bg-white/20 hover:text-white">
-              <Link to="/sell">{t('Start selling')}</Link>
-            </Button>
-          </div>
-        </div>
-      </Reveal>
-    </section>
-  )
-}
-
-/** The landing page (design: Sodo-Gebeya-Landing-Page). Sections follow the feature switches in Admin → Features. */
 export function HomePage() {
   const features = useFeatures()
   const jobsOn = features.on('talent_profiles') || features.on('job_posts')
   return (
     <>
-      <Hero payments={features.payments} />
-      <ForYou />
-      <Marquee />
+      <Hero jobsOn={jobsOn} />
       <HomeBanners />
-      <Categories jobsOn={jobsOn} />
-      <HowItWorks payments={features.payments} />
+      <PopularCategories jobsOn={jobsOn} />
+      <ForYou />
+      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
+        <RecentlyListed />
+        <LocalServices />
+      </section>
       <TopListings />
-      <Fresh />
-      <Workers />
-      <JobsAndCvs />
-      <ForSellers />
+      <WhySodo />
       <Faq payments={features.payments} />
-      <FinalCall />
     </>
   )
 }

@@ -44,23 +44,27 @@ public class CatalogController {
 		}
 	}
 
-	/** {@code images} is filled on the product page only; lists use {@code imageUrl}. */
+	/**
+	 * {@code images} is filled on the product page only; lists use {@code imageUrl}. {@code listedAt}: when it went up
+	 * (shown as "2h ago" on the home page).
+	 */
 	public record ProductDto(Long id, String name, String slug, String description, BigDecimal price,
 			String currency, int available, boolean lowStock, String imageUrl, boolean featured, String categorySlug,
 			String categoryName, List<ImageDto> images, SellerDto seller, String condition, boolean negotiable,
-			String area, List<SpecsService.SpecLine> specs, boolean boosted) {
+			String area, List<SpecsService.SpecLine> specs, boolean boosted, java.time.Instant listedAt) {
 
 		public static ProductDto from(Product p, List<ImageDto> images) {
 			return new ProductDto(p.getId(), p.getName(), p.getSlug(), p.getDescription(), p.getPrice(),
 					p.getCurrency(), Math.max(0, p.available()), p.lowStock(), p.getImageUrl(), p.isFeatured(),
 					p.getCategory().getSlug(), p.getCategory().getName(), images, SellerDto.of(p.getShop()),
-					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea(), List.of(), p.boosted());
+					p.getCondition() == null ? null : p.getCondition().name(), p.isNegotiable(), p.effectiveArea(), List.of(), p.boosted(),
+					p.getCreatedAt());
 		}
 
 		/** The product page also shows the details table (brand, RAM, storage, ...). */
 		public ProductDto withSpecs(List<SpecsService.SpecLine> lines) {
 			return new ProductDto(id, name, slug, description, price, currency, available, lowStock, imageUrl, featured,
-					categorySlug, categoryName, images, seller, condition, negotiable, area, lines, boosted);
+					categorySlug, categoryName, images, seller, condition, negotiable, area, lines, boosted, listedAt);
 		}
 
 		public static ProductDto from(Product p) {
