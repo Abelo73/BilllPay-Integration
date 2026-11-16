@@ -34,6 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import expand_demo_catalog as expand  # noqa: E402  (same folder: slugify, paths)
 
 ROOT_DIR = expand.ROOT
+# The last commit before the demo expansion. Compare against this, not HEAD, which already has the new listings.
+BEFORE_REF = "6d65c11"
 
 API = "https://commons.wikimedia.org/w/api.php"
 UA = "SodoGebeyaDemoSeed/1.0 (development seed data; no personal data)"
@@ -58,11 +60,28 @@ STOP = {"the", "and", "with", "for", "set", "pack", "inch", "cm", "kg", "ml", "l
         "pieces", "piece", "bag", "pair", "small", "large", "medium", "black", "white"}
 
 
+def with_backoff(fn, tries=6):
+    """Retry on rate limits (HTTP 429) and timeouts, waiting longer each time."""
+    for attempt in range(tries):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            if e.code != 429 and e.code < 500:
+                raise
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        time.sleep(5 * 2 ** attempt)
+    raise RuntimeError("gave up after retries")
+
+
 def api(params):
     url = API + "?" + urllib.parse.urlencode({**params, "format": "json", "origin": "*"})
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.load(r)
+
+    def call():
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.load(r)
+    return with_backoff(call)
 
 
 def search(query):
@@ -115,7 +134,7 @@ def find_photo(base, category):
                     "source": info["descriptionurl"], "query": query,
                 }
                 break
-        time.sleep(0.4)
+        time.sleep(1.5)  # be polite to Commons: a slow pace avoids HTTP 429
         if result:
             break
     SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -124,9 +143,11 @@ def find_photo(base, category):
 
 
 def download(url, dest):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        dest.write_bytes(r.read())
+    def call():
+        req = urllib.request.Request(url, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            dest.write_bytes(r.read())
+    with_backoff(call)
 
 
 def to_square_jpeg(src, dest, side=480):
@@ -140,7 +161,7 @@ def main():
     # Listings already in git are kept as they are (their photos are the Commons ones from before).
     import subprocess
     rel = expand.CATALOG.relative_to(ROOT_DIR).as_posix()
-    before = json.loads(subprocess.run(["git", "-C", str(ROOT_DIR), "show", f"HEAD:{rel}"],
+    before = json.loads(subprocess.run(["git", "-C", str(ROOT_DIR), "show", f"{BEFORE_REF}:{rel}"],
                                        capture_output=True, text=True, check=True).stdout)
     old = {p["slug"] for p in before["products"]}
     new_listings = [p for p in catalog["products"] if p["slug"] not in old]
@@ -175,10 +196,25 @@ def main():
         rows.append((base, category, photo))
         print(f"  ok  {base:40s} <- {photo['title'][:60]} ({photo['licence']})")
 
-    CREDITS.write_text(credit_table(rows), encoding="utf-8")
+    CREDITS.write_text(credit_table(merge_rows(CREDITS, rows)), encoding="utf-8")
     print(f"real photos for {found} base items; {len(missing)} base items keep their placeholders")
     if missing:
         print("placeholders kept for:", "; ".join(missing[:20]), "..." if len(missing) > 20 else "")
+
+
+def merge_rows(path, new_rows):
+    """Keep the credit rows already in the file and add this run's, so a partial run never drops credits."""
+    merged = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("| ") and not line.startswith("| Base item"):
+                cells = [c.strip() for c in line.strip("|").split("|")]
+                if len(cells) == 6:
+                    merged[cells[0]] = (cells[0], cells[1], {"title": cells[2], "author": cells[3],
+                                                            "licence": cells[4], "source": cells[5]})
+    for base, category, p in new_rows:
+        merged[base] = (base, category, p)
+    return list(merged.values())
 
 
 def credit_table(rows):
