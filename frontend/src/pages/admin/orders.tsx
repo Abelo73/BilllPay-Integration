@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { adminApi } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
-import { EmptyRow, PageHeader, Pager, StatusBadge } from './shared'
+import { EmptyRow, FilterBar, PageHeader, Pager, StatusBadge } from './shared'
 
 const STATUSES = ['PENDING_PAYMENT', 'PAYMENT_FAILED', 'PAID', 'PARTIALLY_REFUNDED', 'REFUNDED', 'EXPIRED', 'CANCELLED', 'REVIEW_REQUIRED']
 const DELIVERY = ['UNFULFILLED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']
@@ -48,7 +48,7 @@ export function AdminOrdersPage() {
   return (
     <>
       <PageHeader title="Orders" description="Every order, where its payment stands and how far delivery got." />
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <FilterBar>
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input className="pl-8" placeholder="Order number, customer or phone" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -89,7 +89,7 @@ export function AdminOrdersPage() {
             <SelectItem value="SANDBOX">Test only</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </FilterBar>
       <Card>
         <CardContent className="p-0">
           <Table>

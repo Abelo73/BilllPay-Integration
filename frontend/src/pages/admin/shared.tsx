@@ -84,6 +84,11 @@ export function JsonBlock({ label, raw }: { label: string; raw: string | null })
   )
 }
 
+/** The row of search and filters above a list: one tidy box, the same on every admin page. */
+export function FilterBar({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <div className={cn('flex flex-col gap-2 rounded-xl border bg-card p-3 shadow-sm sm:flex-row sm:flex-wrap sm:items-center', className)}>{children}</div>
+}
+
 export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4">

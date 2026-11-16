@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { catalogApi, isAdmin, type ProductRow } from '@/lib/admin-api'
 import { formatETB } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { EmptyRow, PageHeader, Pager } from './shared'
+import { EmptyRow, FilterBar, PageHeader, Pager } from './shared'
 
 export function StockBadge({ p }: { p: Pick<ProductRow, 'available' | 'lowStock' | 'active'> & { inStore?: boolean; blockedReason?: string | null } }) {
   if (p.blockedReason) return <Badge variant="outline" className="border-destructive/30 bg-destructive/10 text-destructive">taken down</Badge>
@@ -71,7 +71,7 @@ export function AdminProductsPage() {
         description="Everything in the catalog. Hidden products stay here (orders keep their history) and can be shown again."
         actions={isAdmin() && <Button asChild><Link to="/admin/products/new"><Plus /> New product</Link></Button>}
       />
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <FilterBar className="gap-3 lg:flex-row lg:items-center">
         <Tabs value={status} onValueChange={(v) => set('status', v === 'all' ? null : v)}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
@@ -108,7 +108,7 @@ export function AdminProductsPage() {
             <Input className="pl-8" placeholder="Name or slug" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
         </div>
-      </div>
+      </FilterBar>
       <Card>
         <CardContent className="p-0">
           <Table>
