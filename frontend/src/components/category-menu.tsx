@@ -112,7 +112,7 @@ export function CategorySheet() {
         </Button>
       </SheetTrigger>
       <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto rounded-t-3xl pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-        <SheetHeader className="text-left">
+        <SheetHeader className="px-5 text-left">
           {picked ? (
             <button type="button" onClick={() => setPicked(null)} className="flex min-h-11 w-fit items-center gap-1 text-sm font-semibold text-primary">
               <ArrowLeft className="size-4" /> {t('All categories')}

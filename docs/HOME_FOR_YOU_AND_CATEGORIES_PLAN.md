@@ -1,6 +1,6 @@
 # Categories and "For you" on the home page: plan
 
-Status: plan for review, 16 November 2026. No code yet.
+Status: phase 1 built and tested on 16 November 2026 (commits c4dce2d, e509683). Phases 2 and 3 not started.
 Decisions for you: section 8.
 
 ## 1. What we want
@@ -106,15 +106,18 @@ A week later they look at sofas a few times: sofas take the first row, laptops m
 ## 6. Phases and tasks
 
 ### Phase 1: categories redesign and on-device "For you" (frontend only, about 4 days)
-- [ ] C1 `/api/categories`: `listingCount`, tree order (small backend change and test)
-- [ ] C2 Home "Shop by category" cards (main categories, counts, 3 chips, personal order)
-- [ ] C3 `/categories` page with filter box and icons per main category
-- [ ] C4 Header mega menu (desktop) and bottom sheet (phone)
-- [ ] F1 `lib/interests.ts`: record actions, weights, decay, 50-action cap, medical excluded, clear, on/off switch
-- [ ] F2 Record from: listing page, category open, search submit, heart
-- [ ] F3 Home "Picked for you" rows, "Recently viewed", recent-search chips, Why? / Clear
-- [ ] F4 Amharic texts for the new screens (`locales/am`)
-- [ ] T1 Tests: interest scoring (unit), home with and without history (e2e), Clear removes everything
+- [x] C1 `/api/categories`: `listingCount`, tree order (small backend change and test)
+- [x] C2 Home "Shop by category" cards (main categories, counts, 3 chips, personal order)
+- [x] C3 `/categories` page with filter box and icons per main category
+- [x] C4 Header mega menu (desktop) and bottom sheet (phone)
+- [x] F1 `lib/interests.ts`: record actions, weights, decay, 50-action cap, medical excluded, clear, on/off switch
+- [x] F2 Record from: listing page, category open, search submit, heart
+- [x] F3 Home "Picked for you" rows, "Recently viewed", recent-search chips, Why? / Clear
+- [x] F4 Amharic texts for the new screens (`locales/am`)
+- [x] T1 Tests: interest scoring, 9 unit tests (`node --experimental-strip-types --test tests/interests-core.test.ts` in `frontend/`); `CategoryCountsIntegrationTest`; a browser run on desktop and phone (first visit, after laptop searches and views, Clear)
+
+Decisions taken for phase 1 (recommended defaults): D1 on by default with an off switch; D2 medical only; D3 not yet
+(device only); D4 popular searches for everyone (phase 2).
 
 **Done when:** a new visitor sees the normal home page; after searching "laptop" twice and opening 2 laptops, the
 home page's first row is laptops with "Because you looked at Laptops"; "Clear my history" brings back the normal
