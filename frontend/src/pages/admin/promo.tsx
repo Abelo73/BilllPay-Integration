@@ -13,6 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { isAdmin } from '@/lib/admin-api'
 import { formatDate, formatETB } from '@/lib/format'
 import { promoAdminApi, type AdminBoost, type AdminPlan, type Banner } from '@/lib/promo-api'
+import { cn } from '@/lib/utils'
 import { PageHeader, Pager, StatusBadge } from './shared'
 
 const err = (e: Error) => toast.error(e.message)
@@ -123,7 +124,7 @@ export function AdminBannersPage() {
   })
   return (
     <div className="space-y-4">
-      <PageHeader title="Banners" description="Shown on the home page while on and within their dates. Use a wide picture (about 1200 × 400)." />
+      <PageHeader title="Banners" description="Shown on the home page while on and within their dates. Add one picture for each place; the frame shows the shape it needs." />
       {isAdmin() && (
         <form className="flex max-w-xl gap-2" onSubmit={(e) => { e.preventDefault(); if (title.trim()) create.mutate() }}>
           <Input placeholder="Banner title, e.g. Holiday sale at Marta Boutique" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
@@ -141,35 +142,138 @@ export function AdminBannersPage() {
 const toLocal = (iso: string | null) => (iso ? new Date(iso).toISOString().slice(0, 10) : '')
 const fromLocal = (d: string) => (d ? new Date(d + 'T00:00:00').toISOString() : null)
 
+/** The three places a banner can show, with the shape each picture must have. */
+const PLACES = [
+  { slot: 'hero' as const, label: 'Home hero, desktop', ratio: '4 / 3', size: '1600 × 1200 px', field: 'heroUrl' as const },
+  { slot: 'phone' as const, label: 'Home hero, phone', ratio: '16 / 10', size: '1600 × 1000 px', field: 'phoneUrl' as const },
+  { slot: 'strip' as const, label: 'Offers strip', ratio: '3 / 1', size: '1600 × 533 px', field: 'stripUrl' as const },
+]
+
+/**
+ * Checks a picture before it is uploaded: a real JPG, PNG or WebP, big enough for the place, and close to its shape.
+ * Returns the problems (empty when it is fine). The admin can still upload; the check only warns.
+ */
+function checkPicture(file: File, place: (typeof PLACES)[number]): Promise<string[]> {
+  return new Promise((resolve) => {
+    const problems: string[] = []
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) problems.push('Use a JPG, PNG or WebP picture.')
+    if (file.size > 5 * 1024 * 1024) problems.push('This picture is larger than 5 MB.')
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const [w, h] = place.ratio.split('/').map((n) => Number(n.trim()))
+      const want = w / h
+      const got = img.naturalWidth / img.naturalHeight
+      if (img.naturalWidth < 800) problems.push(`Too small: ${img.naturalWidth} px wide. Use at least 800 px (the guide is ${place.size}).`)
+      if (Math.abs(got - want) / want > 0.06) problems.push(`The shape is ${img.naturalWidth} × ${img.naturalHeight}. This place needs ${place.ratio.replace(' / ', ':')}, so the picture will be cropped.`)
+      URL.revokeObjectURL(url)
+      resolve(problems)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(['This file is not a picture we can read.']) }
+    img.src = url
+  })
+}
+
+/** One picture frame for one place. The frame has the shape the picture must be, so the admin sees the crop. */
+function PlaceSlot({ b, place, editable, busy, onFile }: {
+  b: Banner
+  place: (typeof PLACES)[number]
+  editable: boolean
+  busy: boolean
+  onFile: (file: File) => void
+}) {
+  const input = useRef<HTMLInputElement>(null)
+  const [warnings, setWarnings] = useState<string[]>([])
+  const [over, setOver] = useState(false)
+  const url = b[place.field]
+  const choose = async (file: File) => {
+    const problems = await checkPicture(file, place)
+    setWarnings(problems)
+    onFile(file) // uploaded anyway: the warnings tell the admin what will look cropped or small
+  }
+  const fallback = !url && place.slot === 'phone' ? 'Uses the hero picture until you add one.' : !url && place.slot === 'hero' ? 'Add a picture to show this banner in the hero.' : !url ? 'Uses the banner picture until you add one.' : null
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold">{place.label}</p>
+      <button
+        type="button"
+        onClick={() => input.current?.click()}
+        onDragOver={(e) => { if (!editable) return; e.preventDefault(); setOver(true) }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setOver(false)
+          const x = e.dataTransfer.files?.[0]
+          if (editable && x && !busy) void choose(x)
+        }}
+        disabled={!editable || busy}
+        style={{ aspectRatio: place.ratio }}
+        className={cn(
+          'grid w-full place-items-center overflow-hidden rounded-xl border-2 border-dashed bg-muted text-muted-foreground transition',
+          over && 'border-primary bg-primary/10',
+        )}
+      >
+        {busy ? <Loader2 className="animate-spin" /> : url ? <img src={url} alt="" className="size-full object-cover" /> : (
+          <span className="flex flex-col items-center gap-1 text-xs"><ImagePlus className="size-5" /> Drop a picture here, or click</span>
+        )}
+      </button>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x) void choose(x); e.target.value = '' }} />
+      <p className="text-xs text-muted-foreground">{place.ratio.replace(' / ', ':')} · {place.size}</p>
+      {fallback && <p className="text-xs text-muted-foreground">{fallback}</p>}
+      {warnings.map((w) => (
+        <p key={w} className="rounded-lg bg-amber-soft px-2 py-1 text-xs text-amber-ink">{w}</p>
+      ))}
+    </div>
+  )
+}
+
 function BannerEditor({ b }: { b: Banner }) {
   const qc = useQueryClient()
-  const input = useRef<HTMLInputElement>(null)
   const [f, setF] = useState({ title: b.title, subtitle: b.subtitle ?? '', linkUrl: b.linkUrl ?? '', startsAt: toLocal(b.startsAt), endsAt: toLocal(b.endsAt), position: String(b.position) })
   const refresh = () => qc.invalidateQueries({ queryKey: ['admin-banners'] })
   const save = useMutation({
-    mutationFn: (active?: boolean) => promoAdminApi.updateBanner(b.id, {
+    mutationFn: (patch?: { active?: boolean; showInHero?: boolean; showInStrip?: boolean }) => promoAdminApi.updateBanner(b.id, {
       title: f.title, subtitle: f.subtitle, linkUrl: f.linkUrl, startsAt: fromLocal(f.startsAt), endsAt: fromLocal(f.endsAt),
-      position: Number(f.position || 0), active: active ?? b.active,
+      position: Number(f.position || 0), active: patch?.active ?? b.active,
+      showInHero: patch?.showInHero ?? b.showInHero, showInStrip: patch?.showInStrip ?? b.showInStrip,
     }),
     onSuccess: () => { refresh(); toast.success('Saved') },
     onError: err,
   })
-  const image = useMutation({ mutationFn: (file: File) => promoAdminApi.bannerImage(b.id, file), onSuccess: refresh, onError: err })
+  const slotImage = useMutation({ mutationFn: ({ slot, file }: { slot: (typeof PLACES)[number]['slot']; file: File }) => promoAdminApi.bannerSlotImage(b.id, slot, file), onSuccess: refresh, onError: err })
   const remove = useMutation({ mutationFn: () => promoAdminApi.deleteBanner(b.id), onSuccess: refresh, onError: err })
   const set = (k: keyof typeof f, v: string) => setF((x) => ({ ...x, [k]: v }))
+  const editable = isAdmin()
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-3 space-y-0">
         <CardTitle className="min-w-0 flex-1 text-base">{b.title}</CardTitle>
         <span className="text-xs text-muted-foreground">{b.clicks} clicks · {b.showing ? 'showing now' : 'not showing'}</span>
-        <Switch checked={b.active} disabled={!isAdmin() || save.isPending} onCheckedChange={(v) => save.mutate(v)} aria-label="Banner on" />
+        <Switch checked={b.active} disabled={!editable || save.isPending} onCheckedChange={(v) => save.mutate({ active: v })} aria-label="Banner on" />
       </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-[280px_1fr]">
-        <button type="button" onClick={() => input.current?.click()} disabled={!isAdmin()}
-          className="grid aspect-[3/1] place-items-center overflow-hidden rounded-xl border-2 border-dashed bg-muted text-muted-foreground">
-          {image.isPending ? <Loader2 className="animate-spin" /> : b.imageUrl ? <img src={b.imageUrl} alt="" className="size-full object-cover" /> : <ImagePlus />}
-        </button>
-        <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const x = e.target.files?.[0]; if (x) image.mutate(x); e.target.value = '' }} />
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.4fr]">
+          {PLACES.map((place) => (
+            <PlaceSlot
+              key={place.slot}
+              b={b}
+              place={place}
+              editable={editable}
+              busy={slotImage.isPending && slotImage.variables?.slot === place.slot}
+              onFile={(file) => slotImage.mutate({ slot: place.slot, file })}
+            />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-6 rounded-xl bg-muted/50 p-4">
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={b.showInHero} disabled={!editable || save.isPending} onCheckedChange={(v) => save.mutate({ showInHero: v })} aria-label="Show in home hero" />
+            Show in the home hero (desktop and phone)
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={b.showInStrip} disabled={!editable || save.isPending} onCheckedChange={(v) => save.mutate({ showInStrip: v })} aria-label="Show in the offers strip" />
+            Show in the offers strip
+          </label>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1"><Label htmlFor={`t${b.id}`}>Title</Label><Input id={`t${b.id}`} value={f.title} maxLength={120} onChange={(e) => set('title', e.target.value)} /></div>
           <div className="space-y-1"><Label htmlFor={`s${b.id}`}>Small text</Label><Input id={`s${b.id}`} value={f.subtitle} maxLength={200} onChange={(e) => set('subtitle', e.target.value)} /></div>
@@ -177,7 +281,7 @@ function BannerEditor({ b }: { b: Banner }) {
           <div className="space-y-1"><Label htmlFor={`p${b.id}`}>Order</Label><Input id={`p${b.id}`} type="number" value={f.position} onChange={(e) => set('position', e.target.value)} /></div>
           <div className="space-y-1"><Label htmlFor={`a${b.id}`}>From</Label><Input id={`a${b.id}`} type="date" value={f.startsAt} onChange={(e) => set('startsAt', e.target.value)} /></div>
           <div className="space-y-1"><Label htmlFor={`e${b.id}`}>Until</Label><Input id={`e${b.id}`} type="date" value={f.endsAt} onChange={(e) => set('endsAt', e.target.value)} /></div>
-          {isAdmin() && (
+          {editable && (
             <div className="flex gap-2 sm:col-span-2">
               <Button size="sm" disabled={save.isPending} onClick={() => save.mutate(undefined)}>Save</Button>
               <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (window.confirm('Delete this banner?')) remove.mutate() }}><Trash2 /> Delete</Button>

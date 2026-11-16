@@ -193,7 +193,7 @@ function Hero({ jobsOn }: { jobsOn: boolean }) {
     <section className="relative isolate overflow-hidden">
       {/* phone: the photo first, edge to edge, with the orange and green wave under it */}
       <div className="relative aspect-[16/10] w-full sm:hidden">
-        <HeroSlider />
+        <HeroSlider variant="phone" />
         <svg viewBox="0 0 400 60" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-12 w-full" aria-hidden>
           <path d="M0 30 C120 0 260 70 400 20 V60 H0Z" className="fill-market" />
           <path d="M0 42 C130 14 270 76 400 34 V60 H0Z" className="fill-primary" />
@@ -230,7 +230,7 @@ function Hero({ jobsOn }: { jobsOn: boolean }) {
             <span className="ml-1 h-1.5 w-6 rotate-[20deg] rounded-full bg-market" />
           </span>
           <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-2xl shadow-primary/20">
-            <HeroSlider />
+            <HeroSlider variant="hero" />
             <svg viewBox="0 0 400 80" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-16 w-full" aria-hidden>
               <path d="M0 60 C140 20 260 90 400 30 V80 H0Z" className="fill-primary" />
             </svg>

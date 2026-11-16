@@ -32,6 +32,15 @@ public class BannerAd {
 
 	private String imageKey;
 
+	/** One picture per place: desktop hero (4:3), phone hero (16:10), offers strip (3:1). Blank falls back to imageKey. */
+	private String heroKey;
+	private String phoneKey;
+	private String stripKey;
+
+	/** Where the banner appears: the home page hero, the offers strip under it, or both. */
+	private boolean showInHero = true;
+	private boolean showInStrip = true;
+
 	private String linkUrl;
 
 	private Instant startsAt;

@@ -45,6 +45,12 @@ export type Banner = {
   title: string
   subtitle: string | null
   imageUrl: string | null
+  /** One picture per place; a blank one falls back (phone to hero, strip to imageUrl). */
+  heroUrl: string | null
+  phoneUrl: string | null
+  stripUrl: string | null
+  showInHero: boolean
+  showInStrip: boolean
   linkUrl: string | null
   startsAt: string | null
   endsAt: string | null
@@ -53,6 +59,9 @@ export type Banner = {
   position: number
   clicks: number
 }
+
+/** Where a banner shows: the home page hero (desktop 4:3 and phone 16:10) and the offers strip (3:1). */
+export type BannerSlot = 'hero' | 'phone' | 'strip'
 
 const send = (method: string, body?: unknown) => ({ method, body: body === undefined ? undefined : JSON.stringify(body) })
 
@@ -86,7 +95,7 @@ async function adminRequest<T>(path: string, init?: RequestInit, json = true): P
 
 export type AdminBoost = BoostView & { productSlug: string | null; shopId: number | null; shopName: string | null; shopPhone: string | null; decidedBy: string | null }
 export type AdminPlan = PlanOrderView & { shopId: number; shopName: string; shopPhone: string | null; pro: boolean; planUntil: string | null; decidedBy: string | null }
-export type BannerInput = { title: string; subtitle?: string; linkUrl?: string; startsAt?: string | null; endsAt?: string | null; active?: boolean; position?: number }
+export type BannerInput = { title: string; subtitle?: string; linkUrl?: string; startsAt?: string | null; endsAt?: string | null; active?: boolean; position?: number; showInHero?: boolean; showInStrip?: boolean }
 
 export const promoAdminApi = {
   counts: () => adminRequest<{ boosts: number; plans: number }>('/promo/counts'),
@@ -104,5 +113,10 @@ export const promoAdminApi = {
     const form = new FormData()
     form.append('file', file)
     return adminRequest<Banner>(`/banners/${id}/image`, { method: 'POST', body: form }, false)
+  },
+  bannerSlotImage: (id: number, slot: BannerSlot, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return adminRequest<Banner>(`/banners/${id}/image/${slot}`, { method: 'POST', body: form }, false)
   },
 }

@@ -12,7 +12,8 @@ export function HomeBanners() {
   const { data } = useQuery({ queryKey: ['banners'], queryFn: promoApi.banners, staleTime: 5 * 60_000 })
   const t = useT()
   const navigate = useNavigate()
-  if (!data?.length) return null
+  const strip = (data ?? []).filter((b) => b.showInStrip)
+  if (!strip.length) return null
   const open = async (b: Banner) => {
     const to = await promoApi.bannerClick(b.id).then((r) => r.linkUrl).catch(() => b.linkUrl ?? '/')
     if (to.startsWith('/')) navigate(to)
@@ -21,12 +22,12 @@ export function HomeBanners() {
   return (
     <section aria-label={t('Special offers')} className="mx-auto max-w-7xl px-4 pt-10 sm:px-6">
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2">
-        {data.map((b) => (
+        {strip.map((b) => (
           <button key={b.id} type="button" onClick={() => open(b)}
             className={cn('group relative shrink-0 snap-start overflow-hidden rounded-3xl bg-primary text-left text-primary-foreground',
               // one banner fills the row; several scroll side by side
-              data.length === 1 ? 'aspect-[5/2] w-full sm:aspect-[4/1]' : 'aspect-[3/1] w-[88%] sm:w-[70%] lg:w-[48%]')}>
-            {b.imageUrl && <img src={b.imageUrl} alt="" className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]" />}
+              strip.length === 1 ? 'aspect-[5/2] w-full sm:aspect-[4/1]' : 'aspect-[3/1] w-[88%] sm:w-[70%] lg:w-[48%]')}>
+            {(b.stripUrl ?? b.imageUrl) && <img src={(b.stripUrl ?? b.imageUrl)!} alt="" className="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.03]" />}
             <span className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/20 to-transparent" />
             <span className="relative flex h-full flex-col justify-end gap-1 p-5 sm:p-7">
               <span className="text-xl font-extrabold leading-tight sm:text-2xl">{b.title}</span>

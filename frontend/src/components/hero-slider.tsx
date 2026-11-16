@@ -23,13 +23,20 @@ const BUILT_IN: Slide[] = [
 ]
 
 /** Sliding advert for the hero: auto-advances, pauses on hover, has arrows, dots and swipe (scroll-snap). */
-export function HeroSlider() {
+export function HeroSlider({ variant = 'hero' }: { variant?: 'hero' | 'phone' }) {
   const t = useT()
   const navigate = useNavigate()
   const { data } = useQuery({ queryKey: ['banners'], queryFn: promoApi.banners, staleTime: 5 * 60_000 })
+  // the phone panel uses its own picture (16:10), the desktop panel its own (4:3); each falls back to the one before
   const fromAdmin: Slide[] = (data ?? [])
-    .filter((b) => b.active)
-    .map((b) => ({ id: `b${b.id}`, title: b.title, subtitle: b.subtitle, image: b.imageUrl, to: b.linkUrl }))
+    .filter((b) => b.active && b.showInHero)
+    .map((b) => ({
+      id: `b${b.id}`,
+      title: b.title,
+      subtitle: b.subtitle,
+      image: variant === 'phone' ? (b.phoneUrl ?? b.heroUrl ?? b.imageUrl) : (b.heroUrl ?? b.imageUrl),
+      to: b.linkUrl,
+    }))
   const slides = fromAdmin.length ? fromAdmin : BUILT_IN
 
   const [index, setIndex] = useState(0)
