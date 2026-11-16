@@ -157,6 +157,10 @@ app:
   # Email + password sign-up asks for a 6-digit code sent to the email first (off: the account is made at once,
   # as the integration and load tests expect)
   sign-up-email-code: ${SIGN_UP_EMAIL_CODE:false}
+  # Keyed hash of seller ID numbers (duplicate check). 32 random bytes, base64. Required before sellers can type an ID number.
+  identity-hmac-key: ${IDENTITY_HMAC_KEY:}
+  # Sign-in and sign-up by phone number (SMS code). Off: email and password only, until the team switches it on.
+  phone-sign-in: ${PHONE_SIGN_IN:false}
   mail:
     enabled: ${MAIL_ENABLED:true}
     from: ${MAIL_FROM:Sodo Gebeya <orders@sodogebeya.local>}

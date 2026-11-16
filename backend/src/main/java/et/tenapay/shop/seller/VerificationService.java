@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -40,6 +41,11 @@ public class VerificationService {
 	private final SmsService sms;
 	private final ShopMetrics metrics;
 	private final TransactionTemplate tx;
+	private final IdNumberHasher idNumbers;
+
+	/** A shop holding the ID number in a request in one of these states blocks any other shop from using it. */
+	private static final List<VerificationStatus> TAKEN = List.of(VerificationStatus.SUBMITTED, VerificationStatus.MORE_INFO,
+			VerificationStatus.APPROVED);
 
 	public Verification latest(Long shopId) {
 		return verifications.findFirstByShopIdOrderByIdDesc(shopId).orElse(null);
@@ -87,15 +93,49 @@ public class VerificationService {
 		return v;
 	}
 
-	public Verification details(Shop shop, Verification.IdType idType, String details) {
+	public Verification details(Shop shop, Verification.IdType idType, String details, String idNumber) {
+		String hash = idNumberHash(shop, idNumber);
 		return tx.execute(s -> {
 			Verification v = editable(shop);
 			if (idType != null) {
 				v.setIdType(idType);
 			}
 			v.setDetails(details == null || details.isBlank() ? null : details.trim());
+			if (hash != null) {
+				v.setIdNumberHash(hash);
+			}
 			return verifications.save(v);
 		});
+	}
+
+	/**
+	 * The keyed hash of the typed ID number, or null when nothing was typed (the saved number stays). Refuses an
+	 * ID number that another shop already holds, and refuses to work at all when the key is not set.
+	 */
+	private String idNumberHash(Shop shop, String idNumber) {
+		if (idNumber == null || idNumber.isBlank()) {
+			return null;
+		}
+		if (!idNumbers.configured()) {
+			throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "ID_CHECK_OFF",
+					"The ID check is not set up yet. Try again later.");
+		}
+		String normalized = IdNumberHasher.normalize(idNumber);
+		if (normalized == null) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "ID_NUMBER_INVALID",
+					"Type the ID number as printed on your card: letters and numbers only.");
+		}
+		String hash = idNumbers.hash(normalized);
+		refuseIfRegistered(shop, hash);
+		return hash;
+	}
+
+	private void refuseIfRegistered(Shop shop, String hash) {
+		if (verifications.existsByIdNumberHashAndShopIdNotAndStatusIn(hash, shop.getId(), TAKEN)) {
+			metrics.shopEvent("verification_duplicate_id");
+			throw new ApiException(HttpStatus.CONFLICT, "DUPLICATE_ID",
+					"This ID is already registered on Sodo Gebeya. Sign in to your existing account, or contact us if you think this is a mistake.");
+		}
 	}
 
 	/** Sends it to staff. ID front and the selfie are required; a two-sided ID also needs its back. */
@@ -112,6 +152,11 @@ public class VerificationService {
 						Map.of("front", v.getIdFrontKey() != null, "back", v.getIdBackKey() != null,
 								"selfie", v.getSelfieKey() != null));
 			}
+			if (v.getIdNumberHash() == null) {
+				throw new ApiException(HttpStatus.BAD_REQUEST, "ID_NUMBER_MISSING", "Type your ID number.");
+			}
+			// checked again at submit: another shop may have sent the same ID since this one was typed
+			refuseIfRegistered(shop, v.getIdNumberHash());
 			v.setStatus(VerificationStatus.SUBMITTED);
 			v.setSubmittedAt(Instant.now());
 			metrics.shopEvent("verification_submitted");

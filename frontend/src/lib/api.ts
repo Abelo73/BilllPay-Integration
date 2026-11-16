@@ -304,7 +304,7 @@ export const api = {
   deleteAddress: (id: number) => request<Address[]>(`/me/addresses/${id}`, { method: 'DELETE' }),
 
   /** With email codes on, the first call answers 422 EMAIL_CODE_SENT; send the same form again with `code`. */
-  register: (body: { fullName: string; email: string; phone: string; password: string; code?: string }) =>
+  register: (body: { fullName: string; email: string; phone?: string; password: string; code?: string }) =>
     request<Session>('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   emailResend: (email: string) =>
     request<EmailCodeSent>('/auth/email/resend', { method: 'POST', body: JSON.stringify({ email }) }),

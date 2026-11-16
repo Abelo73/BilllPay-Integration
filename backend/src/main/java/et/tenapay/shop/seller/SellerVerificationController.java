@@ -37,20 +37,21 @@ public class SellerVerificationController {
 	/** {@code photos}: which photos are uploaded (the images themselves are fetched one by one). */
 	public record VerificationDto(Long id, String status, String idType, boolean idFront, boolean idBack, boolean selfie,
 			boolean licence, String details, String staffNote, Instant submittedAt, Instant decidedAt,
-			Instant shopVerifiedAt) {
+			Instant shopVerifiedAt, boolean idNumberOnFile) {
 
 		static VerificationDto of(Verification v, Shop shop) {
 			if (v == null) {
 				return new VerificationDto(null, "NONE", IdType.FAYDA.name(), false, false, false, false, null, null,
-						null, null, shop.getVerifiedAt());
+						null, null, shop.getVerifiedAt(), false);
 			}
 			return new VerificationDto(v.getId(), v.getStatus().name(), v.getIdType().name(), v.getIdFrontKey() != null,
 					v.getIdBackKey() != null, v.getSelfieKey() != null, v.getLicenceKey() != null, v.getDetails(),
-					v.getStaffNote(), v.getSubmittedAt(), v.getDecidedAt(), shop.getVerifiedAt());
+					v.getStaffNote(), v.getSubmittedAt(), v.getDecidedAt(), shop.getVerifiedAt(), v.getIdNumberHash() != null);
 		}
 	}
 
-	public record DetailsRequest(IdType idType, @Size(max = 1000) String details) {
+	/** idNumber: typed by the seller, stored only as a keyed hash; blank keeps the number already saved. */
+	public record DetailsRequest(IdType idType, @Size(max = 1000) String details, @Size(max = 40) String idNumber) {
 	}
 
 	@GetMapping
@@ -63,7 +64,7 @@ public class SellerVerificationController {
 	@PutMapping
 	public VerificationDto details(@Valid @RequestBody DetailsRequest req) {
 		Shop shop = shopService.requireMine();
-		return VerificationDto.of(verifications.details(shop, req.idType(), req.details()), shop);
+		return VerificationDto.of(verifications.details(shop, req.idType(), req.details(), req.idNumber()), shop);
 	}
 
 	@PostMapping(path = "/photos/{photo}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

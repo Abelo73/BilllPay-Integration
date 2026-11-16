@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Camera, Check, Clock, Loader2, ShieldCheck } from 'lucide-react'
+import { BadgeCheck, Camera, Check, Clock, Loader2, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
@@ -63,6 +64,96 @@ function PhotoSlot({ photo, label, has, editable, onUploaded }: {
   )
 }
 
+/**
+ * The selfie is taken with the live camera only: there is no gallery option here, so an old photo cannot be used.
+ * It shows plain guidance and a frame. It does not detect faces or liveness yet (see docs/IDENTITY_CHECK_PLAN.md).
+ */
+function LiveSelfie({ has, editable, onUploaded }: { has: boolean; editable: boolean; onUploaded: (v: MyVerification) => void }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const video = useRef<HTMLVideoElement>(null)
+  const upload = useMutation({
+    mutationFn: (f: File) => verificationApi.upload('selfie', f),
+    onSuccess: (v) => { onUploaded(v); setOpen(false) },
+    onError: (e) => toast.error(e.message),
+  })
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    let stream: MediaStream | null = null
+    setError(null)
+    navigator.mediaDevices
+      ?.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } }, audio: false })
+      .then((m) => {
+        if (cancelled) { m.getTracks().forEach((tr) => tr.stop()); return }
+        stream = m
+        if (video.current) video.current.srcObject = m
+      })
+      .catch(() => { if (!cancelled) setError(t('We need your camera for the selfie. Allow camera access, or use a phone with a camera.')) })
+    return () => {
+      cancelled = true
+      stream?.getTracks().forEach((tr) => tr.stop())
+    }
+  }, [open, t])
+
+  const capture = () => {
+    const v = video.current
+    if (!v || !v.videoWidth) return
+    const side = Math.min(v.videoWidth, v.videoHeight)
+    const canvas = document.createElement('canvas')
+    canvas.width = 720
+    canvas.height = 720
+    canvas.getContext('2d')?.drawImage(v, (v.videoWidth - side) / 2, (v.videoHeight - side) / 2, side, side, 0, 0, 720, 720)
+    canvas.toBlob((b) => { if (b) upload.mutate(new File([b], 'selfie.jpg', { type: 'image/jpeg' })) }, 'image/jpeg', 0.9)
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={!editable}
+        onClick={() => setOpen(true)}
+        className={cn(
+          'flex h-28 w-full flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-semibold',
+          has ? 'ring-2 ring-primary' : 'border-2 border-dashed bg-muted/40 text-muted-foreground',
+        )}
+      >
+        <Camera className="size-5" />
+        <span>{has ? `${t('Selfie')} ✓` : t('Take a selfie now')}</span>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-black/90 p-4 text-white">
+          <div className="flex items-center justify-between">
+            <p className="font-bold">{t('Take your selfie')}</p>
+            <button type="button" onClick={() => setOpen(false)} className="min-h-11 min-w-11 grid place-items-center" aria-label={t('Close')}>
+              <X className="size-6" />
+            </button>
+          </div>
+          <ul className="mt-2 space-y-1 text-sm text-white/90">
+            <li>{t('Find a bright place and face the light.')}</li>
+            <li>{t('Take off glasses, a hat or a mask.')}</li>
+            <li>{t('Hold the phone at eye level, about an arm\'s length away.')}</li>
+            <li>{t('Only you should be in the photo. Hold your ID next to your face.')}</li>
+          </ul>
+          <div className="relative mx-auto mt-4 aspect-square w-full max-w-sm overflow-hidden rounded-2xl bg-black">
+            {error ? (
+              <p className="grid h-full place-items-center p-6 text-center text-sm">{error}</p>
+            ) : (
+              <video ref={video} autoPlay playsInline muted className="size-full -scale-x-100 object-cover" />
+            )}
+            <div className="pointer-events-none absolute inset-6 rounded-[50%] border-2 border-dashed border-white/80" />
+          </div>
+          <Button size="lg" className="mx-auto mt-4 h-12 w-full max-w-sm text-base" disabled={!!error || upload.isPending} onClick={capture}>
+            {upload.isPending && <Loader2 className="animate-spin" />} {t('Take photo')}
+          </Button>
+        </div>
+      )}
+    </>
+  )
+}
+
 function Step({ n, done, title, text, children }: { n: number; done: boolean; title: string; text: string; children?: React.ReactNode }) {
   return (
     <li className={cn('space-y-3 rounded-2xl border bg-card p-4', !done && children && 'border-2 border-primary/60')}>
@@ -86,11 +177,13 @@ export function SellerVerifyPage() {
   const t = useT()
   const { data: v, isLoading } = useQuery({ queryKey: ['seller-verification'], queryFn: verificationApi.get })
   const [details, setDetails] = useState<string | null>(null)
+  const [idNumber, setIdNumber] = useState<string | null>(null)
   const set = (next: MyVerification) => qc.setQueryData(['seller-verification'], next)
   const saveType = useMutation({ mutationFn: (idType: IdType) => verificationApi.details(idType, details ?? v?.details ?? ''), onSuccess: set, onError: (e) => toast.error(e.message) })
   const submit = useMutation({
     mutationFn: async () => {
-      if (details !== null && details !== (v?.details ?? '')) await verificationApi.details(v!.idType, details)
+      if (idNumber?.trim()) await verificationApi.details(v!.idType, details ?? v!.details ?? '', idNumber.trim())
+      else if (details !== null && details !== (v?.details ?? '')) await verificationApi.details(v!.idType, details)
       return verificationApi.submit()
     },
     onSuccess: (next) => { set(next); toast.success(t("Sent. Our team checks it within a day; we'll text you.")) },
@@ -124,7 +217,7 @@ export function SellerVerifyPage() {
 
   const editable = v.status !== 'APPROVED'
   const twoSided = v.idType !== 'PASSPORT'
-  const ready = v.idFront && v.selfie && (!twoSided || v.idBack)
+  const ready = v.idFront && v.selfie && (!twoSided || v.idBack) && (v.idNumberOnFile || !!idNumber?.trim())
 
   return (
     <div className="space-y-4 pb-20 md:pb-0">
@@ -143,7 +236,20 @@ export function SellerVerifyPage() {
       )}
       <ol className="space-y-3">
         <Step n={1} done title={t('Phone number')} text={t('Proven when you signed in')} />
-        <Step n={2} done={v.idFront && (!twoSided || v.idBack)} title={t('ID card')} text={twoSided ? t('Both sides, all four corners, readable') : t('The photo page')}>
+        <Step n={2} done={v.idFront && (!twoSided || v.idBack) && (v.idNumberOnFile || !!idNumber?.trim())} title={t('ID card')} text={twoSided ? t('Both sides, all four corners, readable') : t('The photo page')}>
+          <div className="space-y-1.5">
+            <Label htmlFor="verify-id-number" className="text-xs">{t('ID number')}</Label>
+            <Input
+              id="verify-id-number"
+              autoComplete="off"
+              maxLength={40}
+              disabled={!editable}
+              value={idNumber ?? ''}
+              onChange={(e) => setIdNumber(e.target.value)}
+              placeholder={v.idNumberOnFile && idNumber === null ? t('Saved. Type it again to change it') : t('As printed on your card')}
+            />
+            <p className="text-xs text-muted-foreground">{t('We keep only a secure code of this number, never the number itself. It is used to stop duplicate accounts.')}</p>
+          </div>
           <div className="flex flex-wrap gap-2">
             {(Object.keys(ID_TYPE_LABEL) as IdType[]).map((idType) => (
               <button
@@ -161,9 +267,9 @@ export function SellerVerifyPage() {
             {twoSided && <PhotoSlot photo="id-back" label={t('Back side')} has={v.idBack} editable={editable} onUploaded={set} />}
           </div>
         </Step>
-        <Step n={3} done={v.selfie} title={t('Selfie holding your ID')} text={t('So we know the ID is yours')}>
+        <Step n={3} done={v.selfie} title={t('Selfie holding your ID')} text={t('Taken now with your camera, so we know the ID is yours')}>
           <div className="grid grid-cols-2 gap-2">
-            <PhotoSlot photo="selfie" label={t('Selfie')} has={v.selfie} editable={editable} onUploaded={set} />
+            <LiveSelfie has={v.selfie} editable={editable} onUploaded={set} />
           </div>
         </Step>
         <Step n={4} done={!!(v.licence || v.details)} title={t('Shop details (optional)')} text={t('Trade licence photo or number, or where your shop is')}>

@@ -23,6 +23,8 @@ export type MyVerification = {
   submittedAt: string | null
   decidedAt: string | null
   shopVerifiedAt: string | null
+  /** The seller has typed an ID number (the number itself is never sent back). */
+  idNumberOnFile: boolean
 }
 
 export const ID_TYPE_LABEL: Record<IdType, string> = {
@@ -49,8 +51,9 @@ async function blobUrl(url: string, token: string | null): Promise<string> {
 
 export const verificationApi = {
   get: () => request<MyVerification>('/seller/verification'),
-  details: (idType: IdType, details: string) =>
-    request<MyVerification>('/seller/verification', { method: 'PUT', body: JSON.stringify({ idType, details }) }),
+  /** idNumber is sent only when the seller typed one; the server keeps a keyed hash, never the number. */
+  details: (idType: IdType, details: string, idNumber?: string) =>
+    request<MyVerification>('/seller/verification', { method: 'PUT', body: JSON.stringify({ idType, details, idNumber }) }),
   upload: (photo: VerificationPhoto, file: File) =>
     uploadWith<MyVerification>(`/api/seller/verification/photos/${photo}`, file, sessionToken()),
   photo: (photo: VerificationPhoto) => blobUrl(`/api/seller/verification/photos/${photo}`, sessionToken()),

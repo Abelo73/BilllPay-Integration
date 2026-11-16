@@ -102,7 +102,9 @@ class VerificationAndListingsIntegrationTest extends IntegrationTest {
 		photo(seller, "id-back", Color.GREEN);
 		JsonNode v = photo(seller, "selfie", Color.ORANGE).body();
 		assertThat(v.path("idFront").asBoolean() && v.path("idBack").asBoolean() && v.path("selfie").asBoolean()).isTrue();
-		assertThat(put("/api/seller/verification", Map.of("idType", "FAYDA", "details", "Licence 12/345"), seller).status())
+		// submitting needs the ID number too (stored as a keyed hash, see IdentityCheckIntegrationTest)
+		assertThat(put("/api/seller/verification", Map.of("idType", "FAYDA", "details", "Licence 12/345",
+				"idNumber", "ET " + (1000 + shopId) + " 2222"), seller).status())
 				.isEqualTo(200);
 
 		// the owner can see their photo, without caching; nobody else can, and the public media route never serves it

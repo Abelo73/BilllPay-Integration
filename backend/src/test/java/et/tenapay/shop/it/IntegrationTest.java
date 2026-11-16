@@ -59,6 +59,10 @@ import tools.jackson.databind.ObjectMapper;
 		"app.scheduling.enabled=false",
 		// sign-up makes the account at once in the tests that just need a customer (EmailSignUpIntegrationTest turns codes on)
 		"app.sign-up-email-code=false",
+		// phone sign-in is off by default; the phone tests turn it on (PhoneSignInOffIntegrationTest checks the off case)
+		"app.phone-sign-in=true",
+		// keyed hash for seller ID numbers (test key only; production uses IDENTITY_HMAC_KEY from the server .env)
+		"app.identity-hmac-key=aWRlbnRpdHktdGVzdC1rZXktMDEyMzQ1Njc4OWFiY2RlZg==",
 		// Telegram stays in test mode (no token); the webhook needs this secret
 		"telegram.webhook-secret=" + IntegrationTest.TELEGRAM_SECRET,
 		"telegram.channel-id=@sodo-test",

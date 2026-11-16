@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, CheckCircle2, FlaskConical, Loader2, Mail, MessageSquareText, Phone, ShieldCheck, Truck, UserRound } from 'lucide-react'
+import { ArrowLeft, FlaskConical, Loader2, Mail, Phone, ShieldCheck, Truck, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { IconInput, PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
-import { api, ApiError, type EmailCodeSent, type PhoneCodeSent } from '@/lib/api'
+import { api, ApiError, type EmailCodeSent } from '@/lib/api'
 import { useT } from '@/lib/i18n'
 import { type Session, useSession } from '@/store/session'
 
@@ -26,10 +26,8 @@ function AuthShell({ title, description, children }: { title: string; descriptio
       <div className="hidden space-y-6 lg:block">
         <img src="/products/habesha-netela.jpg" alt="" className="aspect-[4/3] w-full rounded-3xl object-cover shadow-xl" />
         <ul className="space-y-3 text-sm text-muted-foreground">
-          <li className="flex items-center gap-3"><MessageSquareText className="size-4 text-success" /> {t('Sign in with your phone, no password to remember')}</li>
-          <li className="flex items-center gap-3"><Truck className="size-4 text-success" /> {t('Track every order and delivery')}</li>
-          <li className="flex items-center gap-3"><ShieldCheck className="size-4 text-success" /> {t('Payments stay on BillPay. We never see your wallet or bank details')}</li>
-          <li className="flex items-center gap-3"><CheckCircle2 className="size-4 text-success" /> {t('Faster checkout with your address saved')}</li>
+          <li className="flex items-center gap-3"><Truck className="size-4 text-success" /> {t('Track your orders')}</li>
+          <li className="flex items-center gap-3"><ShieldCheck className="size-4 text-success" /> {t('Pay safely with BillPay')}</li>
         </ul>
       </div>
       <Card className="w-full">
@@ -80,150 +78,6 @@ function useCountdown(until: number) {
   return Math.max(0, Math.ceil((until - now) / 1000))
 }
 
-/**
- * Phone sign-in (design S13): number → 6-digit SMS code → name, the first time only.
- * The same flow signs people in and creates accounts.
- */
-function PhoneSignIn({ onSignedIn }: { onSignedIn: (s: Session, created: boolean) => void }) {
-  const t = useT()
-  const [phone, setPhone] = useState('')
-  const [sent, setSent] = useState<(PhoneCodeSent & { at: number }) | null>(null)
-  const [code, setCode] = useState('')
-  const [askName, setAskName] = useState(false)
-  const [fullName, setFullName] = useState('')
-  const codeRef = useRef<HTMLInputElement>(null)
-  const resendIn = useCountdown(sent ? sent.at + sent.resendInSeconds * 1000 : 0)
-
-  const start = useMutation({
-    mutationFn: (p: string) => api.phoneStart(p),
-    onSuccess: (s) => {
-      setSent({ ...s, at: Date.now() })
-      setCode('')
-      setTimeout(() => codeRef.current?.focus(), 50)
-    },
-  })
-  const verify = useMutation({
-    mutationFn: () => api.phoneVerify(sent!.phone, code, askName ? fullName : undefined),
-    onSuccess: (s) => onSignedIn(s, askName),
-    onError: (e) => {
-      if (e instanceof ApiError && e.code === 'NAME_REQUIRED') setAskName(true)
-      if (e instanceof ApiError && (e.code === 'CODE_EXPIRED' || e.code === 'TOO_MANY_TRIES')) setCode('')
-    },
-  })
-
-  // fill the 6 digits → check right away (not on the name step)
-  useEffect(() => {
-    if (code.length === 6 && sent && !askName && !verify.isPending && !verify.isSuccess) verify.mutate()
-  }, [code]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (!sent) {
-    return (
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          start.mutate(phone)
-        }}
-      >
-        <div className="space-y-2">
-          <Label htmlFor="phone">{t('Your phone number')}</Label>
-          <div className="flex h-12 overflow-hidden rounded-xl border bg-card focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/30">
-            <span className="flex items-center border-r px-3 text-base font-bold" aria-hidden>+251</span>
-            <input
-              id="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel-national"
-              required
-              placeholder="911 234 567"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent px-3 text-lg font-semibold outline-none placeholder:font-normal placeholder:text-muted-foreground"
-            />
-          </div>
-        </div>
-        <ErrorBox error={start.error} />
-        <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={start.isPending}>
-          {start.isPending && <Loader2 className="animate-spin" />} {t('Send code')}
-        </Button>
-        <p className="text-center text-xs text-muted-foreground">{t("We'll text you a 6-digit code. No password needed.")}</p>
-      </form>
-    )
-  }
-
-  // split around the placeholder so the number stays bold in either language
-  const [sentBefore, sentAfter] = t('Enter the code we sent to {phone}').split('{phone}')
-  const [codeBefore, codeAfter] = t('Your code is {code}.').split('{code}')
-  return (
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault()
-        verify.mutate()
-      }}
-    >
-      <p className="text-center text-sm">
-        {sentBefore}<strong className="whitespace-nowrap">{sent.maskedPhone}</strong>{sentAfter}
-      </p>
-      {sent.testMode && (
-        <div className="flex gap-2 rounded-lg bg-warning/20 p-3 text-sm">
-          <FlaskConical className="mt-0.5 size-4 shrink-0" />
-          <span>
-            {t('SMS test mode: no text was sent.')}
-            {sent.devCode ? <> {codeBefore}<strong className="font-mono tracking-widest">{sent.devCode}</strong>{codeAfter}</> : ` ${t('The code is in the backend log.')}`}
-          </span>
-        </div>
-      )}
-      <div className="space-y-2">
-        <Label htmlFor="code">{t('6-digit code')}</Label>
-        <Input
-          ref={codeRef}
-          id="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          pattern="\d{6}"
-          maxLength={6}
-          required
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          className="h-14 text-center font-mono text-2xl font-bold tracking-[0.5em]"
-          disabled={askName}
-        />
-      </div>
-      {askName && (
-        <Field id="fullName" label={t('Your name')} autoComplete="name" required autoFocus value={fullName} onChange={(e) => setFullName(e.target.value)} />
-      )}
-      {verify.error && !(verify.error instanceof ApiError && verify.error.code === 'NAME_REQUIRED') && <ErrorBox error={verify.error} />}
-      {askName && <p className="text-sm text-muted-foreground">{t('Welcome to Sodo Gebeya! This is your first sign-in, so tell us your name.')}</p>}
-      <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={verify.isPending || code.length !== 6 || (askName && !fullName.trim())}>
-        {verify.isPending && <Loader2 className="animate-spin" />} {askName ? t('Create my account') : t('Continue')}
-      </Button>
-      <div className="flex items-center justify-between text-sm">
-        <button
-          type="button"
-          className="flex min-h-11 items-center gap-1 font-semibold text-brand hover:underline"
-          onClick={() => {
-            setSent(null)
-            setAskName(false)
-            verify.reset()
-            start.reset()
-          }}
-        >
-          <ArrowLeft className="size-4" /> {t('Change number')}
-        </button>
-        {resendIn > 0 ? (
-          <span className="text-muted-foreground">{t('Resend in {time}', { time: `0:${String(resendIn).padStart(2, '0')}` })}</span>
-        ) : (
-          <button type="button" className="min-h-11 font-semibold text-brand hover:underline" disabled={start.isPending} onClick={() => start.mutate(sent.phone)}>
-            {t('Send a new code')}
-          </button>
-        )}
-      </div>
-      <ErrorBox error={start.error} />
-    </form>
-  )
-}
-
 function EmailSignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
   const t = useT()
   const [email, setEmail] = useState('')
@@ -247,74 +101,98 @@ function EmailSignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
   )
 }
 
-function SwitchMethod({ toEmail, onClick }: { toEmail: boolean; onClick: () => void }) {
-  const t = useT()
-  return (
-    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-      <span className="h-px flex-1 bg-border" />
-      <button type="button" onClick={onClick} className="min-h-11 font-semibold text-brand hover:underline">
-        {toEmail ? t('Use email and password instead') : t('Use my phone number instead')}
-      </button>
-      <span className="h-px flex-1 bg-border" />
-    </div>
-  )
-}
-
 function useFinish() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const setSession = useSession((s) => s.setSession)
   const t = useT()
-  return (s: Session, created = false) => {
+  return (s: Session, created = false, fallback?: string) => {
     setSession(s)
     toast.success(created ? t('Your account is ready!') : t('Welcome back, {name}!', { name: s.user.fullName.split(' ')[0] }))
-    navigate(safeNext(params.get('next')), { replace: true })
+    navigate(safeNext(params.get('next') ?? fallback ?? null), { replace: true })
   }
 }
 
+/** The "next" part of a link, kept when switching between sign-in and sign-up. */
+function nextQuery(params: URLSearchParams) {
+  const next = params.get('next')
+  return next ? `?next=${encodeURIComponent(next)}` : ''
+}
+
+/** Sign in with email and password. Phone sign-in is switched off for now. */
 export function LoginPage() {
   const t = useT()
   const [params] = useSearchParams()
   const session = useSession((s) => s.session)
   const finish = useFinish()
-  const [withEmail, setWithEmail] = useState(params.get('method') === 'email')
   if (session) return <Navigate to={safeNext(params.get('next'))} replace />
 
   return (
-    <AuthShell title={t('Sign in')} description={t('Buy and sell in Wolaita Sodo.')}>
-      {withEmail ? <EmailSignIn onSignedIn={(s) => finish(s)} /> : <PhoneSignIn onSignedIn={finish} />}
-      <SwitchMethod toEmail={!withEmail} onClick={() => setWithEmail(!withEmail)} />
+    <AuthShell title={t('Sign in')} description={t('Use your email and password.')}>
+      <EmailSignIn onSignedIn={(s) => finish(s)} />
       <p className="text-center text-sm text-muted-foreground">
-        {t('New here?')} {withEmail ? (
-          <Link to={`/register${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-semibold text-brand hover:underline">
-            {t('Create an account')}
-          </Link>
-        ) : (
-          <>{t("Just enter your phone. We'll create your account.")}</>
-        )}
+        {t('New here?')}{' '}
+        <Link to={`/register${nextQuery(params)}`} className="font-semibold text-brand hover:underline">
+          {t('Create an account')}
+        </Link>
       </p>
     </AuthShell>
   )
 }
 
-/** Creating an account: phone first (same flow as sign-in); email and password stay available. */
+/**
+ * Create an account, as a buyer or as a seller. Both use email and a password; a seller is sent on to open a shop.
+ * Without ?role= the page asks which one.
+ */
 export function RegisterPage() {
   const t = useT()
   const [params] = useSearchParams()
   const session = useSession((s) => s.session)
   const finish = useFinish()
-  const [withEmail, setWithEmail] = useState(params.get('method') === 'email')
+  const role = params.get('role') === 'seller' ? 'seller' : params.get('role') === 'buyer' ? 'buyer' : null
   if (session) return <Navigate to={safeNext(params.get('next'))} replace />
 
+  if (!role) {
+    return (
+      <AuthShell title={t('Create an account')} description={t('What do you want to do?')}>
+        <div className="grid gap-3">
+          <Button asChild size="lg" className="h-auto justify-start whitespace-normal py-4 text-left">
+            <Link to={`/register?role=buyer${nextQuery(params).replace('?', '&')}`}>
+              <span className="block">
+                <span className="block text-base font-bold">{t('Buy')}</span>
+                <span className="block text-sm font-normal opacity-90">{t('Shop from sellers in Sodo')}</span>
+              </span>
+            </Link>
+          </Button>
+          <Button asChild size="lg" variant="outline" className="h-auto justify-start whitespace-normal py-4 text-left">
+            <Link to={`/register?role=seller${nextQuery(params).replace('?', '&')}`}>
+              <span className="block">
+                <span className="block text-base font-bold">{t('Sell')}</span>
+                <span className="block text-sm font-normal opacity-90">{t('Open a shop. It is free.')}</span>
+              </span>
+            </Link>
+          </Button>
+        </div>
+        <p className="text-center text-sm text-muted-foreground">
+          {t('Have an account?')}{' '}
+          <Link to={`/login${nextQuery(params)}`} className="font-semibold text-brand hover:underline">{t('Sign in')}</Link>
+        </p>
+      </AuthShell>
+    )
+  }
+
+  const seller = role === 'seller'
   return (
-    <AuthShell title={t('Create your account')} description={t('Track orders, check out faster, and be first to sell when shops open.')}>
-      {withEmail ? <EmailRegister onDone={(s) => finish(s, true)} /> : <PhoneSignIn onSignedIn={finish} />}
-      <SwitchMethod toEmail={!withEmail} onClick={() => setWithEmail(!withEmail)} />
+    <AuthShell
+      title={seller ? t('Sell on Sodo Gebeya') : t('Create your account')}
+      description={seller ? t('Step 1 of 2: make your account. Then open your shop.') : t('It takes one minute.')}
+    >
+      <EmailRegister onDone={(s) => finish(s, true, seller ? '/sell' : '/account')} />
       <p className="text-center text-sm text-muted-foreground">
-        {t('Already have an account?')}{' '}
-        <Link to={`/login${params.get('next') ? `?next=${encodeURIComponent(params.get('next')!)}` : ''}`} className="font-semibold text-brand hover:underline">
-          {t('Sign in')}
-        </Link>
+        <Link to={`/register${nextQuery(params)}`} className="font-semibold text-brand hover:underline">{t('Back')}</Link>
+        {' · '}
+        {t('Have an account?')}{' '}
+        <Link to={`/login${nextQuery(params)}`} className="font-semibold text-brand hover:underline">{t('Sign in')}</Link>
       </p>
     </AuthShell>
   )
@@ -322,7 +200,7 @@ export function RegisterPage() {
 
 function EmailRegister({ onDone }: { onDone: (s: Session) => void }) {
   const t = useT()
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', confirm: '' })
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   // Set once the shop has emailed a code (sign-up with email codes on): the form then asks for the code
   const [sent, setSent] = useState<(EmailCodeSent & { at: number }) | null>(null)
@@ -337,7 +215,7 @@ function EmailRegister({ onDone }: { onDone: (s: Session) => void }) {
   }
   const register = useMutation({
     mutationFn: () =>
-      api.register({ fullName: form.fullName, email: form.email, phone: form.phone, password: form.password, code: sent ? code : undefined }),
+      api.register({ fullName: form.fullName, email: form.email, password: form.password, code: sent ? code : undefined }),
     onSuccess: onDone,
     onError: (e) => {
       if (e instanceof ApiError && e.code === 'VALIDATION_FAILED') setErrors((e.body.errors as Record<string, string>) ?? {})
@@ -437,7 +315,6 @@ function EmailRegister({ onDone }: { onDone: (s: Session) => void }) {
     >
       <Field id="fullName" label={t('Full name')} autoComplete="name" required value={form.fullName} onChange={set('fullName')} error={errors.fullName} />
       <Field id="email" label={t('Email')} type="email" autoComplete="email" required value={form.email} onChange={set('email')} error={errors.email} />
-      <Field id="phone" label={t('Phone (optional)')} type="tel" inputMode="tel" autoComplete="tel" placeholder="0911 234 567" value={form.phone} onChange={set('phone')} error={errors.phone} />
       <Field id="password" label={t('Password')} type="password" autoComplete="new-password" required value={form.password} onChange={set('password')} error={errors.password} />
       <Field id="confirm" label={t('Confirm password')} type="password" autoComplete="new-password" required value={form.confirm} onChange={set('confirm')} error={errors.confirm} />
       {register.error && !(register.error instanceof ApiError && ['VALIDATION_FAILED', 'EMAIL_CODE_SENT'].includes(register.error.code ?? '')) && <ErrorBox error={register.error} />}

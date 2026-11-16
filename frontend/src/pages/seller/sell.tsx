@@ -74,10 +74,10 @@ export function SellPage() {
       {!session && (
         <Card>
           <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
-            <p className="flex-1 text-sm">{t('Sign in or create a free account first. It takes a minute with your phone number.')}</p>
+            <p className="flex-1 text-sm">{t('Sign in or create a free account first. It takes a minute with your email.')}</p>
             <div className="flex gap-2">
               <Button asChild variant="outline"><Link to="/login?next=/sell">{t('Sign in')}</Link></Button>
-              <Button asChild><Link to="/register?next=/sell">{t('Create account')}</Link></Button>
+              <Button asChild><Link to="/register?role=seller&next=/sell">{t('Create account')}</Link></Button>
             </div>
           </CardContent>
         </Card>

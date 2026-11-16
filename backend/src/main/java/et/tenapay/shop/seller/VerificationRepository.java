@@ -1,5 +1,6 @@
 package et.tenapay.shop.seller;
 
+import java.util.Collection;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -13,4 +14,7 @@ public interface VerificationRepository extends JpaRepository<Verification, Long
 	Page<Verification> findByStatus(VerificationStatus status, Pageable pageable);
 
 	long countByStatus(VerificationStatus status);
+
+	/** Another shop already holds this ID number in a request that is pending or approved. */
+	boolean existsByIdNumberHashAndShopIdNotAndStatusIn(String idNumberHash, Long shopId, Collection<VerificationStatus> statuses);
 }

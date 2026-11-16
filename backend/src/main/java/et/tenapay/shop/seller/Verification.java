@@ -49,6 +49,10 @@ public class Verification {
 
 	private String details;
 
+	/** HMAC of the ID number (see IdNumberHasher). The number itself is never stored. */
+	@Column(name = "id_number_hash")
+	private String idNumberHash;
+
 	@Enumerated(EnumType.STRING)
 	private VerificationStatus status = VerificationStatus.DRAFT;
 

@@ -24,6 +24,8 @@ public class AuthController {
 	private final EmailCodeService emailCodes;
 	private final et.tenapay.shop.config.AppProperties app;
 	private final PhoneAuthService phoneAuth;
+	@org.springframework.beans.factory.annotation.Value("${app.phone-sign-in:false}")
+	private boolean phoneSignIn;
 	private final StaffTwoStepService twoStep;
 	private final UserRepository users;
 
@@ -97,16 +99,25 @@ public class AuthController {
 			@Size(max = 200) String fullName) {
 	}
 
-	/** Step 1 of phone sign-in: text a 6-digit code to the number. */
+	/** Step 1 of phone sign-in: text a 6-digit code to the number. Off unless app.phone-sign-in is on. */
 	@PostMapping("/api/auth/phone/start")
 	public PhoneAuthService.CodeSent phoneStart(@Valid @RequestBody PhoneStartRequest req, HttpServletRequest http) {
+		requirePhoneSignIn();
 		return phoneAuth.sendCode(req.phone(), client(http), req.language());
 	}
 
 	/** Step 2: check the code and sign in (creating the account on a first sign-in, which needs fullName). */
 	@PostMapping("/api/auth/phone/verify")
 	public Session phoneVerify(@Valid @RequestBody PhoneVerifyRequest req, HttpServletRequest http) {
+		requirePhoneSignIn();
 		return phoneAuth.verify(req.phone(), req.code(), req.fullName(), client(http));
+	}
+
+	/** Phone sign-in and sign-up are switched off for now: email and password only. */
+	private void requirePhoneSignIn() {
+		if (!phoneSignIn) {
+			throw et.tenapay.shop.common.ApiException.notFound("Phone sign-in");
+		}
 	}
 
 	public record StaffVerifyRequest(@jakarta.validation.constraints.NotNull java.util.UUID challengeId, @NotBlank @Size(max = 10) String code,
