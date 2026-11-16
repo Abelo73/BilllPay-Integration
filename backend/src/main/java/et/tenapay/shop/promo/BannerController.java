@@ -105,7 +105,7 @@ public class BannerController {
 		}
 		BannerAd b = banners.findById(id).orElseThrow(() -> ApiException.notFound("Banner"));
 		ImageProcessor.Processed img = images.process(file.getBytes());
-		String key = "banners/" + UUID.randomUUID() + ".jpg";
+		String key = bannerKey(b.getId(), null);
 		storage.put(key, img.large(), "image/jpeg");
 		String old = b.getImageKey();
 		b.setImageKey(key);
@@ -127,7 +127,7 @@ public class BannerController {
 		}
 		BannerAd b = banners.findById(id).orElseThrow(() -> ApiException.notFound("Banner"));
 		ImageProcessor.Processed img = images.process(file.getBytes());
-		String key = "banners/" + UUID.randomUUID() + "-" + slot + ".jpg";
+		String key = bannerKey(b.getId(), slot);
 		storage.put(key, img.large(), "image/jpeg");
 		String old = slotKey(b, slot);
 		setSlotKey(b, slot, key);
@@ -135,6 +135,14 @@ public class BannerController {
 			storage.delete(old);
 		}
 		return view(b);
+	}
+
+	/**
+	 * banners/<id>/<name>.jpg: the public media route serves only keys shaped like this (see MediaController.SAFE_KEY).
+	 */
+	static String bannerKey(Long id, String slot) {
+		String name = (slot == null ? "" : slot + "-") + UUID.randomUUID().toString().toLowerCase();
+		return "banners/" + id + "/" + name + ".jpg";
 	}
 
 	private static final java.util.Set<String> SLOTS = java.util.Set.of("hero", "phone", "strip");

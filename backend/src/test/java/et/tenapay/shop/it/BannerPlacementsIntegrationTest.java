@@ -52,6 +52,9 @@ class BannerPlacementsIntegrationTest extends IntegrationTest {
 				.isEqualTo(200);
 		JsonNode hero = banner(get("/api/admin/banners", admin).body(), id);
 		assertThat(hero.path("heroUrl").asString()).isNotBlank();
+		// the picture must be reachable on the public media route, or the home page shows a broken image
+		String heroPath = hero.path("heroUrl").asString();
+		assertThat(get(heroPath).status()).as("hero picture at " + heroPath).isEqualTo(200);
 		assertThat(hero.path("phoneUrl").asString()).isEqualTo(hero.path("heroUrl").asString());
 		assertThat(hero.path("stripUrl").isNull()).isTrue();
 
