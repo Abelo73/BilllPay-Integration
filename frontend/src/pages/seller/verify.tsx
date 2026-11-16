@@ -83,7 +83,6 @@ function LiveSelfie({ has, editable, onUploaded }: { has: boolean; editable: boo
     if (!open) return
     let cancelled = false
     let stream: MediaStream | null = null
-    setError(null)
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } }, audio: false })
       .then((m) => {
@@ -114,7 +113,7 @@ function LiveSelfie({ has, editable, onUploaded }: { has: boolean; editable: boo
       <button
         type="button"
         disabled={!editable}
-        onClick={() => setOpen(true)}
+        onClick={() => { setError(null); setOpen(true) }}
         className={cn(
           'flex h-28 w-full flex-col items-center justify-center gap-1.5 rounded-xl text-xs font-semibold',
           has ? 'ring-2 ring-primary' : 'border-2 border-dashed bg-muted/40 text-muted-foreground',
