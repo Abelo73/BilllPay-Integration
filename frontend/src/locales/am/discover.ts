@@ -105,6 +105,25 @@ export const discover: Record<string, string> = {
   'Made with': 'በ',
   'for Wolaita Sodo': 'ለወላይታ ሶዶ የተሠራ',
 
+  // ---- photo crop step (listing photos) ----
+  'Place photo {i} of {n}': 'ፎቶ {i} ከ{n} ያስተካክሉ',
+  'Place your photo': 'ፎቶዎን ያስተካክሉ',
+  'Drag to move it, zoom to fill the frame. Listings show photos in this shape (4:3).': 'ለማንቀሳቀስ ይጎትቱ፣ ፍሬሙን ለመሙላት ያጉሉ። ማስታወቂያዎች ፎቶዎችን በዚህ ቅርጽ (4:3) ያሳያሉ።',
+  'Photo frame: drag or use the arrow keys to move, + and - to zoom': 'የፎቶ ፍሬም፦ ለማንቀሳቀስ ይጎትቱ ወይም የቀስት ቁልፎችን ይጠቀሙ፣ ለማጉላት + እና -',
+  'This photo could not be opened here. You can still send it as it is.': 'ይህ ፎቶ እዚህ ሊከፈት አልቻለም። እንዳለ መላክ ይችላሉ።',
+  'Zoom': 'አጉላ',
+  'Photo shape': 'የፎቶ ቅርጽ',
+  'Fill': 'ሙላ',
+  'Fit whole photo': 'ሙሉውን ፎቶ አሳይ',
+  'Rotate': 'አዙር',
+  'This photo is small, so it may look blurry. A sharper photo sells better.': 'ይህ ፎቶ ትንሽ ስለሆነ ደብዛዛ ሊመስል ይችላል። ጥርት ያለ ፎቶ የበለጠ ይሸጣል።',
+  'Leave out': 'ተወው',
+  'Use as it is': 'እንዳለ ተጠቀም',
+  'Use photo': 'ፎቶውን ተጠቀም',
+  '{name} is larger than 25 MB.': '{name} ከ25 MB ይበልጣል።',
+  '{name} is larger than 5 MB. Use "Use photo" to make it smaller.': '{name} ከ5 MB ይበልጣል። ለማሳነስ "ፎቶውን ተጠቀም" ይጫኑ።',
+  'The first photo is the main one. Drag to reorder. Photos are shown in 4:3 (landscape): you place each one in the frame before it is added. JPG, PNG or WebP, at least 300×300.': 'የመጀመሪያው ፎቶ ዋናው ነው። ቅደም ተከተል ለመቀየር ይጎትቱ። ፎቶዎች በ4:3 (በአግድም) ይታያሉ፤ እያንዳንዱን ከመጨመርዎ በፊት በፍሬሙ ውስጥ ያስተካክላሉ። JPG፣ PNG ወይም WebP፣ ቢያንስ 300×300።',
+
   // ---- category names (main) ----
   'Electronics': 'ኤሌክትሮኒክስ',
   'Home & Living': 'ቤትና ኑሮ',

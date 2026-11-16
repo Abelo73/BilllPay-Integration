@@ -23,7 +23,7 @@ export function ProductCard({ product }: { product: Product }) {
           categorySlug={product.categorySlug}
           imageUrl={product.imageUrl}
           name={product.name}
-          className="aspect-square w-full transition duration-500 group-hover:scale-[1.03]"
+          className="aspect-[4/3] w-full transition duration-500 group-hover:scale-[1.03]"
         />
       </Link>
       {product.boosted ? (

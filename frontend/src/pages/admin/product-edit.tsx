@@ -29,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { PhotoCropDialog, type CropRequest } from '@/components/photo-cropper'
 import { SpecFields } from '@/components/spec-fields'
 import { catalogApi, isAdmin, type ChangeRow, type ProductDetail, type ProductInput } from '@/lib/admin-api'
 import { categoryTree, type Specs } from '@/lib/specs-api'
@@ -41,6 +42,8 @@ import { StockBadge } from './products'
 import { PageHeader } from './shared'
 
 const MAX_BYTES = 5 * 1024 * 1024
+/** Before the crop step shrinks it: phone photos can be big. */
+const MAX_INPUT_BYTES = 25 * 1024 * 1024
 const TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const ACTION_LABEL: Record<string, string> = {
   CREATED: 'Created',
@@ -295,18 +298,31 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
   const [dragId, setDragId] = useState<number | null>(null)
   const room = detail.maxImages - detail.images.length
 
+  // the crop step: each photo is placed in the 4:3 frame (and shrunk to 1600 × 1200) before it is sent
+  const [crop, setCrop] = useState<CropRequest | null>(null)
+  const cropDone = useRef<((f: File | null) => void) | null>(null)
+  const placePhoto = (file: File, index: number, total: number) =>
+    new Promise<File | null>((resolve) => {
+      cropDone.current = resolve
+      setCrop({ file, index, total })
+    })
+
   const upload = async (files: File[]) => {
     const list = files.slice(0, room)
     if (files.length > room) toast.warning(t(room === 1 ? 'Only {n} more photo allowed (max {max}).' : 'Only {n} more photos allowed (max {max}).', { n: room, max: detail.maxImages }))
-    for (const [i, f] of list.entries()) {
-      if (!TYPES.includes(f.type)) { toast.error(t('{name}: use JPG, PNG or WebP.', { name: f.name })); continue }
-      if (f.size > MAX_BYTES) { toast.error(t('{name} is larger than 5 MB.', { name: f.name })); continue }
-      setUploading(t('Uploading {i} of {n}: {name}', { i: i + 1, n: list.length, name: f.name }))
+    for (const [i, original] of list.entries()) {
+      if (!TYPES.includes(original.type)) { toast.error(t('{name}: use JPG, PNG or WebP.', { name: original.name })); continue }
+      if (original.size > MAX_INPUT_BYTES) { toast.error(t('{name} is larger than 25 MB.', { name: original.name })); continue }
+      const f = await placePhoto(original, i, list.length)
+      if (!f) continue // "Leave out"
+      if (f.size > MAX_BYTES) { toast.error(t('{name} is larger than 5 MB. Use "Use photo" to make it smaller.', { name: f.name })); continue }
+      setUploading(t('Uploading {i} of {n}: {name}', { i: i + 1, n: list.length, name: original.name }))
       try {
         onChange(await client.uploadImage(id, f))
       } catch (e) {
-        toast.error(`${f.name}: ${(e as Error).message}`)
+        toast.error(`${original.name}: ${(e as Error).message}`)
       }
+      setUploading(null)
     }
     setUploading(null)
   }
@@ -330,7 +346,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
         <CardTitle className="flex items-center justify-between text-base">
           {t('Photos')} <span className="text-xs font-normal text-muted-foreground">{detail.images.length} / {detail.maxImages}</span>
         </CardTitle>
-        <CardDescription>{t('The first photo is the main one. Drag to reorder. JPG, PNG or WebP, up to 5 MB, at least 300×300.')}</CardDescription>
+        <CardDescription>{t('The first photo is the main one. Drag to reorder. Photos are shown in 4:3 (landscape): you place each one in the frame before it is added. JPG, PNG or WebP, at least 300×300.')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {detail.images.length === 0 && detail.product.imageUrl && (
@@ -352,7 +368,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
               }}
               className={cn('group relative overflow-hidden rounded-xl border bg-muted', dragId === img.id && 'opacity-50')}
             >
-              <img src={img.thumbUrl} alt={t('Photo {n}', { n: i + 1 })} className="aspect-square w-full object-cover" />
+              <img src={img.thumbUrl} alt={t('Photo {n}', { n: i + 1 })} className="aspect-[4/3] w-full object-cover" />
               {i === 0 && <Badge className="absolute left-1.5 top-1.5 gap-1 text-[10px]"><Star className="size-3" /> {t('Main')}</Badge>}
               {editable && (
                 <>
@@ -391,7 +407,7 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
               }}
               disabled={!!uploading}
               className={cn(
-                'flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition hover:border-brand hover:text-brand',
+                'flex aspect-[4/3] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed text-xs text-muted-foreground transition hover:border-brand hover:text-brand',
                 dragOver && 'border-brand bg-brand/5 text-brand',
               )}
             >
@@ -401,6 +417,14 @@ function Photos({ detail, onChange }: { detail: ProductDetail; onChange: (d: Pro
           )}
         </div>
         {uploading && <p className="text-xs text-muted-foreground">{uploading}</p>}
+        <PhotoCropDialog
+          request={crop}
+          onDone={(f) => {
+            setCrop(null)
+            cropDone.current?.(f)
+            cropDone.current = null
+          }}
+        />
         <input
           ref={input}
           type="file"

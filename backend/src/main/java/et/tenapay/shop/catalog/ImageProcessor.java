@@ -26,14 +26,16 @@ import net.coobird.thumbnailator.Thumbnails;
 import net.coobird.thumbnailator.geometry.Positions;
 
 /**
- * Turns an uploaded photo into a large (≤ 1200 px) and a square thumbnail (400 px) JPEG. The file is decoded, not
+ * Turns an uploaded photo into a large (≤ 1200 px) and a 4:3 thumbnail (480 × 360) JPEG, the shape of the listing
+ * cards; the seller's crop step already sends 4:3, other photos are cut to it from the centre. The file is decoded, not
  * trusted by name or MIME type; phone photos are rotated by their EXIF orientation; transparency becomes white.
  */
 @Component
 public class ImageProcessor {
 
 	public static final int LARGE = 1200;
-	public static final int THUMB = 400;
+	public static final int THUMB = 480;
+	public static final int THUMB_HEIGHT = 360;
 	public static final int MIN_SIDE = 300;
 	public static final int MAX_SIDE = 8000;
 	private static final Set<String> FORMATS = Set.of("jpeg", "jpg", "png", "webp");
@@ -49,7 +51,7 @@ public class ImageProcessor {
 			BufferedImage large = Math.max(rgb.getWidth(), rgb.getHeight()) > LARGE
 					? Thumbnails.of(rgb).size(LARGE, LARGE).asBufferedImage()
 					: rgb;
-			BufferedImage thumb = Thumbnails.of(rgb).size(THUMB, THUMB).crop(Positions.CENTER).asBufferedImage();
+			BufferedImage thumb = Thumbnails.of(rgb).size(THUMB, THUMB_HEIGHT).crop(Positions.CENTER).asBufferedImage();
 			return new Processed(jpeg(large, 0.85f), jpeg(thumb, 0.82f), large.getWidth(), large.getHeight());
 		} catch (IOException | RuntimeException e) {
 			if (e instanceof ApiException api) {

@@ -40,7 +40,7 @@ class ImageProcessorTest {
 	}
 
 	@Test
-	void shrinksLargePhotoAndMakesSquareThumbnail() throws IOException {
+	void shrinksLargePhotoAndMakesFourByThreeThumbnail() throws IOException {
 		ImageProcessor.Processed p = processor.process(image(3000, 2000, "jpg", false));
 		BufferedImage large = read(p.large());
 		BufferedImage thumb = read(p.thumb());
@@ -48,7 +48,7 @@ class ImageProcessorTest {
 		assertThat(large.getWidth()).isEqualTo(1200);
 		assertThat(large.getHeight()).isEqualTo(800); // aspect ratio kept
 		assertThat(thumb.getWidth()).isEqualTo(ImageProcessor.THUMB);
-		assertThat(thumb.getHeight()).isEqualTo(ImageProcessor.THUMB);
+		assertThat(thumb.getHeight()).isEqualTo(ImageProcessor.THUMB_HEIGHT); // 4:3, like the listing cards
 		assertThat(p.width()).isEqualTo(1200);
 	}
 
