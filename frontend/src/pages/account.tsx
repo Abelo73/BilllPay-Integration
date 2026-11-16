@@ -1,9 +1,10 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Store, Trash2, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { Camera, ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Store, Trash2, UserRound } from 'lucide-react'
+import { useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
+import { ImageCropDialog } from '@/components/image-crop'
 import { ToReview } from '@/components/reviews'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,7 +17,7 @@ import { api, type Address, type AddressInput } from '@/lib/api'
 import { formatDate, formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { userContact, useSession } from '@/store/session'
+import { userContact, useSession, type SessionUser } from '@/store/session'
 
 const STATUS_TONE: Record<string, string> = {
   PAID: 'bg-success/15 text-success border-success/30',
@@ -196,6 +197,85 @@ function toInput(a: Address): AddressInput {
   return { label: a.label, recipientName: a.recipientName, phone: a.phone, addressLine: a.addressLine, city: a.city, notes: a.notes ?? '' }
 }
 
+/** The profile picture, or the first letter of the name on a coloured circle when there is none. */
+function Avatar({ user, size }: { user: SessionUser; size: number }) {
+  return user.avatarUrl ? (
+    <img src={user.avatarUrl} alt="" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />
+  ) : (
+    <span
+      className="grid shrink-0 place-items-center rounded-full bg-primary font-semibold text-primary-foreground"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+      aria-hidden
+    >
+      {user.fullName[0]?.toUpperCase()}
+    </span>
+  )
+}
+
+/** A square profile picture, cropped in the browser before it is saved (see ImageCropDialog). */
+function ProfilePicture({ user }: { user: SessionUser }) {
+  const t = useT()
+  const { setUser } = useSession()
+  const input = useRef<HTMLInputElement>(null)
+  const [picking, setPicking] = useState<File | null>(null)
+  const upload = useMutation({
+    mutationFn: (f: File) => api.avatar.upload(f),
+    onSuccess: (u) => {
+      setUser(u)
+      setPicking(null)
+      toast.success(t('Profile picture saved'))
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const remove = useMutation({
+    mutationFn: () => api.avatar.remove(),
+    onSuccess: (u) => {
+      setUser(u)
+      toast.success(t('Profile picture removed'))
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const pick = (f?: File) => {
+    if (!f) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type)) return toast.error(t('Use a JPG, PNG or WebP photo.'))
+    if (f.size > 5 * 1024 * 1024) return toast.error(t('That photo is larger than 5 MB.'))
+    setPicking(f)
+  }
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><Camera className="size-4" /> {t('Profile picture')}</CardTitle>
+        <CardDescription>{t('A square photo of you. Others see it in chats.')}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap items-center gap-5">
+        <Avatar user={user} size={96} />
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => input.current?.click()} disabled={upload.isPending}>
+            {upload.isPending && <Loader2 className="animate-spin" />} {user.avatarUrl ? t('Change picture') : t('Add picture')}
+          </Button>
+          {user.avatarUrl && (
+            <Button variant="ghost" className="text-destructive" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              <Trash2 /> {t('Remove')}
+            </Button>
+          )}
+        </div>
+        <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = '' }} />
+      </CardContent>
+      {picking && (
+        <ImageCropDialog
+          file={picking}
+          aspect={1}
+          round
+          outWidth={512}
+          title={t('Crop your picture')}
+          onCancel={() => setPicking(null)}
+          onDone={(f) => upload.mutate(f)}
+        />
+      )}
+    </Card>
+  )
+}
+
 function Profile() {
   const t = useT()
   const { session, setUser } = useSession()
@@ -210,6 +290,8 @@ function Profile() {
     onError: (e) => toast.error(e.message),
   })
   return (
+    <div className="space-y-6">
+      <ProfilePicture user={user} />
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base"><UserRound className="size-4" /> {t('Profile')}</CardTitle>
@@ -235,6 +317,7 @@ function Profile() {
         </form>
       </CardContent>
     </Card>
+    </div>
   )
 }
 
@@ -334,9 +417,7 @@ export function AccountPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-4 py-12 sm:px-6">
       <div className="flex items-center gap-4">
-        <span className="grid size-14 place-items-center rounded-full bg-primary text-xl font-semibold text-primary-foreground">
-          {session.user.fullName[0]?.toUpperCase()}
-        </span>
+        <Avatar user={session.user} size={56} />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{t('Hi, {name}', { name: session.user.fullName.split(' ')[0] })}</h1>
           <p className="text-sm text-muted-foreground">{userContact(session.user)}</p>

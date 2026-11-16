@@ -14,6 +14,8 @@ export type SessionUser = {
   phoneVerified?: boolean
   /** false for phone-only accounts: there is no password to change */
   hasPassword?: boolean
+  /** the profile picture (a square), or null when none is set */
+  avatarUrl?: string | null
 }
 
 /** What to show for "signed in as …": the email, else the phone. */

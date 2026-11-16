@@ -15,7 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import et.tenapay.shop.catalog.ImageProcessor;
 import et.tenapay.shop.common.ApiException;
+import et.tenapay.shop.media.MediaStorage;
 import et.tenapay.shop.common.PageDto;
 import et.tenapay.shop.order.CheckoutService;
 import et.tenapay.shop.order.Order;
@@ -37,6 +39,8 @@ public class MeController {
 	private final UserRepository users;
 	private final OrderRepository orders;
 	private final AuthService auth;
+	private final ImageProcessor images;
+	private final MediaStorage storage;
 
 	public record ProfileUpdate(@NotBlank @Size(max = 200) String fullName,
 			@Pattern(regexp = "^$|^\\+?[0-9 ()-]{9,20}$", message = "must be a valid phone number") String phone) {
@@ -71,6 +75,39 @@ public class MeController {
 		}
 		u.setFullName(req.fullName().trim());
 		u.setPhone(phone);
+		return UserView.of(u);
+	}
+
+	/** The profile picture: square, re-encoded (camera data is dropped). Replaces the old one. */
+	@PostMapping(path = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+	@Transactional
+	public UserView uploadAvatar(@org.springframework.web.bind.annotation.RequestPart("file") org.springframework.web.multipart.MultipartFile file)
+			throws java.io.IOException {
+		if (file.isEmpty()) {
+			throw new ApiException(org.springframework.http.HttpStatus.BAD_REQUEST, "EMPTY_FILE", "Choose a picture.");
+		}
+		User u = load();
+		ImageProcessor.Processed img = images.process(file.getBytes());
+		// avatars/<number>/<name>.jpg: the public media route serves only this shape (see MediaController.SAFE_KEY)
+		String key = "avatars/" + Instant.now().toEpochMilli() + "/" + java.util.UUID.randomUUID().toString().toLowerCase() + ".jpg";
+		storage.put(key, img.large(), "image/jpeg");
+		String old = u.getAvatarKey();
+		u.setAvatarKey(key);
+		if (old != null) {
+			storage.delete(old);
+		}
+		return UserView.of(u);
+	}
+
+	@org.springframework.web.bind.annotation.DeleteMapping("/avatar")
+	@Transactional
+	public UserView removeAvatar() {
+		User u = load();
+		String old = u.getAvatarKey();
+		u.setAvatarKey(null);
+		if (old != null) {
+			storage.delete(old);
+		}
 		return UserView.of(u);
 	}
 

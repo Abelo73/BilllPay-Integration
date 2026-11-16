@@ -242,7 +242,8 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
   const res = await fetch(`/api${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      // a file upload sets its own multipart type; everything else is JSON
+      ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init?.headers,
     },
@@ -319,6 +320,15 @@ export const api = {
   me: () => request<SessionUser>('/me'),
   updateMe: (body: { fullName: string; phone: string }) =>
     request<SessionUser>('/me', { method: 'PATCH', body: JSON.stringify(body) }),
+  /** The profile picture (square). The server keeps one per person; uploading again replaces it. */
+  avatar: {
+    upload: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return request<SessionUser>('/me/avatar', { method: 'POST', body: form })
+    },
+    remove: () => request<SessionUser>('/me/avatar', { method: 'DELETE' }),
+  },
   changePassword: (currentPassword: string, newPassword: string) =>
     request<Session>('/me/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
   logoutEverywhere: () => request<{ signedOut: boolean }>('/me/logout-all', { method: 'POST' }),

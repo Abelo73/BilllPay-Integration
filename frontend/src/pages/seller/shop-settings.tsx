@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import { useOutletContext } from 'react-router'
 import { toast } from 'sonner'
 
+import { ImageCropDialog } from '@/components/image-crop'
 import { Card, CardContent } from '@/components/ui/card'
 import { useT } from '@/lib/i18n'
 import { sellerApi, type MyShop } from '@/lib/seller-api'
@@ -25,14 +26,17 @@ function PhotoPicker({ kind, shop }: { kind: 'logo' | 'cover'; shop: MyShop }) {
     },
     onError: (e) => toast.error(e.message),
   })
+  // the picture is cropped to the shape it will show in before it is sent (logo: square, cover: wide)
+  const [picking, setPicking] = useState<File | null>(null)
   const pick = (f: File | undefined) => {
     if (!f) return
     if (!TYPES.includes(f.type)) return toast.error(t('Use a JPG, PNG or WebP photo.'))
     if (f.size > MAX_BYTES) return toast.error(t('That photo is larger than 5 MB.'))
-    upload.mutate(f)
+    setPicking(f)
   }
   const url = kind === 'logo' ? shop.logoUrl : shop.coverUrl
   return (
+    <>
     <button
       type="button"
       onClick={() => input.current?.click()}
@@ -56,6 +60,18 @@ function PhotoPicker({ kind, shop }: { kind: 'logo' | 'cover'; shop: MyShop }) {
       </span>
       <input ref={input} type="file" accept={TYPES.join(',')} hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = '' }} />
     </button>
+      {picking && (
+        <ImageCropDialog
+          file={picking}
+          aspect={kind === 'logo' ? 1 : 3}
+          round={kind === 'logo'}
+          outWidth={kind === 'logo' ? 512 : 1500}
+          title={kind === 'logo' ? t('Crop your logo') : t('Crop your cover photo')}
+          onCancel={() => setPicking(null)}
+          onDone={(f) => { setPicking(null); upload.mutate(f) }}
+        />
+      )}
+    </>
   )
 }
 
