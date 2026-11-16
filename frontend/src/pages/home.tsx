@@ -222,14 +222,14 @@ function Hero({ jobsOn }: { jobsOn: boolean }) {
           </Reveal>
         </div>
 
-        {/* wide screens: the photo in a soft blob, the orange marks and the "Support local" note */}
+        {/* wide screens: the advert in a rounded panel with a wave along the bottom, the orange marks and the "Support local" note */}
         <div className="relative hidden lg:block">
           <span className="absolute -left-3 top-8 z-10 flex flex-col gap-2" aria-hidden>
             <span className="h-1.5 w-7 -rotate-[35deg] rounded-full bg-market" />
             <span className="ml-3 h-1.5 w-8 -rotate-[10deg] rounded-full bg-market" />
             <span className="ml-1 h-1.5 w-6 rotate-[20deg] rounded-full bg-market" />
           </span>
-          <div className="relative aspect-[4/3] overflow-hidden shadow-2xl shadow-primary/20 [border-radius:58%_42%_38%_62%/52%_40%_60%_48%]">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] shadow-2xl shadow-primary/20">
             <HeroSlider />
             <svg viewBox="0 0 400 80" preserveAspectRatio="none" className="absolute inset-x-0 -bottom-px h-16 w-full" aria-hidden>
               <path d="M0 60 C140 20 260 90 400 30 V80 H0Z" className="fill-primary" />
