@@ -114,4 +114,29 @@ export const account: Record<string, string> = {
   'My jobs': 'ሥራዎቼ',
   'My chats': 'መልዕክቶቼ',
   'Offer my skills': 'ሙያዬን ላቅርብ',
+  // ---- sign-up and identity check (translation to be reviewed by a native speaker) ----
+  'What do you want to do?':
+    'ምን ማድረግ ይፈልጋሉ?',
+  'Buy':
+    'ለመግዛት',
+  'Shop from sellers in Sodo':
+    'ከሶዶ ሻጮች ይግዙ',
+  'Sell':
+    'ለመሸጥ',
+  'Open a shop. It is free.':
+    'ሱቅ ይክፈቱ። ነጻ ነው።',
+  'Back':
+    'ተመለስ',
+  'Have an account?':
+    'መለያ አለዎት?',
+  'Step 1 of 2: make your account. Then open your shop.':
+    'ደረጃ 1 ከ 2፦ መለያዎን ይፍጠሩ። ከዚያ ሱቅዎን ይክፈቱ።',
+  'It takes one minute.':
+    'አንድ ደቂቃ ብቻ ይወስዳል።',
+  'Use your email and password.':
+    'ኢሜይልዎንና የይለፍ ቃልዎን ይጠቀሙ።',
+  'Track your orders':
+    'ትዕዛዞችዎን ይከታተሉ',
+  'Pay safely with BillPay':
+    'በBillPay በደህና ይክፈሉ',
 }

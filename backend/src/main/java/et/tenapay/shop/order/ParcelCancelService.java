@@ -76,7 +76,9 @@ public class ParcelCancelService {
 		Order order = order(orderNumber);
 		List<Result> done = new ArrayList<>();
 		for (OrderParcel p : parcels.findByOrderIdOrderByParcelNoAsc(order.getId())) {
-			boolean open = order.cash() ? p.getCashCollectedAt() == null : p.getPayoutStatus() == EarningStatus.HELD;
+			// a parcel with no payout is Sodo Gebeya's own (nothing is held for a seller): still open until sent
+			boolean open = order.cash() ? p.getCashCollectedAt() == null
+					: p.getPayoutStatus() == null || p.getPayoutStatus() == EarningStatus.HELD;
 			if (open && cancellable(p.getFulfilmentStatus())) {
 				done.add(cancel(order, p, reason, Who.STAFF, staff));
 			}
@@ -109,7 +111,7 @@ public class ParcelCancelService {
 		if (cash && p.getCashCollectedAt() != null) {
 			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_SENT", "The cash for this was already collected.");
 		}
-		if (!cash && p.getPayoutStatus() != EarningStatus.HELD) {
+		if (!cash && p.getPayoutStatus() != null && p.getPayoutStatus() != EarningStatus.HELD) {
 			throw new ApiException(HttpStatus.CONFLICT, "ALREADY_PAID_OUT",
 					"The seller has already been paid for this. Contact Sodo Gebeya support.");
 		}

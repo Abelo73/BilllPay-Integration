@@ -64,7 +64,7 @@ export function SellPage() {
   const noShop = shop.error instanceof ApiError && shop.error.code === 'NO_SHOP'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6 sm:py-12">
+    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 pb-32 sm:px-6 sm:py-12 md:pb-12">
       <div className="space-y-2">
         <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('Sell on Sodo Gebeya')}</h1>
         <p className="text-muted-foreground">{t('Reach buyers across Wolaita Sodo without opening a second shop.')}</p>

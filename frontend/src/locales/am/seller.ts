@@ -141,4 +141,35 @@ export const seller: Record<string, string> = {
   'On Sodo Gebeya since {date}': 'ከ{date} ጀምሮ በሶዶ ገበያ',
   'No products in the store right now.': 'አሁን በገበያው ላይ ምርት የለም።',
   'My shop': 'ሱቄ',
+  // ---- sign-up and identity check (translation to be reviewed by a native speaker) ----
+  'Sign in or create a free account first. It takes a minute with your email.':
+    'መጀመሪያ ይግቡ ወይም ነጻ መለያ ይፍጠሩ። በኢሜይልዎ አንድ ደቂቃ ብቻ ይወስዳል።',
+  'ID number':
+    'የመታወቂያ ቁጥር',
+  'As printed on your card':
+    'በካርድዎ ላይ እንደተጻፈው',
+  'Saved. Type it again to change it':
+    'ተቀምጧል። ለመቀየር እንደገና ይጻፉ',
+  'We keep only a secure code of this number, never the number itself. It is used to stop duplicate accounts.':
+    'የዚህን ቁጥር ደህንነቱ የተጠበቀ ኮድ ብቻ እናስቀምጣለን፤ ቁጥሩን ራሱ በጭራሽ አናስቀምጥም። የተባዙ መለያዎችን ለመከላከል ይጠቅማል።',
+  'Taken now with your camera, so we know the ID is yours':
+    'አሁን በካሜራዎ የሚነሳ፤ መታወቂያው የእርስዎ መሆኑን ለማረጋገጥ።',
+  'Take a selfie now':
+    'አሁን ራስ ፎቶ ያንሱ',
+  'We need your camera for the selfie. Allow camera access, or use a phone with a camera.':
+    'ለራስ ፎቶ ካሜራዎ ያስፈልጋል። የካሜራ ፈቃድ ይስጡ ወይም ካሜራ ያለው ስልክ ይጠቀሙ።',
+  'Take your selfie':
+    'ራስ ፎቶዎን ያንሱ',
+  'Find a bright place and face the light.':
+    'ብርሃን ያለበት ቦታ ይፈልጉ፤ ፊትዎን ወደ ብርሃኑ ያዙሩ።',
+  'Take off glasses, a hat or a mask.':
+    'መነጽር፣ ኮፍያ ወይም ማስክ ያውጡ።',
+  "Hold the phone at eye level, about an arm's length away.":
+    'ስልኩን በዓይን ደረጃ፣ በክንድ ርቀት ያዙ።',
+  'Only you should be in the photo. Hold your ID next to your face.':
+    'በፎቶው ውስጥ እርስዎ ብቻ ይሁኑ። መታወቂያዎን ከፊትዎ አጠገብ ይያዙ።',
+  'Take photo':
+    'ፎቶ ያንሱ',
+  'Close':
+    'ዝጋ',
 }
