@@ -1,5 +1,6 @@
 import { Coffee, Headphones, Lamp, Package, Shirt, Wheat, type LucideIcon } from 'lucide-react'
 
+import { FadeImage } from '@/components/fade-image'
 import { cn } from '@/lib/utils'
 
 const STYLES: Record<string, { icon: LucideIcon; gradient: string }> = {
@@ -25,7 +26,7 @@ export function ProductVisual({
   iconClassName?: string
 }) {
   if (imageUrl) {
-    return <img src={imageUrl} alt={name} className={cn('object-cover', className)} loading="lazy" />
+    return <FadeImage src={imageUrl} alt={name} className={cn('object-cover', className)} />
   }
   const { icon: Icon, gradient } = STYLES[categorySlug] ?? { icon: Package, gradient: 'from-muted to-accent' }
   return (

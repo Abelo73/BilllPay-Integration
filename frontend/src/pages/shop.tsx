@@ -158,7 +158,7 @@ export function ShopPage() {
           </Select>
         </div>
 
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="smooth-x -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Chip active={!category} onClick={() => pickCategory(null)}>{t('All')}</Chip>
           {all.filter((c) => !c.parentId).map((c) => (
             <Chip key={c.slug} active={main?.id === c.id} onClick={() => pickCategory(c.slug)}>
@@ -168,7 +168,7 @@ export function ShopPage() {
         </div>
 
         {subs.length > 0 && main && (
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t('{name} types', { name: main.name })}>
+          <div className="smooth-x -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t('{name} types', { name: main.name })}>
             <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>{t('All {name}', { name: main.name.toLowerCase() })}</SubChip>
             {subs.map((s) => (
               <SubChip key={s.slug} active={current?.id === s.id} onClick={() => pickCategory(s.slug)}>{s.name}</SubChip>

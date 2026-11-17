@@ -1,3 +1,4 @@
+import { FadeImage } from '@/components/fade-image'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Lock, MapPin, Minus, Plus, RotateCcw, Store, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -31,7 +32,7 @@ function Gallery({ name, categorySlug, images }: { name: string; categorySlug: s
   }
   return (
     <div className="space-y-3">
-      <img src={images[active].url} alt={name} className="aspect-square w-full rounded-3xl object-cover ring-1 ring-border" />
+      <FadeImage key={images[active].url} src={images[active].url} alt={name} loading="eager" className="aspect-square w-full rounded-3xl object-cover ring-1 ring-border" />
       {images.length > 1 && (
         <div className="flex gap-3">
           {images.map((img, i) => (
