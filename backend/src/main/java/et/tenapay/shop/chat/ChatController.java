@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import et.tenapay.shop.chat.ChatService.ContactView;
 import et.tenapay.shop.chat.ChatService.ConversationView;
 import et.tenapay.shop.chat.ChatService.MessageView;
 import et.tenapay.shop.chat.ChatService.OfferView;
@@ -75,6 +76,11 @@ public class ChatController {
 	@PostMapping
 	public ConversationView start(@Valid @RequestBody StartRequest req) {
 		return chat.start(me(), req.productId(), req.text());
+	}
+
+	@GetMapping("/{id}/contact")
+	public ContactView contact(@PathVariable Long id) {
+		return chat.contact(me(), id);
 	}
 
 	@GetMapping("/{id}")

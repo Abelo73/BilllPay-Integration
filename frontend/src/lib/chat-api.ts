@@ -52,10 +52,28 @@ export type Conversation = {
   lastMessageAt: string
   unread: boolean
   blockedBy: ChatSide | null
+  /** the other side's picture: the shop logo, or the buyer's picture when their profile is public */
+  otherAvatarUrl: string | null
 }
 
 /** The other person: online now, last active, typing right now, and when they last read the chat ("Seen"). */
 export type ChatOtherStatus = { online: boolean; lastActiveAt: string | null; typing: boolean; readAt: string | null }
+
+/** Who the other person is, for the details panel. Phone and email are never included. */
+export type ChatContact = {
+  kind: 'SHOP' | 'PERSON'
+  name: string
+  avatarUrl: string | null
+  area: string | null
+  /** a buyer's bio: only when their public profile is on */
+  bio: string | null
+  shopSlug: string | null
+  /** a buyer's public profile id: only when it is on */
+  personId: string | null
+  verified: boolean
+  pro: boolean
+  since: string | null
+}
 
 export type ChatThread = { conversation: Conversation; messages: ChatMessage[]; canWrite: boolean; other: ChatOtherStatus | null }
 
@@ -68,6 +86,7 @@ export const chatApi = {
   unread: () => request<{ unread: number }>('/chats/unread'),
   start: (productId: number, text?: string) => request<Conversation>('/chats', json({ productId, text })),
   thread: (id: number, after = 0) => request<ChatThread>(`/chats/${id}?after=${after}`),
+  contact: (id: number) => request<ChatContact>(`/chats/${id}/contact`),
   send: (id: number, text: string, replyToId?: number) => request<ChatMessage>(`/chats/${id}/messages`, json({ text, replyToId })),
   /** Tells the other side this person is typing (they see it for a few seconds). */
   typing: (id: number) => request<{ ok: boolean }>(`/chats/${id}/typing`, json({})),

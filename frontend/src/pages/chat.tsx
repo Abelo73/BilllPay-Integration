@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Ban, Camera, Check, CheckCheck, Flag, HandCoins, Loader2, Mic, MoreVertical, Reply, Send, ShieldAlert, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Ban, BadgeCheck, Camera, Check, CheckCheck, Flag, HandCoins, Loader2, MapPin, Mic, MoreVertical, Reply, Send, ShieldAlert, Trash2, X } from 'lucide-react'
 import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { PersonAvatar } from '@/components/person-avatar'
 import { ApiError } from '@/lib/api'
 import { ChatAlertSettings } from '@/components/message-alerts'
 import { clock, useVoiceRecorder, VoicePlayer } from '@/components/voice-note'
@@ -21,7 +22,7 @@ import { formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
-import { chatTime, initials } from './chats'
+import { chatTime } from './chats'
 
 const STATUS_LABEL: Record<ChatOffer['status'], string> = {
   PENDING: 'Waiting for an answer',
@@ -60,6 +61,76 @@ function OfferCard({ offer, onAnswer, busy }: { offer: ChatOffer; onAnswer: (a: 
         </p>
       )}
     </div>
+  )
+}
+
+/** Who the other person is: a shop's public details, or a buyer's picture and bio only if they chose to share them. */
+function ContactDialog({ id, open, onOpenChange, name }: { id: number; open: boolean; onOpenChange: (open: boolean) => void; name: string }) {
+  const t = useT()
+  const contact = useQuery({ queryKey: ['chat-contact', id], queryFn: () => chatApi.contact(id), enabled: open })
+  const c = contact.data
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader className="items-center text-center">
+          <PersonAvatar name={c?.name ?? name} url={c?.avatarUrl ?? null} className="size-24 text-2xl" />
+          <DialogTitle className="pt-2 text-xl">{c?.name ?? name}</DialogTitle>
+          <DialogDescription>{c?.kind === 'SHOP' ? t('Shop') : t('Buyer')}</DialogDescription>
+        </DialogHeader>
+        {contact.isLoading && <Loader2 className="mx-auto animate-spin text-muted-foreground" />}
+        {c?.kind === 'SHOP' && (
+          <div className="space-y-3 text-sm">
+            {(c.verified || c.pro) && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {c.verified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-foreground">
+                    <BadgeCheck className="size-3.5" /> {t('Verified')}
+                  </span>
+                )}
+                {c.pro && <span className="rounded-full bg-amber-soft px-2.5 py-1 text-xs font-bold text-amber-ink">{t('Pro shop')}</span>}
+              </div>
+            )}
+            {c.area && (
+              <p className="flex items-center justify-center gap-1.5 text-muted-foreground">
+                <MapPin className="size-4" /> {c.area}
+              </p>
+            )}
+            {c.since && (
+              <p className="text-center text-xs text-muted-foreground">
+                {t('On Sodo Gebeya since {date}', { date: new Date(c.since).toLocaleDateString([], { month: 'long', year: 'numeric' }) })}
+              </p>
+            )}
+          </div>
+        )}
+        {c?.kind === 'PERSON' &&
+          (c.personId ? (
+            <div className="space-y-3 text-sm">
+              {c.area && (
+                <p className="flex items-center justify-center gap-1.5 text-muted-foreground">
+                  <MapPin className="size-4" /> {c.area}
+                </p>
+              )}
+              {c.bio && <p className="rounded-xl bg-muted p-3 text-center leading-relaxed">{c.bio}</p>}
+            </div>
+          ) : (
+            <p className="rounded-xl bg-muted p-3 text-center text-sm text-muted-foreground">
+              {t('This person keeps their profile private, so only their name is shown here.')}
+            </p>
+          ))}
+        <DialogFooter className="sm:justify-center">
+          {c?.kind === 'SHOP' && c.shopSlug && (
+            <Button asChild className="h-11 w-full">
+              <Link to={`/shops/${c.shopSlug}`}>{t('View shop')}</Link>
+            </Button>
+          )}
+          {c?.kind === 'PERSON' && c.personId && (
+            <Button asChild className="h-11 w-full">
+              <Link to={`/people/${c.personId}`}>{t('View profile')}</Link>
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -183,6 +254,7 @@ export function ChatPage() {
   const [offerPrice, setOfferPrice] = useState('')
   const [offerQty, setOfferQty] = useState('1')
   const [reportOpen, setReportOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
   const [reason, setReason] = useState<ReportReason>('OFF_PLATFORM_PAYMENT')
   const [details, setDetails] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -334,10 +406,10 @@ export function ChatPage() {
           <Button asChild variant="ghost" size="icon" className="size-11" aria-label={t('Back to chats')}>
             <Link to="/chats"><ArrowLeft /></Link>
           </Button>
-          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-            {c ? initials(c.otherName) : ''}
-          </span>
-          <div className="min-w-0 flex-1">
+          <button type="button" onClick={() => setContactOpen(true)} aria-label={t('About this person')} className="shrink-0 rounded-full ring-offset-2 focus-visible:ring-2 focus-visible:ring-ring">
+            <PersonAvatar name={c?.otherName ?? '?'} url={c?.otherAvatarUrl ?? null} className="size-10 text-sm" />
+          </button>
+          <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setContactOpen(true)}>
             <p className="truncate font-bold">{c?.otherName ?? '…'}</p>
             <p className="truncate text-xs text-muted-foreground">
               {c?.side === 'BUYER' ? t('Seller') : t('Buyer')}
@@ -559,6 +631,8 @@ export function ChatPage() {
           </form>
         </div>
       )}
+
+      {c && <ContactDialog id={id} open={contactOpen} onOpenChange={setContactOpen} name={c.otherName} />}
 
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>
         <DialogContent>

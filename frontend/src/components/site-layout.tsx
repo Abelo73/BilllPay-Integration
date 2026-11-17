@@ -204,6 +204,7 @@ function MobileMenu() {
 function BottomNav() {
   const t = useT()
   const { pathname } = useLocation()
+  const session = useSession((s) => s.session)
   const item = ({ isActive }: { isActive: boolean }) =>
     cn(
       'flex min-h-11 min-w-14 flex-col items-center justify-center gap-0.5 text-[11px] transition-colors',
@@ -230,7 +231,12 @@ function BottomNav() {
       </Link>
       <ChatsNavLink className={item} />
       <NavLink to="/account" className={item}>
-        <User className="size-[22px]" /> {t('Account')}
+        {session?.user.avatarUrl ? (
+          <img src={session.user.avatarUrl} alt="" className="size-[22px] rounded-full object-cover" />
+        ) : (
+          <User className="size-[22px]" />
+        )}
+        {t('Account')}
       </NavLink>
     </nav>
   )

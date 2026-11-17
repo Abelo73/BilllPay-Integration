@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router'
 
 import { ChatAlertSettings } from '@/components/message-alerts'
+import { PersonAvatar } from '@/components/person-avatar'
 import { Button } from '@/components/ui/button'
 import { chatApi, type Conversation } from '@/lib/chat-api'
 import { useLiveConnected } from '@/lib/live'
@@ -44,14 +45,11 @@ function Row({ c }: { c: Conversation }) {
       to={`/chats/${c.id}`}
       className="flex gap-3 border-b px-2 py-3 transition-colors last:border-b-0 hover:bg-muted/50"
     >
-      <span
-        className={cn(
-          'grid size-12 shrink-0 place-items-center rounded-full text-sm font-bold',
-          c.side === 'BUYER' ? 'bg-primary text-primary-foreground' : 'bg-amber-soft text-amber-ink',
-        )}
-      >
-        {initials(c.otherName)}
-      </span>
+      <PersonAvatar
+        name={c.otherName}
+        url={c.otherAvatarUrl}
+        className={cn('size-12 text-sm', c.side === 'BUYER' ? '' : 'bg-amber-soft text-amber-ink')}
+      />
       <span className="min-w-0 flex-1 space-y-0.5">
         <span className="flex items-baseline justify-between gap-2">
           <span className={cn('truncate text-[15px]', c.unread ? 'font-extrabold' : 'font-semibold')}>{c.otherName}</span>

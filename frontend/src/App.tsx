@@ -6,6 +6,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router'
 import { SiteLayout } from '@/components/site-layout'
 import { ThemeProvider } from '@/components/theme-provider'
 import { MessageAlerts } from '@/components/message-alerts'
+import { InstallBanner } from '@/components/install-app'
 import { Toaster } from '@/components/ui/sonner'
 import { AccountPage } from '@/pages/account'
 import { ChatPage } from '@/pages/chat'
@@ -120,6 +121,7 @@ export default function App() {
         <RouterProvider router={router} />
         <Toaster richColors position="top-center" />
         <MessageAlerts />
+        <InstallBanner />
       </QueryClientProvider>
     </ThemeProvider>
   )

@@ -325,4 +325,27 @@ class ChatIntegrationTest extends IntegrationTest {
 		String stranger = customer("Nobody Voice", "0922000042");
 		assertThat(upload("/api/chats/" + id + "/voice?seconds=4", "voice.webm", "audio/webm", audio, stranger).status()).isEqualTo(404);
 	}
+
+	@Test
+	void contactShowsTheShopToTheBuyerAndOnlyWhatIsSharedOfTheBuyer() {
+		Seller s = seller("0912000050");
+		String buyer = customer("Sara Buyer", "0922000050");
+		String stranger = customer("Nobody Contact", "0922000051");
+		long id = start(buyer, s.productId(), "Hi");
+
+		// the buyer sees the shop's public details
+		JsonNode shop = get("/api/chats/" + id + "/contact", buyer).body();
+		assertThat(shop.path("kind").asString()).isEqualTo("SHOP");
+		assertThat(shop.path("name").asString()).isEqualTo(s.shopName());
+		assertThat(shop.path("shopSlug").asString()).isNotBlank();
+
+		// the seller sees the buyer's name, and no bio or profile link while the buyer's profile is private
+		JsonNode person = get("/api/chats/" + id + "/contact", s.token()).body();
+		assertThat(person.path("kind").asString()).isEqualTo("PERSON");
+		assertThat(person.path("personId").isNull()).isTrue();
+		assertThat(person.path("bio").isNull()).isTrue();
+
+		// a stranger learns nothing about the conversation
+		assertThat(get("/api/chats/" + id + "/contact", stranger).status()).isEqualTo(404);
+	}
 }

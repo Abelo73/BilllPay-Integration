@@ -121,7 +121,16 @@ public class ChatService {
 
 	/** One row in the chat list; {@code side} is the viewer's side (BUYER or SELLER). */
 	public record ConversationView(Long id, String side, String otherName, String shopName, String shopSlug,
-			ProductCard product, String lastMessagePreview, Instant lastMessageAt, boolean unread, String blockedBy) {
+			ProductCard product, String lastMessagePreview, Instant lastMessageAt, boolean unread, String blockedBy,
+			String otherAvatarUrl) {
+	}
+
+	/**
+	 * Who the other person is, for the details panel. A shop shows its public details. A customer shows a picture, area
+	 * and bio only when their public profile is on. Phone, email and payment details are never included.
+	 */
+	public record ContactView(String kind, String name, String avatarUrl, String area, String bio, String shopSlug,
+			String personId, boolean verified, boolean pro, Instant since) {
 	}
 
 	/**
@@ -572,14 +581,39 @@ public class ChatService {
 		if (c.getProductId() != null) {
 			card = products.findById(c.getProductId()).map(this::card).orElse(null);
 		}
+		User buyer = p.side() == Conversation.Side.BUYER ? null : users.findById(c.getBuyerId()).orElse(null);
 		String other = p.side() == Conversation.Side.BUYER
 				? (p.shop() == null ? "Shop" : p.shop().getName())
-				: users.findById(c.getBuyerId()).map(User::getFullName).orElse("Buyer");
+				: (buyer == null ? "Buyer" : buyer.getFullName());
+		String otherAvatar = p.side() == Conversation.Side.BUYER
+				? (p.shop() == null || p.shop().getLogoKey() == null ? null : media.urlFor(p.shop().getLogoKey()))
+				: (buyer == null || !buyer.isProfilePublic() || buyer.getAvatarKey() == null ? null : media.urlFor(buyer.getAvatarKey()));
 		Instant read = c.lastReadAt(p.side());
 		boolean unread = viewer != null && (read == null || read.isBefore(c.getLastMessageAt()));
 		return new ConversationView(c.getId(), p.side().name(), other, p.shop() == null ? null : p.shop().getName(),
 				p.shop() == null ? null : p.shop().getSlug(), card, c.getLastMessagePreview(), c.getLastMessageAt(), unread,
-				c.getBlockedBy() == null ? null : c.getBlockedBy().name());
+				c.getBlockedBy() == null ? null : c.getBlockedBy().name(), otherAvatar);
+	}
+
+	/** The other person's details for the panel in a chat. */
+	public ContactView contact(UUID userId, Long conversationId) {
+		return tx.execute(s -> {
+			Party p = party(userId, conversationId);
+			if (p.side() == Conversation.Side.BUYER) {
+				Shop shop = p.shop();
+				if (shop == null) {
+					throw ApiException.notFound("Shop");
+				}
+				return new ContactView("SHOP", shop.getName(), shop.getLogoKey() == null ? null : media.urlFor(shop.getLogoKey()),
+						shop.getArea(), null, shop.getSlug(), null, shop.getVerifiedAt() != null, shop.pro(), shop.getCreatedAt());
+			}
+			User buyer = users.findById(p.c().getBuyerId()).orElseThrow(() -> ApiException.notFound("Buyer"));
+			boolean show = buyer.isProfilePublic();
+			return new ContactView("PERSON", buyer.getFullName(),
+					show && buyer.getAvatarKey() != null ? media.urlFor(buyer.getAvatarKey()) : null,
+					show ? buyer.getArea() : null, show ? buyer.getBio() : null, null,
+					show ? buyer.getId().toString() : null, false, false, buyer.getCreatedAt());
+		});
 	}
 
 	private ProductCard card(Product p) {
