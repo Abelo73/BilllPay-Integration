@@ -5,6 +5,7 @@ import { Link, useParams, useSearchParams } from 'react-router'
 
 import { Stars } from '@/components/reviews'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ApiError } from '@/lib/api'
 import { formatETB } from '@/lib/format'
@@ -17,9 +18,12 @@ import { initials } from './chats'
 /** Pro profile statuses as the pro sees them (the server sends the code). */
 const PRO_STATUS: Record<string, string> = { PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected', SUSPENDED: 'suspended' }
 
+/** A pro in the list. "Quick look" shows the key details in a dialog without leaving the list. */
 function ProCardView({ p }: { p: ProCard }) {
   const t = useT()
+  const [quick, setQuick] = useState(false)
   return (
+    <>
     <Link to={`/pros/${p.id}`} className="flex gap-3 rounded-2xl border bg-card p-3 transition hover:border-primary/40 hover:shadow-sm">
       <span className="grid size-14 shrink-0 place-items-center rounded-full bg-accent text-lg font-extrabold text-accent-foreground">{initials(p.displayName)}</span>
       <span className="min-w-0 flex-1 space-y-0.5">
@@ -35,8 +39,41 @@ function ProCardView({ p }: { p: ProCard }) {
           {p.priceFrom !== null && <span className="text-muted-foreground">· {t('from {price}', { price: formatETB(p.priceFrom) })}</span>}
         </span>
         {p.areas && <span className="flex items-center gap-1 truncate text-xs text-muted-foreground"><MapPin className="size-3" /> {p.areas}</span>}
+        <span className="pt-1 block">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setQuick(true) }}
+          >
+            {t('Quick look')}
+          </Button>
+        </span>
       </span>
     </Link>
+    <Dialog open={quick} onOpenChange={setQuick}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {p.displayName} <BadgeCheck className="size-4 text-primary" aria-label={t('Approved by Sodo Gebeya')} />
+          </DialogTitle>
+          <DialogDescription>{t(TRADE_LABEL[p.trade])}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <span className="inline-flex items-center gap-1"><Briefcase className="size-4" /> {p.jobsDone === 1 ? t('{n} job done', { n: p.jobsDone }) : t('{n} jobs done', { n: p.jobsDone })}</span>
+          <span className="inline-flex items-center gap-1">
+            {p.rating !== null ? <><Stars value={p.rating} /> <strong>{p.rating.toFixed(1)}</strong></> : <span className="text-muted-foreground">{t('No ratings yet')}</span>}
+          </span>
+          {p.priceFrom !== null && <span className="inline-flex items-center gap-1"><Hammer className="size-4" /> {t('from {price}', { price: formatETB(p.priceFrom) })}</span>}
+          {p.areas && <span className="inline-flex items-center gap-1"><MapPin className="size-4" /> {p.areas}</span>}
+        </div>
+        <DialogFooter>
+          <Button asChild className="rounded-full"><Link to={`/pros/${p.id}`}>{t('Open the full profile')}</Link></Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 

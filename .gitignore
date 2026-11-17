@@ -23,3 +23,6 @@ hs_err_pid*.log
 
 # Server deploy history (deploy/deploy-server.sh)
 deploy/.deployed
+
+__pycache__/
+*.pyc
