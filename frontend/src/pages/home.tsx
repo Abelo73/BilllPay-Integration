@@ -479,7 +479,7 @@ function RecentlyListed() {
   const items = data?.content ?? []
   if (!isLoading && items.length === 0) return null
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <SectionTitle title={t('Recently Listed')} to="/shop" link={t('View all')} />
       <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
         {isLoading && Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl sm:aspect-[4/4.2] sm:h-auto" />)}
@@ -500,7 +500,7 @@ const SERVICES: { trade: string; title: string; note: string; icon: LucideIcon; 
 function LocalServices() {
   const t = useT()
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <SectionTitle title={t('Local Services')} to="/services" link={t('View all')} />
       <ul className="divide-y overflow-hidden rounded-2xl border bg-card">
         {SERVICES.map((s) => (
