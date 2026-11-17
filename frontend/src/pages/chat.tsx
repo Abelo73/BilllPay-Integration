@@ -134,6 +134,51 @@ function ContactDialog({ id, open, onOpenChange, name }: { id: number; open: boo
   )
 }
 
+/** Swipe a message to the right to reply (as on Instagram); on a computer, double-click it. */
+function useSwipeToReply(onReply: () => void) {
+  const REPLY_AT = 56
+  const start = useRef<{ x: number; y: number; id: number } | null>(null)
+  const distance = useRef(0)
+  const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const end = () => {
+    const reply = distance.current >= REPLY_AT
+    start.current = null
+    distance.current = 0
+    setDragging(false)
+    setDx(0)
+    if (reply) onReply()
+  }
+  return {
+    dx,
+    dragging,
+    handlers: {
+      onPointerDown: (e: { clientX: number; clientY: number; pointerId: number }) => {
+        start.current = { x: e.clientX, y: e.clientY, id: e.pointerId }
+        setDragging(true)
+      },
+      onPointerMove: (e: { clientX: number; clientY: number; pointerId: number }) => {
+        const s = start.current
+        if (!s || s.id !== e.pointerId) return
+        const x = e.clientX - s.x
+        const y = e.clientY - s.y
+        if (Math.abs(y) > Math.abs(x) + 6) {
+          // a scroll, not a swipe
+          start.current = null
+          setDragging(false)
+          setDx(0)
+          return
+        }
+        distance.current = Math.max(0, Math.min(x, 90))
+        setDx(distance.current)
+      },
+      onPointerUp: end,
+      onPointerCancel: end,
+      onDoubleClick: () => onReply(),
+    },
+  }
+}
+
 /** The short text for a message in a quote, the reply bar, or the list of chats. */
 function previewText(kind: string, text: string | null, t: (s: string) => string) {
   if (kind === 'TEXT') return text ?? ''
@@ -158,6 +203,7 @@ function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
   busy: boolean
 }) {
   const t = useT()
+  const swipe = useSwipeToReply(onReply)
   if (m.kind === 'SYSTEM') {
     return <p className="mx-auto my-2 max-w-xs rounded-full bg-background px-3 py-1 text-center text-xs text-muted-foreground shadow-sm">{m.body}</p>
   }
@@ -186,7 +232,7 @@ function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
     )
   } else if (m.kind === 'IMAGE' && m.imageUrl) {
     content = (
-      <div className={cn('max-w-[80%] overflow-hidden rounded-2xl p-1 shadow-sm', m.mine ? 'bg-primary' : 'border bg-card', tail)}>
+      <div className={cn('overflow-hidden rounded-2xl p-1 shadow-sm', m.mine ? 'bg-primary' : 'border bg-card', tail)}>
         {quote && <div className="px-1 pt-1">{quote}</div>}
         <a href={m.imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl">
           <img src={m.imageUrl} alt={t('Photo in chat')} className="max-h-72 max-w-[18rem] object-cover" />
@@ -197,7 +243,7 @@ function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
     content = (
       <>
         {quote}
-        <div className={cn('max-w-[85%]', tail)}>
+        <div className={tail}>
           <VoicePlayer src={m.audioUrl} seconds={m.audioSeconds} mine={m.mine} />
         </div>
       </>
@@ -206,7 +252,7 @@ function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
     content = (
       <div
         className={cn(
-          'max-w-[80%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm',
+          'rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm',
           m.mine ? 'bg-primary text-primary-foreground' : 'border bg-card',
           tail,
         )}
@@ -218,25 +264,28 @@ function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
   }
 
   return (
-    <div id={`msg-${m.id}`} className={cn('group flex items-end gap-1', m.mine ? 'flex-row-reverse' : 'flex-row', grouped ? 'mt-0.5' : 'mt-3')}>
-      <div className={cn('flex min-w-0 flex-col', m.mine ? 'items-end' : 'items-start')}>
+    <div
+      id={`msg-${m.id}`}
+      {...swipe.handlers}
+      className={cn('relative flex select-none', m.mine ? 'justify-end' : 'justify-start', grouped ? 'mt-0.5' : 'mt-3')}
+      style={{ transform: `translateX(${swipe.dx}px)`, transition: swipe.dragging ? 'none' : 'transform 150ms ease-out', touchAction: 'pan-y' }}
+    >
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-full bg-background text-muted-foreground shadow-sm"
+        style={{ opacity: Math.min(1, swipe.dx / 56), transform: `translateX(${-36 + Math.min(swipe.dx, 56) / 2}px)` }}
+      >
+        <Reply className="size-4" />
+      </span>
+      <div className={cn('flex min-w-0 max-w-[80%] flex-col', m.mine ? 'items-end' : 'items-start')}>
         {content}
         {m.flagged && !m.mine && (
-          <p className="mt-1 flex max-w-[80%] items-start gap-1.5 text-xs font-medium text-destructive">
+          <p className="mt-1 flex items-start gap-1.5 text-xs font-medium text-destructive">
             <ShieldAlert className="mt-0.5 size-3.5 shrink-0" /> {t('Careful: never pay outside Sodo Gebeya or before you get the item.')}
           </p>
         )}
         {last && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{chatTime(m.createdAt)}</span>}
       </div>
-      <button
-        type="button"
-        onClick={onReply}
-        aria-label={t('Reply')}
-        title={t('Reply')}
-        className="mb-6 grid size-8 shrink-0 place-items-center rounded-full bg-background text-muted-foreground opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <Reply className="size-4" />
-      </button>
     </div>
   )
 }
