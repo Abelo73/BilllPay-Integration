@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Ban, Camera, Check, CheckCheck, Flag, HandCoins, Loader2, MoreVertical, Send, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Ban, Camera, Check, CheckCheck, Flag, HandCoins, Loader2, Mic, MoreVertical, Reply, Send, ShieldAlert, Trash2, X } from 'lucide-react'
 import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
 import { ChatAlertSettings } from '@/components/message-alerts'
+import { clock, useVoiceRecorder, VoicePlayer } from '@/components/voice-note'
 import { subscribeLive, useLiveConnected } from '@/lib/live'
 import { chatApi, type ChatMessage, type ChatOffer, type ReportReason } from '@/lib/chat-api'
 import { playChime } from '@/lib/chat-sound'
@@ -62,14 +63,26 @@ function OfferCard({ offer, onAnswer, busy }: { offer: ChatOffer; onAnswer: (a: 
   )
 }
 
+/** The short text for a message in a quote, the reply bar, or the list of chats. */
+function previewText(kind: string, text: string | null, t: (s: string) => string) {
+  if (kind === 'TEXT') return text ?? ''
+  if (kind === 'AUDIO') return t('Voice message')
+  if (kind === 'IMAGE') return t('Photo')
+  if (kind === 'OFFER') return t('Offer')
+  return ''
+}
+
 /**
  * One message. Messages from the same person in a row are grouped: they sit close together, and only the last of the
- * group shows its time and the speech-bubble tail.
+ * group shows its time and the speech-bubble tail. A reply button sits beside each message; a reply shows the message
+ * it answers above its text, and tapping that quote scrolls to the original.
  */
-function Bubble({ m, grouped, last, onAnswer, busy }: {
+function Bubble({ m, grouped, last, onReply, onQuote, onAnswer, busy }: {
   m: ChatMessage
   grouped: boolean
   last: boolean
+  onReply: () => void
+  onQuote: (id: number) => void
   onAnswer: (offerId: number, a: 'accept' | 'decline' | 'withdraw') => void
   busy: boolean
 }) {
@@ -78,31 +91,81 @@ function Bubble({ m, grouped, last, onAnswer, busy }: {
     return <p className="mx-auto my-2 max-w-xs rounded-full bg-background px-3 py-1 text-center text-xs text-muted-foreground shadow-sm">{m.body}</p>
   }
   const tail = last ? (m.mine ? 'rounded-br-md' : 'rounded-bl-md') : ''
-  return (
-    <div className={cn('flex flex-col', m.mine ? 'items-end' : 'items-start', grouped ? 'mt-0.5' : 'mt-3')}>
-      {m.kind === 'OFFER' && m.offer ? (
+  const quote = m.replyTo && (
+    <button
+      type="button"
+      onClick={() => onQuote(m.replyTo!.id)}
+      className={cn(
+        'mb-1.5 block w-full rounded-lg border-l-4 px-2.5 py-1.5 text-left text-xs',
+        m.mine ? 'border-primary-foreground/70 bg-primary-foreground/15' : 'border-primary bg-muted',
+      )}
+    >
+      <span className="block font-bold">{m.replyTo.mine ? t('You') : t('Other person')}</span>
+      <span className="line-clamp-2 opacity-90">{previewText(m.replyTo.kind, m.replyTo.text, t)}</span>
+    </button>
+  )
+
+  let content
+  if (m.kind === 'OFFER' && m.offer) {
+    content = (
+      <>
+        {quote}
         <OfferCard offer={m.offer} busy={busy} onAnswer={(a) => onAnswer(m.offer!.id, a)} />
-      ) : m.kind === 'IMAGE' && m.imageUrl ? (
-        <a href={m.imageUrl} target="_blank" rel="noreferrer" className={cn('block max-w-[80%] overflow-hidden rounded-2xl shadow-sm', tail)}>
+      </>
+    )
+  } else if (m.kind === 'IMAGE' && m.imageUrl) {
+    content = (
+      <div className={cn('max-w-[80%] overflow-hidden rounded-2xl p-1 shadow-sm', m.mine ? 'bg-primary' : 'border bg-card', tail)}>
+        {quote && <div className="px-1 pt-1">{quote}</div>}
+        <a href={m.imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-xl">
           <img src={m.imageUrl} alt={t('Photo in chat')} className="max-h-72 max-w-[18rem] object-cover" />
         </a>
-      ) : (
-        <p
-          className={cn(
-            'max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm',
-            m.mine ? 'bg-primary text-primary-foreground' : 'border bg-card',
-            tail,
-          )}
-        >
-          {m.body}
-        </p>
-      )}
-      {m.flagged && !m.mine && (
-        <p className="mt-1 flex max-w-[80%] items-start gap-1.5 text-xs font-medium text-destructive">
-          <ShieldAlert className="mt-0.5 size-3.5 shrink-0" /> {t('Careful: never pay outside Sodo Gebeya or before you get the item.')}
-        </p>
-      )}
-      {last && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{chatTime(m.createdAt)}</span>}
+      </div>
+    )
+  } else if (m.kind === 'AUDIO' && m.audioUrl) {
+    content = (
+      <>
+        {quote}
+        <div className={cn('max-w-[85%]', tail)}>
+          <VoicePlayer src={m.audioUrl} seconds={m.audioSeconds} mine={m.mine} />
+        </div>
+      </>
+    )
+  } else {
+    content = (
+      <div
+        className={cn(
+          'max-w-[80%] rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm',
+          m.mine ? 'bg-primary text-primary-foreground' : 'border bg-card',
+          tail,
+        )}
+      >
+        {quote}
+        <p className="whitespace-pre-wrap break-words">{m.body}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div id={`msg-${m.id}`} className={cn('group flex items-end gap-1', m.mine ? 'flex-row-reverse' : 'flex-row', grouped ? 'mt-0.5' : 'mt-3')}>
+      <div className={cn('flex min-w-0 flex-col', m.mine ? 'items-end' : 'items-start')}>
+        {content}
+        {m.flagged && !m.mine && (
+          <p className="mt-1 flex max-w-[80%] items-start gap-1.5 text-xs font-medium text-destructive">
+            <ShieldAlert className="mt-0.5 size-3.5 shrink-0" /> {t('Careful: never pay outside Sodo Gebeya or before you get the item.')}
+          </p>
+        )}
+        {last && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{chatTime(m.createdAt)}</span>}
+      </div>
+      <button
+        type="button"
+        onClick={onReply}
+        aria-label={t('Reply')}
+        title={t('Reply')}
+        className="mb-6 grid size-8 shrink-0 place-items-center rounded-full bg-background text-muted-foreground opacity-100 shadow-sm transition-opacity md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        <Reply className="size-4" />
+      </button>
     </div>
   )
 }
@@ -115,6 +178,7 @@ export function ChatPage() {
   const session = useSession((s) => s.session)
   const qc = useQueryClient()
   const [text, setText] = useState('')
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const [offerPrice, setOfferPrice] = useState('')
   const [offerQty, setOfferQty] = useState('1')
@@ -191,13 +255,26 @@ export function ChatPage() {
     qc.invalidateQueries({ queryKey: ['chats'] })
   }
   const send = useMutation({
-    mutationFn: () => chatApi.send(id, text),
+    mutationFn: () => chatApi.send(id, text, replyTo?.id),
     onSuccess: () => {
       setText('')
+      setReplyTo(null)
       refresh()
     },
     onError: (e) => toast.error(e.message),
   })
+  const voice = useMutation({
+    mutationFn: ({ audio, seconds }: { audio: Blob; seconds: number }) => chatApi.sendVoice(id, audio, seconds, replyTo?.id),
+    onSuccess: () => {
+      setReplyTo(null)
+      refresh()
+    },
+    onError: (e) => toast.error(e.message),
+  })
+  const recorder = useVoiceRecorder((audio, seconds) => voice.mutate({ audio, seconds }))
+  const startRecording = () => {
+    recorder.start().catch(() => toast.error(t('Allow the microphone to send voice messages.')))
+  }
   const photo = useMutation({ mutationFn: (f: File) => chatApi.sendImage(id, f), onSuccess: refresh, onError: (e) => toast.error(e.message) })
   const offer = useMutation({
     mutationFn: () => chatApi.offer(id, Number(offerPrice), Number(offerQty) || 1),
@@ -324,7 +401,15 @@ export function ChatPage() {
           return (
             <Fragment key={m.id}>
               {newDay && <p className="my-3 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{dayLabel(m.createdAt)}</p>}
-              <Bubble m={m} grouped={grouped} last={last} busy={answer.isPending} onAnswer={(offerId, a) => answer.mutate({ offerId, a })} />
+              <Bubble
+                m={m}
+                grouped={grouped}
+                last={last}
+                busy={answer.isPending}
+                onReply={() => setReplyTo(m)}
+                onQuote={(quoted) => document.getElementById(`msg-${quoted}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}
+                onAnswer={(offerId, a) => answer.mutate({ offerId, a })}
+              />
               {m.id === lastMineId && (
                 <p className={cn('mt-1 flex items-center justify-end gap-1 text-[11px] font-semibold', seen ? 'text-primary' : 'text-muted-foreground')}>
                   {seen ? <CheckCheck className="size-3.5" /> : <Check className="size-3.5" />}
@@ -352,6 +437,34 @@ export function ChatPage() {
         </p>
       ) : (
         <div className="space-y-2 border-t bg-card p-2.5 md:rounded-b-2xl md:border">
+          {replyTo && (
+            <div className="flex items-center gap-2 rounded-xl border-l-4 border-primary bg-muted/60 py-1.5 pl-3 pr-1.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-primary">
+                  {t('Replying to')} {replyTo.mine ? t('your message') : (c?.otherName ?? t('them'))}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{previewText(replyTo.kind, replyTo.body, t)}</p>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="size-9 shrink-0" aria-label={t('Cancel reply')} onClick={() => setReplyTo(null)}>
+                <X className="size-4" />
+              </Button>
+            </div>
+          )}
+          {recorder.recording && (
+            <div className="flex items-center gap-2 rounded-3xl border border-destructive/40 bg-background px-2 py-1.5">
+              <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 rounded-full text-destructive" aria-label={t('Delete recording')} onClick={recorder.cancel}>
+                <Trash2 className="size-5" />
+              </Button>
+              <p className="flex flex-1 items-center gap-2 text-sm font-semibold tabular-nums">
+                <span className="size-2.5 animate-pulse rounded-full bg-destructive" />
+                {clock(recorder.seconds)}
+                <span className="text-xs font-normal text-muted-foreground">{t('Recording… tap send when you are done')}</span>
+              </p>
+              <Button type="button" size="icon" className="size-10 shrink-0 rounded-full" aria-label={t('Send voice message')} onClick={recorder.stop}>
+                <Send className="size-[18px]" />
+              </Button>
+            </div>
+          )}
           {offerOpen && (
             <form
               className="flex flex-wrap items-end gap-2 rounded-xl border border-warning bg-amber-soft/50 p-2"
@@ -372,7 +485,7 @@ export function ChatPage() {
             </form>
           )}
           <form
-            className="flex items-end gap-1.5"
+            className={cn('flex items-end gap-1.5', recorder.recording && 'hidden')}
             onSubmit={(e) => {
               e.preventDefault()
               if (text.trim()) send.mutate()
@@ -426,15 +539,23 @@ export function ChatPage() {
                 className="block max-h-32 min-h-11 w-full resize-none bg-transparent py-3 text-[15px] leading-snug outline-none placeholder:text-muted-foreground"
               />
             </label>
-            <Button
-              type="submit"
-              size="icon"
-              className={cn('size-10 shrink-0 rounded-full transition-colors', text.trim() ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}
-              aria-label={t('Send')}
-              disabled={send.isPending || !text.trim()}
-            >
-              {send.isPending ? <Loader2 className="animate-spin" /> : <Send className="size-[18px]" />}
-            </Button>
+            {text.trim() ? (
+              <Button type="submit" size="icon" className="size-10 shrink-0 rounded-full" aria-label={t('Send')} disabled={send.isPending}>
+                {send.isPending ? <Loader2 className="animate-spin" /> : <Send className="size-[18px]" />}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                className="size-10 shrink-0 rounded-full bg-muted text-foreground hover:bg-accent"
+                aria-label={t('Record a voice message')}
+                title={t('Tap to record a voice message')}
+                disabled={voice.isPending}
+                onClick={startRecording}
+              >
+                {voice.isPending ? <Loader2 className="animate-spin" /> : <Mic className="size-[18px]" />}
+              </Button>
+            )}
           </form>
         </div>
       )}

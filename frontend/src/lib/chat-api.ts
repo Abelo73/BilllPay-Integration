@@ -26,7 +26,12 @@ export type ChatMessage = {
   id: number
   senderRole: ChatSide | 'SYSTEM'
   mine: boolean
-  kind: 'TEXT' | 'IMAGE' | 'OFFER' | 'SYSTEM'
+  kind: 'TEXT' | 'IMAGE' | 'OFFER' | 'SYSTEM' | 'AUDIO'
+  /** the message this one answers (a short quote), or null */
+  replyTo: { id: number; mine: boolean; kind: string; text: string | null } | null
+  /** voice message: where to play it, and its length in seconds */
+  audioUrl: string | null
+  audioSeconds: number | null
   body: string | null
   imageUrl: string | null
   offer: ChatOffer | null
@@ -63,7 +68,7 @@ export const chatApi = {
   unread: () => request<{ unread: number }>('/chats/unread'),
   start: (productId: number, text?: string) => request<Conversation>('/chats', json({ productId, text })),
   thread: (id: number, after = 0) => request<ChatThread>(`/chats/${id}?after=${after}`),
-  send: (id: number, text: string) => request<ChatMessage>(`/chats/${id}/messages`, json({ text })),
+  send: (id: number, text: string, replyToId?: number) => request<ChatMessage>(`/chats/${id}/messages`, json({ text, replyToId })),
   /** Tells the other side this person is typing (they see it for a few seconds). */
   typing: (id: number) => request<{ ok: boolean }>(`/chats/${id}/typing`, json({})),
   /** Marks this person as online; sent every 30 s while the app is open. */
@@ -75,6 +80,21 @@ export const chatApi = {
   block: (id: number, blocked: boolean) => request<{ blocked: boolean }>(`/chats/${id}/block`, json({ blocked })),
   report: (id: number, reason: ReportReason, details?: string) =>
     request<{ reported: boolean }>(`/chats/${id}/report`, json({ reason, details })),
+  /** A voice message: the recording as one file (WebM, Ogg or MP4), its length, and an optional reply. */
+  async sendVoice(id: number, audio: Blob, seconds: number, replyToId?: number): Promise<ChatMessage> {
+    const form = new FormData()
+    form.append('file', audio, 'voice')
+    const token = sessionToken()
+    const q = new URLSearchParams({ seconds: String(seconds) })
+    if (replyToId) q.set('replyToId', String(replyToId))
+    const res = await fetch(`/api/chats/${id}/voice?${q}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    if (!res.ok) throw new ApiError(res.status, await res.json().catch(() => ({})))
+    return res.json()
+  },
   async sendImage(id: number, file: File): Promise<ChatMessage> {
     const form = new FormData()
     form.append('file', file)

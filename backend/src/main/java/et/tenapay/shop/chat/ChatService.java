@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -75,6 +76,8 @@ public class ChatService {
 	private final et.tenapay.shop.inbox.InboxService inbox;
 	private final ChatPresence presence;
 	private final et.tenapay.shop.live.LiveHub live;
+	static final long MAX_VOICE_BYTES = 3L * 1024 * 1024;
+	static final int MAX_VOICE_SECONDS = 120;
 
 	public ChatService(ConversationRepository conversations, ChatMessageRepository messages, ChatOfferRepository offers,
 			ChatReportRepository reports, ShopRepository shops, ProductRepository products, UserRepository users,
@@ -108,8 +111,12 @@ public class ChatService {
 			String madeBy, boolean mine, String status, Instant expiresAt, boolean canAnswer, boolean canWithdraw, boolean canBuy) {
 	}
 
+	/** The message this one answers, as a short quote. {@code text} is null for photos and voice messages. */
+	public record ReplyPreview(Long id, boolean mine, String kind, String text) {
+	}
+
 	public record MessageView(Long id, String senderRole, boolean mine, String kind, String body, String imageUrl,
-			OfferView offer, boolean flagged, Instant createdAt) {
+			OfferView offer, boolean flagged, Instant createdAt, ReplyPreview replyTo, String audioUrl, Integer audioSeconds) {
 	}
 
 	/** One row in the chat list; {@code side} is the viewer's side (BUYER or SELLER). */
@@ -161,7 +168,7 @@ public class ChatService {
 			c = conversations.findByBuyerIdAndShopId(buyerId, shopId).orElseThrow();
 		}
 		if (firstMessage != null && !firstMessage.isBlank()) {
-			sendText(buyerId, c.getId(), firstMessage);
+			sendText(buyerId, c.getId(), firstMessage, null);
 		}
 		Long id = c.getId();
 		return tx.execute(s -> view(party(buyerId, id), buyerId));
@@ -245,12 +252,34 @@ public class ChatService {
 
 	// ---------- writing ----------
 
-	public MessageView sendText(UUID userId, Long conversationId, String text) {
+	public MessageView sendText(UUID userId, Long conversationId, String text, Long replyToId) {
 		String body = text == null ? "" : text.strip();
 		if (body.isEmpty() || body.length() > 2000) {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_MESSAGE", "Write a message of up to 2000 characters.");
 		}
-		return post(userId, conversationId, ChatMessage.Kind.TEXT, body, null, null);
+		return post(userId, conversationId, ChatMessage.Kind.TEXT, body, null, null, replyToId, null, null);
+	}
+
+	/** A voice message: a short recording (up to two minutes), stored privately like a photo. */
+	public MessageView sendVoice(UUID userId, Long conversationId, byte[] audio, String contentType, int seconds, Long replyToId) {
+		if (audio == null || audio.length == 0 || audio.length > MAX_VOICE_BYTES) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_VOICE", "A voice message can be up to 3 MB.");
+		}
+		if (seconds < 1 || seconds > MAX_VOICE_SECONDS) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_VOICE", "A voice message can be up to 2 minutes.");
+		}
+		String type = contentType == null ? "" : contentType.split(";")[0].strip().toLowerCase(Locale.ROOT);
+		String ext = switch (type) {
+			case "audio/webm" -> "webm";
+			case "audio/ogg" -> "ogg";
+			case "audio/mp4" -> "mp4";
+			case "audio/x-m4a", "audio/m4a" -> "m4a";
+			default -> throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_VOICE", "Send a voice message as WebM, Ogg, MP4 or M4A.");
+		};
+		party(userId, conversationId); // check access before doing any work
+		String key = "chat/" + conversationId + "/" + UUID.randomUUID() + "-voice." + ext;
+		storage.put(key, audio, type);
+		return post(userId, conversationId, ChatMessage.Kind.AUDIO, null, null, null, replyToId, key, seconds);
 	}
 
 	public MessageView sendImage(UUID userId, Long conversationId, byte[] upload) {
@@ -258,10 +287,11 @@ public class ChatService {
 		ImageProcessor.Processed img = images.process(upload);
 		String key = "chat/" + conversationId + "/" + UUID.randomUUID() + "-l.jpg";
 		storage.put(key, img.large(), "image/jpeg");
-		return post(userId, conversationId, ChatMessage.Kind.IMAGE, null, key, null);
+		return post(userId, conversationId, ChatMessage.Kind.IMAGE, null, key, null, null, null, null);
 	}
 
-	private MessageView post(UUID userId, Long conversationId, ChatMessage.Kind kind, String body, String imageKey, Long offerId) {
+	private MessageView post(UUID userId, Long conversationId, ChatMessage.Kind kind, String body, String imageKey, Long offerId,
+			Long replyToId, String audioKey, Integer audioSeconds) {
 		if (messages.countBySenderIdAndCreatedAtAfter(userId, Instant.now().minusSeconds(60)) >= MAX_MESSAGES_PER_MINUTE) {
 			throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "SLOW_DOWN", "You're sending messages too fast. Wait a moment.");
 		}
@@ -272,7 +302,16 @@ public class ChatService {
 			if (p.c().getBlockedBy() != null) {
 				throw new ApiException(HttpStatus.FORBIDDEN, "CHAT_BLOCKED", "This conversation is blocked.");
 			}
+			if (replyToId != null) {
+				// a reply must quote a real message from this same chat
+				messages.findById(replyToId)
+						.filter(target -> conversationId.equals(target.getConversationId()) && target.getKind() != ChatMessage.Kind.SYSTEM)
+						.orElseThrow(() -> new ApiException(HttpStatus.BAD_REQUEST, "BAD_REPLY", "That message can't be replied to here."));
+			}
 			ChatMessage m = new ChatMessage();
+			m.setReplyToId(replyToId);
+			m.setAudioKey(audioKey);
+			m.setAudioSeconds(audioSeconds);
 			m.setConversationId(conversationId);
 			m.setSenderId(userId);
 			m.setSenderRole(p.side() == Conversation.Side.BUYER ? ChatMessage.SenderRole.BUYER : ChatMessage.SenderRole.SELLER);
@@ -284,6 +323,7 @@ public class ChatService {
 			messages.save(m);
 			String preview = switch (kind) {
 				case IMAGE -> "Photo";
+				case AUDIO -> "Voice message";
 				case OFFER -> "Offer";
 				default -> body.length() > 150 ? body.substring(0, 150) + "…" : body;
 			};
@@ -332,7 +372,7 @@ public class ChatService {
 			p.c().setProductId(pid);
 			return offers.save(o).getId();
 		});
-		return post(userId, conversationId, ChatMessage.Kind.OFFER, null, null, offerId);
+		return post(userId, conversationId, ChatMessage.Kind.OFFER, null, null, offerId, null, null, null);
 	}
 
 	public enum OfferAction { ACCEPT, DECLINE, WITHDRAW }
@@ -550,10 +590,24 @@ public class ChatService {
 	private List<MessageView> messageViews(List<ChatMessage> list, UUID viewer, Party p) {
 		List<Long> offerIds = list.stream().map(ChatMessage::getOfferId).filter(java.util.Objects::nonNull).toList();
 		Map<Long, OfferView> offerViews = offerIds.isEmpty() ? Map.of() : offerViews(offers.findByIdIn(offerIds), viewer, p);
+		List<Long> replyIds = list.stream().map(ChatMessage::getReplyToId).filter(java.util.Objects::nonNull).distinct().toList();
+		Map<Long, ChatMessage> quoted = replyIds.isEmpty() ? Map.of()
+				: messages.findAllById(replyIds).stream().collect(java.util.stream.Collectors.toMap(ChatMessage::getId, x -> x));
 		return list.stream().map(m -> new MessageView(m.getId(), m.getSenderRole().name(),
 				viewer != null && viewer.equals(m.getSenderId()), m.getKind().name(), m.getBody(),
 				m.getImageKey() == null ? null : media.urlFor(m.getImageKey()),
-				m.getOfferId() == null ? null : offerViews.get(m.getOfferId()), m.isFlagged(), m.getCreatedAt())).toList();
+				m.getOfferId() == null ? null : offerViews.get(m.getOfferId()), m.isFlagged(), m.getCreatedAt(),
+				m.getReplyToId() == null || !quoted.containsKey(m.getReplyToId()) ? null : quotePreview(quoted.get(m.getReplyToId()), viewer),
+				m.getAudioKey() == null ? null : media.urlFor(m.getAudioKey()), m.getAudioSeconds())).toList();
+	}
+
+	private static ReplyPreview quotePreview(ChatMessage target, UUID viewer) {
+		String text = switch (target.getKind()) {
+			case TEXT -> target.getBody().length() > 140 ? target.getBody().substring(0, 140) + "…" : target.getBody();
+			case OFFER -> "Offer";
+			default -> null;
+		};
+		return new ReplyPreview(target.getId(), viewer != null && viewer.equals(target.getSenderId()), target.getKind().name(), text);
 	}
 
 	private Map<Long, OfferView> offerViews(List<ChatOffer> list, UUID viewer, Party p) {

@@ -22,7 +22,7 @@ public class MediaController {
 
 	private static final String PREFIX = "/api/media/";
 	/** Keys we generate look like products/42/3f2a…-l.jpg; anything else is refused. */
-	private static final Pattern SAFE_KEY = Pattern.compile("^[a-z]+/[0-9]+/[a-z0-9-]+\\.(jpg|webp|png)$");
+	private static final Pattern SAFE_KEY = Pattern.compile("^[a-z]+/[0-9]+/[a-z0-9-]+\\.(jpg|webp|png|webm|ogg|m4a|mp4)$");
 
 	private final MediaStorage storage;
 

@@ -22,7 +22,7 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ChatMessage {
 
-	public enum Kind { TEXT, IMAGE, OFFER, SYSTEM }
+	public enum Kind { TEXT, IMAGE, OFFER, SYSTEM, AUDIO }
 
 	public enum SenderRole { BUYER, SELLER, SYSTEM }
 
@@ -48,6 +48,17 @@ public class ChatMessage {
 
 	/** Looks like an attempt to deal off the platform; shown with a safety warning. */
 	private boolean flagged;
+
+	/** The message this one answers (in the same chat), or null. */
+	@Column(name = "reply_to_id")
+	private Long replyToId;
+
+	/** Voice message: the stored recording's key, and its length in seconds. */
+	@Column(name = "audio_key")
+	private String audioKey;
+
+	@Column(name = "audio_seconds")
+	private Integer audioSeconds;
 
 	@Column(updatable = false)
 	private Instant createdAt = Instant.now();

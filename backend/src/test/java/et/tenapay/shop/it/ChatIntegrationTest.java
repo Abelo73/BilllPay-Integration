@@ -282,4 +282,47 @@ class ChatIntegrationTest extends IntegrationTest {
 			reader.join(2000);
 		}
 	}
+
+	@Test
+	void repliesQuoteAMessageFromTheSameChatOnly() {
+		Seller s = seller("0912000040");
+		String buyer = customer("Rahel Buyer", "0922000040");
+		long id = start(buyer, s.productId(), "Do you deliver?");
+		long question = thread(buyer, id).path("messages").get(0).path("id").asLong();
+
+		Res reply = post("/api/chats/" + id + "/messages", Map.of("text", "Yes, across Sodo.", "replyToId", question), s.token());
+		assertThat(reply.status()).as(reply.raw()).isEqualTo(200);
+		JsonNode msgs = thread(s.token(), id).path("messages");
+		JsonNode last = msgs.get(msgs.size() - 1);
+		assertThat(last.path("replyTo").path("id").asLong()).isEqualTo(question);
+		assertThat(last.path("replyTo").path("text").asString()).isEqualTo("Do you deliver?");
+		assertThat(last.path("replyTo").path("mine").asBoolean()).isFalse();
+
+		// a reply to a message that is not in this chat is refused
+		assertThat(post("/api/chats/" + id + "/messages", Map.of("text", "Hi", "replyToId", 999999999L), s.token()).status()).isEqualTo(400);
+	}
+
+	@Test
+	void voiceMessagesAreStoredPlayableAndChecked() {
+		Seller s = seller("0912000041");
+		String buyer = customer("Yonas Buyer", "0922000041");
+		long id = start(buyer, s.productId(), null);
+		byte[] audio = {0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 1, 2, 3};
+
+		Res ok = upload("/api/chats/" + id + "/voice?seconds=4", "voice.webm", "audio/webm", audio, buyer);
+		assertThat(ok.status()).as(ok.raw()).isEqualTo(200);
+		assertThat(ok.body().path("kind").asString()).isEqualTo("AUDIO");
+		assertThat(ok.body().path("audioSeconds").asInt()).isEqualTo(4);
+		String url = ok.body().path("audioUrl").asString();
+		assertThat(url).contains("/api/media/chat/");
+		assertThat(getBytes(url).statusCode()).isEqualTo(200);
+
+		// the wrong kind of file, or too long, is refused
+		assertThat(upload("/api/chats/" + id + "/voice?seconds=4", "x.txt", "text/plain", audio, buyer).status()).isEqualTo(400);
+		assertThat(upload("/api/chats/" + id + "/voice?seconds=500", "voice.webm", "audio/webm", audio, buyer).status()).isEqualTo(400);
+
+		// a stranger cannot send into this chat
+		String stranger = customer("Nobody Voice", "0922000042");
+		assertThat(upload("/api/chats/" + id + "/voice?seconds=4", "voice.webm", "audio/webm", audio, stranger).status()).isEqualTo(404);
+	}
 }

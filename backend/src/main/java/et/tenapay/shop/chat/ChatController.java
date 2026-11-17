@@ -42,7 +42,7 @@ public class ChatController {
 	public record StartRequest(@NotNull Long productId, @Size(max = 2000) String text) {
 	}
 
-	public record TextRequest(@Size(max = 2000) String text) {
+	public record TextRequest(@Size(max = 2000) String text, Long replyToId) {
 	}
 
 	public record OfferRequest(Long productId, @NotNull BigDecimal unitPrice, @Min(1) @Max(20) Integer quantity) {
@@ -98,7 +98,7 @@ public class ChatController {
 
 	@PostMapping("/{id}/messages")
 	public MessageView send(@PathVariable Long id, @Valid @RequestBody TextRequest req) {
-		return chat.sendText(me(), id, req.text());
+		return chat.sendText(me(), id, req.text(), req.replyToId());
 	}
 
 	@PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -107,6 +107,13 @@ public class ChatController {
 			throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_IMAGE", "Send a JPG, PNG or WebP photo up to 5 MB.");
 		}
 		return chat.sendImage(me(), id, file.getBytes());
+	}
+
+	/** A voice message: the recording as one file, with its length in seconds and an optional reply. */
+	@PostMapping(path = "/{id}/voice", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public MessageView sendVoice(@PathVariable Long id, @RequestPart("file") MultipartFile file, @RequestParam int seconds,
+			@RequestParam(required = false) Long replyToId) throws IOException {
+		return chat.sendVoice(me(), id, file.getBytes(), file.getContentType(), seconds, replyToId);
 	}
 
 	@PostMapping("/{id}/offers")
