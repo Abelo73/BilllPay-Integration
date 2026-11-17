@@ -78,7 +78,7 @@ export function HeroSlider({ variant = 'hero' }: { variant?: 'hero' | 'phone' })
         >
           {s.image && <img src={s.image} alt="" className="size-full object-cover" loading={i === 0 ? 'eager' : 'lazy'} />}
           <span className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
-          <span className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-5 sm:p-7 lg:px-14 lg:pb-16">
+          <span className={cn("absolute inset-x-0 bottom-0 flex flex-col gap-2 p-5 sm:p-7 lg:px-14 lg:pb-16", variant === 'phone' && 'pb-16')}>
             <span className="text-xl font-extrabold leading-tight sm:text-2xl">{t(s.title)}</span>
             {s.subtitle && <span className="text-sm text-white/90">{t(s.subtitle)}</span>}
             {s.to && (

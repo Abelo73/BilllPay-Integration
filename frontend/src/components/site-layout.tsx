@@ -260,6 +260,7 @@ function Footer() {
     ...(payments ? [{ to: '/orders/track', label: 'Track your order' }] : []),
     { to: '/categories', label: 'All categories' },
     { to: '/work/cv', label: 'Professional CV' },
+    { to: '/docs/Sodo_Gebeya_How_To_Use.pdf', label: 'How to use (PDF)' },
   ]
   return (
     <footer className="relative isolate mt-12 overflow-hidden bg-[#0E5A43] pb-20 text-white md:pb-0 print:hidden">
@@ -309,6 +310,8 @@ function FooterLinks({ title, links }: { title: string; links: { to: string; lab
           <li key={l.to}>
             {l.to.startsWith('/#') ? (
               <a href={l.to} className="hover:text-white">{t(l.label)}</a>
+            ) : l.to.endsWith('.pdf') ? (
+              <a href={l.to} download className="hover:text-white">{t(l.label)}</a>
             ) : (
               <Link to={l.to} className="hover:text-white">{t(l.label)}</Link>
             )}
