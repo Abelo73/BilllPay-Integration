@@ -120,6 +120,15 @@ public class AuthService {
 		}
 	}
 
+	/** The email was confirmed with a code (at sign-up, or at sign-in for accounts made before that check). */
+	public void markEmailVerified(String email) {
+		tx.executeWithoutResult(s -> users.findByEmail(normalizeEmail(email)).ifPresent(u -> {
+			if (u.getEmailVerifiedAt() == null) {
+				u.setEmailVerifiedAt(Instant.now());
+			}
+		}));
+	}
+
 	public Session register(String fullName, String email, String phone, String password, ClientInfo client) {
 		PasswordPolicy.check(password);
 		String normalized = normalizeEmail(email);

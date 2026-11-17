@@ -69,7 +69,11 @@ public class AuthController {
 			}
 			emailCodes.consume(email, req.code());
 		}
-		return auth.register(req.fullName(), req.email(), req.phone(), req.password(), client(http));
+		Session session = auth.register(req.fullName(), req.email(), req.phone(), req.password(), client(http));
+		if (app.signUpEmailCode()) {
+			auth.markEmailVerified(req.email()); // the code proved the address
+		}
+		return session;
 	}
 
 	public record EmailCodeRequest(@NotBlank @Email @Size(max = 200) String email) {
@@ -131,6 +135,50 @@ public class AuthController {
 
 	@PostMapping("/api/auth/login")
 	public Session login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+		Session session = auth.login(req.email(), req.password(), Portal.SHOP, client(http));
+		requireConfirmedEmail(req.email(), http);
+		return session;
+	}
+
+	/**
+	 * With email codes on, an email account confirms its email once. The password was right, so a code is emailed and
+	 * the sign-in waits for it (POST /api/auth/email/confirm). Accounts made before this check are asked the same way.
+	 */
+	private void requireConfirmedEmail(String email, HttpServletRequest http) {
+		if (!app.signUpEmailCode()) {
+			return;
+		}
+		User u = users.findByEmail(AuthService.normalizeEmail(email)).orElse(null);
+		if (u == null || u.getEmail() == null || u.getEmailVerifiedAt() != null || u.getRole().isStaff()) {
+			return;
+		}
+		Map<String, Object> details = new java.util.HashMap<>();
+		details.put("maskedEmail", EmailCodeService.mask(u.getEmail()));
+		try {
+			EmailCodeService.CodeSent sent = emailCodes.sendConfirm(u.getEmail(), client(http));
+			details.put("expiresInSeconds", sent.expiresInSeconds());
+			details.put("resendInSeconds", sent.resendInSeconds());
+			if (sent.devCode() != null) {
+				details.put("devCode", sent.devCode());
+			}
+		} catch (et.tenapay.shop.common.ApiException limited) {
+			// a code went out a moment ago: its box is still shown, with the same wait
+		}
+		throw new et.tenapay.shop.common.ApiException(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED",
+				"Confirm your email first. Enter the 6-digit code we sent you.", details);
+	}
+
+	public record ConfirmEmailRequest(@NotBlank @Email @Size(max = 200) String email, @NotBlank @Size(max = 200) String password,
+			@NotBlank @Size(max = 12) String code) {
+	}
+
+	/** Confirms the email with the code, then signs in. The password is still checked. */
+	@PostMapping("/api/auth/email/confirm")
+	public Session confirmEmail(@Valid @RequestBody ConfirmEmailRequest req, HttpServletRequest http) {
+		if (app.signUpEmailCode()) {
+			emailCodes.consume(AuthService.normalizeEmail(req.email()), req.code());
+			auth.markEmailVerified(req.email());
+		}
 		return auth.login(req.email(), req.password(), Portal.SHOP, client(http));
 	}
 

@@ -106,6 +106,10 @@ public class NotificationService {
 		return send(Kind.PASSWORD_RESET_CODE, "PASSWORD_RESET_CODE:" + codeId, null, email, EmailTemplates.resetCode(code));
 	}
 
+	public Notification.Status onConfirmCode(long codeId, String email, String code) {
+		return send(Kind.EMAIL_CONFIRM_CODE, "EMAIL_CONFIRM_CODE:" + codeId, null, email, EmailTemplates.confirmCode(code));
+	}
+
 	public Notification.Status onSignUpCode(long codeId, String email, String code) {
 		return send(Kind.SIGN_UP_CODE, "SIGN_UP_CODE:" + codeId, null, email, EmailTemplates.signUpCode(code));
 	}

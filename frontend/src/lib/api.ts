@@ -319,6 +319,9 @@ export const api = {
     request<EmailCodeSent>('/auth/email/resend', { method: 'POST', body: JSON.stringify({ email }) }),
   login: (email: string, password: string) =>
     request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  /** Confirms an email that was never confirmed (the code is emailed at sign-in), then signs in. */
+  confirmEmail: (email: string, password: string, code: string) =>
+    request<Session>('/auth/email/confirm', { method: 'POST', body: JSON.stringify({ email, password, code }) }),
   phoneStart: (phone: string) =>
     request<PhoneCodeSent>('/auth/phone/start', { method: 'POST', body: JSON.stringify({ phone, language: useLang.getState().lang }) }),
   phoneVerify: (phone: string, code: string, fullName?: string) =>

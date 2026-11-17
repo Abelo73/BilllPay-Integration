@@ -48,6 +48,9 @@ public class User {
 	/** Set once the owner proved the phone with an SMS code; only then can it be used to sign in. */
 	private Instant phoneVerifiedAt;
 
+	/** When the email was confirmed with a code; null means the person still has to confirm it at sign-in. */
+	private Instant emailVerifiedAt;
+
 	/** Site language, "en" or "am"; SMS and alerts follow it. */
 	private String language = "en";
 

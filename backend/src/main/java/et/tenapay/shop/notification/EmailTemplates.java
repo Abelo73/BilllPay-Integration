@@ -19,7 +19,7 @@ final class EmailTemplates {
 
 	enum Kind {
 		ORDER_PLACED, CASH_ORDERED, PAYMENT_REMINDER, PAYMENT_CONFIRMED, PAYMENT_FAILED, SHIPPED, DELIVERED, CANCELLED, EXPIRED, REFUNDED,
-		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE
+		PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE, EMAIL_CONFIRM_CODE
 	}
 
 	record Email(String subject, String html, String text) {
@@ -75,7 +75,7 @@ final class EmailTemplates {
 					o, "Order again");
 			case REFUNDED -> build("Refund issued for " + o.orderNumber(), "Refund issued",
 					"We've sent a refund through BillPay to the method you paid with.", o, "View your order");
-			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE -> throw new IllegalArgumentException("not an order email");
+			case PASSWORD_CHANGED, STAFF_SIGN_IN_CODE, SIGN_UP_CODE, PASSWORD_RESET_CODE, EMAIL_CONFIRM_CODE -> throw new IllegalArgumentException("not an order email");
 		};
 	}
 
@@ -112,6 +112,15 @@ final class EmailTemplates {
 	}
 
 	/** The six digits in separate boxes, so the code is easy to read and to copy by hand. */
+	static Email confirmCode(String code) {
+		String title = "Confirm your email";
+		String intro = "Enter this code to confirm your email and sign in to your Sodo Gebeya account. It works for 5 minutes.";
+		String html = frame(title, "<p style=\"margin:0 0 20px;line-height:1.6\">" + esc(intro) + "</p>" + codeBoxes(code)
+				+ "<p style=\"margin:20px 0 0;font-size:13px;color:#6b7280;line-height:1.6\">Didn't try to sign in? Ignore this email and change your password. Never share this code.</p>");
+		String text = title + "\n\n" + intro + "\n\nYour code: " + code + "\n\nDidn't try to sign in? Ignore this email and change your password. Never share the code.\n\n— Sodo Gebeya";
+		return new Email("Your Sodo Gebeya confirmation code", html, text);
+	}
+
 	private static String codeBoxes(String code) {
 		StringBuilder row = new StringBuilder("<table role=\"presentation\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:0 auto\"><tr>");
 		for (int i = 0; i < code.length(); i++) {

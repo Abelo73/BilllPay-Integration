@@ -82,7 +82,85 @@ function EmailSignIn({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
   const t = useT()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const login = useMutation({ mutationFn: () => api.login(email, password), onSuccess: onSignedIn })
+  // set when the password was right but the email was never confirmed: a code is emailed and asked for here
+  const [confirm, setConfirm] = useState<{ maskedEmail: string; resendAt: number } | null>(null)
+  const [code, setCode] = useState('')
+  const codeRef = useRef<HTMLInputElement>(null)
+  const resendIn = useCountdown(confirm?.resendAt ?? 0)
+  const login = useMutation({
+    mutationFn: () => api.login(email, password),
+    onSuccess: onSignedIn,
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === 'EMAIL_NOT_VERIFIED') {
+        const wait = Number(e.body.resendInSeconds ?? 60)
+        setConfirm({ maskedEmail: String(e.body.maskedEmail ?? email), resendAt: Date.now() + wait * 1000 })
+        setCode('')
+        setTimeout(() => codeRef.current?.focus(), 50)
+      }
+    },
+  })
+  const confirmEmail = useMutation({
+    mutationFn: () => api.confirmEmail(email, password, code),
+    onSuccess: onSignedIn,
+    onError: (e) => {
+      if (e instanceof ApiError && (e.code === 'CODE_EXPIRED' || e.code === 'TOO_MANY_TRIES' || e.code === 'WRONG_CODE')) setCode('')
+    },
+  })
+
+  if (confirm) {
+    return (
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (code.length === 6) confirmEmail.mutate()
+        }}
+      >
+        <div className="rounded-xl bg-accent p-4 text-sm text-accent-foreground">
+          <p className="font-bold">{t('Confirm your email once')}</p>
+          <p className="mt-1">{t('We sent a 6-digit code to {email}. Enter it to sign in. You only need to do this once.', { email: confirm.maskedEmail })}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm-code">{t('6-digit code')}</Label>
+          <Input
+            ref={codeRef}
+            id="confirm-code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            className="h-14 text-center font-mono text-2xl font-bold tracking-[0.5em]"
+          />
+        </div>
+        <ErrorBox error={confirmEmail.error} />
+        <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={confirmEmail.isPending || code.length !== 6}>
+          {confirmEmail.isPending && <Loader2 className="animate-spin" />} {t('Confirm and sign in')}
+        </Button>
+        <div className="flex items-center justify-between text-sm">
+          <button
+            type="button"
+            className="flex min-h-11 items-center gap-1 font-semibold text-brand hover:underline"
+            onClick={() => {
+              setConfirm(null)
+              login.reset()
+            }}
+          >
+            <ArrowLeft className="size-4" /> {t('Change email')}
+          </button>
+          {resendIn > 0 ? (
+            <span className="text-muted-foreground">{t('Resend in {time}', { time: `0:${String(resendIn).padStart(2, '0')}` })}</span>
+          ) : (
+            <button type="button" className="min-h-11 font-semibold text-brand hover:underline" disabled={login.isPending} onClick={() => login.mutate()}>
+              {t('Send a new code')}
+            </button>
+          )}
+        </div>
+      </form>
+    )
+  }
+
   return (
     <form
       className="space-y-4"

@@ -81,15 +81,23 @@ public class EmailCodeService {
 
 	/** Emails a new code to this (already normalized) address. */
 	public CodeSent send(String email, ClientInfo client) {
-		return issue(email, client, false);
+		return issue(email, client, Purpose.SIGN_UP);
 	}
+
+	/** A code to confirm an existing account's email at sign-in. */
+	public CodeSent sendConfirm(String email, ClientInfo client) {
+		return issue(email, client, Purpose.CONFIRM);
+	}
+
+	/** Why a code was sent: each purpose has its own email. */
+	public enum Purpose { SIGN_UP, RESET, CONFIRM }
 
 	/** A code for a password reset (its own email, same limits). */
 	public CodeSent sendReset(String email, ClientInfo client) {
-		return issue(email, client, true);
+		return issue(email, client, Purpose.RESET);
 	}
 
-	private CodeSent issue(String email, ClientInfo client, boolean reset) {
+	private CodeSent issue(String email, ClientInfo client, Purpose purpose) {
 		Instant now = Instant.now();
 		String code = String.format("%06d", RANDOM.nextInt(1_000_000));
 		Long savedId = tx.execute(s -> {
@@ -113,7 +121,11 @@ public class EmailCodeService {
 			c.setIp(client == null ? null : client.ip());
 			return codes.save(c).getId();
 		});
-		Notification.Status status = reset ? notifications.onResetCode(savedId, email, code) : notifications.onSignUpCode(savedId, email, code);
+		Notification.Status status = switch (purpose) {
+			case RESET -> notifications.onResetCode(savedId, email, code);
+			case CONFIRM -> notifications.onConfirmCode(savedId, email, code);
+			case SIGN_UP -> notifications.onSignUpCode(savedId, email, code);
+		};
 		if (status == Notification.Status.FAILED) {
 			// the code never left: forget it, so the person can try again at once (no "wait 60 seconds")
 			tx.executeWithoutResult(s -> codes.deleteById(savedId));
