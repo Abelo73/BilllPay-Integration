@@ -1,11 +1,13 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, ChevronRight, KeyRound, Loader2, LogOut, MapPin, Package, Plus, ShieldAlert, Store, Trash2, UserRound } from 'lucide-react'
+import { Briefcase, Camera, ChevronRight, KeyRound, Loader2, LogOut, MapPin, MessageCircle, Package, Plus, ShieldAlert, Store, Trash2, UserRound } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { ImageCropDialog } from '@/components/image-crop'
 import { ToReview } from '@/components/reviews'
+import { LocationPicker } from '@/components/location-picker'
+import { ZoomPicture } from '@/components/zoom-picture'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -129,6 +131,7 @@ function Addresses() {
                 <p className="text-foreground">{a.recipientName} · {a.phone}</p>
                 <p>{a.addressLine}, {a.city}</p>
                 {a.notes && <p>{t('Note: {notes}', { notes: a.notes })}</p>}
+                {a.latitude != null && a.longitude != null && <p className="flex items-center gap-1 text-xs font-medium text-brand"><MapPin className="size-3.5" /> {t('Pin on the map')}</p>}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => setEditing({ id: a.id, form: toInput(a) })}>{t('Edit')}</Button>
@@ -183,6 +186,13 @@ function Addresses() {
                 <Label htmlFor="a-notes">{t('Notes for the rider')}</Label>
                 <Input id="a-notes" className="h-10" value={f.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
               </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>{t('Pin on the map (optional)')}</Label>
+                <LocationPicker
+                  value={f.latitude != null && f.longitude != null ? { lat: f.latitude, lng: f.longitude } : null}
+                  onChange={(pin) => setEditing((cur) => (cur ? { ...cur, form: { ...cur.form, latitude: pin?.lat ?? null, longitude: pin?.lng ?? null } } : cur))}
+                />
+              </div>
               <div className="flex gap-2 sm:col-span-2">
                 <Button type="submit" disabled={save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} {t('Save address')}</Button>
                 <Button type="button" variant="outline" onClick={() => setEditing(null)}>{t('Cancel')}</Button>
@@ -196,7 +206,16 @@ function Addresses() {
 }
 
 function toInput(a: Address): AddressInput {
-  return { label: a.label, recipientName: a.recipientName, phone: a.phone, addressLine: a.addressLine, city: a.city, notes: a.notes ?? '' }
+  return {
+    label: a.label,
+    recipientName: a.recipientName,
+    phone: a.phone,
+    addressLine: a.addressLine,
+    city: a.city,
+    notes: a.notes ?? '',
+    latitude: a.latitude,
+    longitude: a.longitude,
+  }
 }
 
 /** The profile picture, or the first letter of the name on a coloured circle when there is none. */
@@ -493,26 +512,73 @@ export function AccountPage() {
   const session = useSession((s) => s.session)
   const [params, setParams] = useSearchParams()
   if (!session) return <Navigate to="/login?next=/account" replace />
+  const user = session.user
+  const tab = params.get('tab') ?? 'orders'
+  const tiles = [
+    { label: t('Orders'), hint: t('Track and pay'), icon: Package, to: '/account', tone: 'bg-accent text-accent-foreground' },
+    { label: t('Chats'), hint: t('Talk to sellers'), icon: MessageCircle, to: '/chats', tone: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
+    { label: t('Addresses'), hint: t('Delivery places'), icon: MapPin, to: '/account?tab=addresses', tone: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' },
+    { label: t('Jobs'), hint: t('Work near you'), icon: Briefcase, to: '/jobs', tone: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
+  ]
   return (
-    <div className="mx-auto max-w-5xl space-y-8 px-4 py-12 sm:px-6">
-      <div className="flex items-center gap-4">
-        <Avatar user={session.user} size={56} />
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('Hi, {name}', { name: session.user.fullName.split(' ')[0] })}</h1>
-          <p className="text-sm text-muted-foreground">{userContact(session.user)}</p>
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-10">
+      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-brand p-5 text-primary-foreground shadow-lg sm:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 size-72 rounded-full bg-amber-300/10 blur-3xl" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
+          <ZoomPicture src={user.avatarUrl ?? null} alt={user.fullName} className="shrink-0">
+            <span className="block rounded-full ring-4 ring-white/30">
+              <Avatar user={user} size={88} />
+            </span>
+          </ZoomPicture>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-primary-foreground/75">{t('Welcome back')}</p>
+            <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{user.fullName}</h1>
+            <p className="truncate text-sm text-primary-foreground/80">{userContact(user)}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-white/15 px-2.5 py-1">{user.profilePublic ? t('Public profile on') : t('Profile private')}</span>
+              {user.area && <span className="rounded-full bg-white/15 px-2.5 py-1">{user.area}</span>}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="secondary" className="rounded-full">
+              <Link to="/sell"><Store /> {t('Sell')}</Link>
+            </Button>
+            {user.profilePublic && (
+              <Button asChild variant="outline" className="rounded-full border-white/40 bg-transparent text-white hover:bg-white/10 hover:text-white">
+                <Link to={`/people/${user.id}`}>{t('View public profile')}</Link>
+              </Button>
+            )}
+          </div>
         </div>
-        <Button asChild variant="outline" className="ml-auto rounded-full">
-          <Link to="/sell"><Store /> {t('Sell')}</Link>
-        </Button>
-      </div>
-      <Tabs value={params.get('tab') ?? 'orders'} onValueChange={(tab) => setParams(tab === 'orders' ? {} : { tab }, { replace: true })}>
-        <TabsList>
-          <TabsTrigger value="orders">{t('My orders')}</TabsTrigger>
-          <TabsTrigger value="addresses">{t('Addresses')}</TabsTrigger>
-          <TabsTrigger value="profile">{t('Profile')}</TabsTrigger>
-          <TabsTrigger value="security">{t('Security')}</TabsTrigger>
+      </section>
+
+      <nav aria-label={t('Quick links')} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {tiles.map((tile) => (
+          <Link
+            key={tile.label}
+            to={tile.to}
+            className="group flex flex-col gap-3 rounded-2xl border bg-card p-4 transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+          >
+            <span className={cn('grid size-10 place-items-center rounded-xl', tile.tone)}>
+              <tile.icon className="size-5" />
+            </span>
+            <span>
+              <span className="block font-semibold">{tile.label}</span>
+              <span className="block text-xs text-muted-foreground">{tile.hint}</span>
+            </span>
+          </Link>
+        ))}
+      </nav>
+
+      <Tabs value={tab} onValueChange={(next) => setParams(next === 'orders' ? {} : { tab: next }, { replace: true })}>
+        <TabsList className="flex w-full justify-start overflow-x-auto rounded-full bg-muted p-1">
+          <TabsTrigger value="orders" className="rounded-full">{t('My orders')}</TabsTrigger>
+          <TabsTrigger value="addresses" className="rounded-full">{t('Addresses')}</TabsTrigger>
+          <TabsTrigger value="profile" className="rounded-full">{t('Profile')}</TabsTrigger>
+          <TabsTrigger value="security" className="rounded-full">{t('Security')}</TabsTrigger>
         </TabsList>
-        <TabsContent value="orders" className="space-y-4 pt-4">
+        <TabsContent value="orders" className="space-y-4 pt-5">
           <ToReview />
           <div className="flex flex-wrap gap-2 text-sm">
             <Link to="/jobs" className="rounded-full border px-3 py-1.5 font-semibold hover:border-primary/40">{t('My jobs')}</Link>
@@ -521,9 +587,9 @@ export function AccountPage() {
           </div>
           <MyOrders />
         </TabsContent>
-        <TabsContent value="addresses" className="pt-4"><Addresses /></TabsContent>
-        <TabsContent value="profile" className="pt-4"><Profile /></TabsContent>
-        <TabsContent value="security" className="pt-4"><Security /></TabsContent>
+        <TabsContent value="addresses" className="pt-5"><Addresses /></TabsContent>
+        <TabsContent value="profile" className="pt-5"><Profile /></TabsContent>
+        <TabsContent value="security" className="pt-5"><Security /></TabsContent>
       </Tabs>
     </div>
   )

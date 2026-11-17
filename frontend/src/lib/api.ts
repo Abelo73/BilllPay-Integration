@@ -138,9 +138,17 @@ export type Address = {
   city: string
   notes: string | null
   isDefault: boolean
+  /** the pin on the map, if the person set one; only the owner sees it */
+  latitude: number | null
+  longitude: number | null
 }
 
-export type AddressInput = Omit<Address, 'id' | 'isDefault' | 'notes'> & { notes?: string; makeDefault?: boolean }
+export type AddressInput = Omit<Address, 'id' | 'isDefault' | 'notes' | 'latitude' | 'longitude'> & {
+  notes?: string
+  makeDefault?: boolean
+  latitude?: number | null
+  longitude?: number | null
+}
 
 /** checkoutUrl is null for cash on delivery: no BillPay page, go to the order page. */
 export type CheckoutResponse = { orderNumber: string; checkoutUrl: string | null; paymentMethod?: PaymentMethod }

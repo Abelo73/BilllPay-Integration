@@ -39,6 +39,10 @@ public class CustomerAddress {
 
 	private String notes;
 
+	/** The pin on the map, if the person set one (both or neither). */
+	private java.math.BigDecimal latitude;
+	private java.math.BigDecimal longitude;
+
 	@Column(name = "is_default")
 	private boolean defaultAddress;
 

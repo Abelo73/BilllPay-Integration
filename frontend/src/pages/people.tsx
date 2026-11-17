@@ -1,3 +1,4 @@
+import { ZoomPicture } from '@/components/zoom-picture'
 import { useQuery } from '@tanstack/react-query'
 import { MapPin } from 'lucide-react'
 import { Link, useParams } from 'react-router'
@@ -26,7 +27,9 @@ export function PublicProfilePage() {
     <div className="mx-auto max-w-md px-4 py-10">
       <Card>
         <CardContent className="space-y-4 p-6 text-center">
-          <Avatar name={p.firstName} url={p.avatarUrl} size={112} />
+          <ZoomPicture src={p.avatarUrl} alt={p.firstName}>
+            <Avatar name={p.firstName} url={p.avatarUrl} size={112} />
+          </ZoomPicture>
           <div>
             <h1 className="text-2xl font-bold">{p.firstName}</h1>
             {p.area && (

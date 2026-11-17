@@ -38,15 +38,19 @@ public class AddressController {
 			@NotBlank @Size(max = 300) String addressLine,
 			@NotBlank @Size(max = 100) String city,
 			@Size(max = 300) String notes,
-			Boolean makeDefault) {
+			Boolean makeDefault,
+			@jakarta.validation.constraints.DecimalMin("-90") @jakarta.validation.constraints.DecimalMax("90") Double latitude,
+			@jakarta.validation.constraints.DecimalMin("-180") @jakarta.validation.constraints.DecimalMax("180") Double longitude) {
 	}
 
 	public record AddressView(Long id, String label, String recipientName, String phone, String addressLine,
-			String city, String notes, boolean isDefault) {
+			String city, String notes, boolean isDefault, Double latitude, Double longitude) {
 
 		static AddressView of(CustomerAddress a) {
 			return new AddressView(a.getId(), a.getLabel(), a.getRecipientName(), a.getPhone(), a.getAddressLine(),
-					a.getCity(), a.getNotes(), a.isDefaultAddress());
+					a.getCity(), a.getNotes(), a.isDefaultAddress(),
+					a.getLatitude() == null ? null : a.getLatitude().doubleValue(),
+					a.getLongitude() == null ? null : a.getLongitude().doubleValue());
 		}
 	}
 
@@ -111,6 +115,12 @@ public class AddressController {
 		a.setAddressLine(req.addressLine().trim());
 		a.setCity(req.city().trim());
 		a.setNotes(req.notes() == null || req.notes().isBlank() ? null : req.notes().trim());
+		// the pin is both numbers or neither
+		if ((req.latitude() == null) != (req.longitude() == null)) {
+			throw new ApiException(HttpStatus.BAD_REQUEST, "PIN_INCOMPLETE", "Set both the latitude and the longitude, or neither.");
+		}
+		a.setLatitude(req.latitude() == null ? null : java.math.BigDecimal.valueOf(req.latitude()).setScale(6, java.math.RoundingMode.HALF_UP));
+		a.setLongitude(req.longitude() == null ? null : java.math.BigDecimal.valueOf(req.longitude()).setScale(6, java.math.RoundingMode.HALF_UP));
 	}
 
 	private static UUID me() {
