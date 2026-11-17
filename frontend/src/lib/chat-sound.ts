@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react'
  */
 
 const KEY = 'chat-sound'
+const VIBRATE_KEY = 'chat-vibrate'
 const listeners = new Set<() => void>()
 let ctx: AudioContext | null = null
 
@@ -26,20 +27,41 @@ export function setChatSoundOn(on: boolean) {
   listeners.forEach((l) => l())
 }
 
-/** Re-renders a component when the setting changes (also from another tab). */
+/** Vibrate on phones; on by default, its own switch (works even when sound is off). */
+export function chatVibrateOn(): boolean {
+  try {
+    return localStorage.getItem(VIBRATE_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+
+export function setChatVibrateOn(on: boolean) {
+  try {
+    localStorage.setItem(VIBRATE_KEY, on ? 'on' : 'off')
+  } catch {
+    // storage blocked: the setting lasts only for this page
+  }
+  listeners.forEach((l) => l())
+}
+
+function subscribeSettings(onChange: () => void) {
+  listeners.add(onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    listeners.delete(onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+/** Re-renders a component when the sound setting changes (also from another tab). */
 export function useChatSoundOn(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      listeners.add(onChange)
-      window.addEventListener('storage', onChange)
-      return () => {
-        listeners.delete(onChange)
-        window.removeEventListener('storage', onChange)
-      }
-    },
-    chatSoundOn,
-    () => true,
-  )
+  return useSyncExternalStore(subscribeSettings, chatSoundOn, () => true)
+}
+
+/** Re-renders a component when the vibrate setting changes. */
+export function useChatVibrateOn(): boolean {
+  return useSyncExternalStore(subscribeSettings, chatVibrateOn, () => true)
 }
 
 /** Call once on the first tap or key press anywhere; creates the audio context the browser allows after a gesture. */
@@ -52,8 +74,19 @@ export function unlockChatSound() {
   }
 }
 
-/** The chime, plus a short buzz on phones that support it. Nothing plays when the person has turned sound off. */
+/** A short buzz on phones that support it, if vibrate is on. */
+export function buzz() {
+  if (!chatVibrateOn()) return
+  try {
+    navigator.vibrate?.([120, 60, 120])
+  } catch {
+    // not supported
+  }
+}
+
+/** The chime (if sound is on) and the buzz (if vibrate is on). */
 export function playChime() {
+  buzz()
   if (!chatSoundOn()) return
   try {
     ctx ??= new AudioContext()
@@ -75,11 +108,6 @@ export function playChime() {
     })
   } catch {
     // audio blocked: the visual alert still shows
-  }
-  try {
-    navigator.vibrate?.(120)
-  } catch {
-    // not supported
   }
 }
 

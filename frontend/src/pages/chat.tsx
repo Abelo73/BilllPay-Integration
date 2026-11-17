@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Ban, Camera, Flag, HandCoins, Loader2, MoreVertical, Send, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, Ban, Camera, Check, CheckCheck, Flag, HandCoins, Loader2, MoreVertical, Send, ShieldAlert } from 'lucide-react'
 import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
-import { ChatSoundToggle } from '@/components/message-alerts'
+import { ChatAlertSettings } from '@/components/message-alerts'
 import { subscribeLive, useLiveConnected } from '@/lib/live'
 import { chatApi, type ChatMessage, type ChatOffer, type ReportReason } from '@/lib/chat-api'
 import { playChime } from '@/lib/chat-sound'
@@ -62,35 +62,47 @@ function OfferCard({ offer, onAnswer, busy }: { offer: ChatOffer; onAnswer: (a: 
   )
 }
 
-function Bubble({ m, onAnswer, busy }: { m: ChatMessage; onAnswer: (offerId: number, a: 'accept' | 'decline' | 'withdraw') => void; busy: boolean }) {
+/**
+ * One message. Messages from the same person in a row are grouped: they sit close together, and only the last of the
+ * group shows its time and the speech-bubble tail.
+ */
+function Bubble({ m, grouped, last, onAnswer, busy }: {
+  m: ChatMessage
+  grouped: boolean
+  last: boolean
+  onAnswer: (offerId: number, a: 'accept' | 'decline' | 'withdraw') => void
+  busy: boolean
+}) {
   const t = useT()
   if (m.kind === 'SYSTEM') {
-    return <p className="mx-auto max-w-xs rounded-full bg-muted px-3 py-1 text-center text-xs text-muted-foreground">{m.body}</p>
+    return <p className="mx-auto my-2 max-w-xs rounded-full bg-background px-3 py-1 text-center text-xs text-muted-foreground shadow-sm">{m.body}</p>
   }
+  const tail = last ? (m.mine ? 'rounded-br-md' : 'rounded-bl-md') : ''
   return (
-    <div className={cn('flex flex-col gap-1', m.mine ? 'items-end' : 'items-start')}>
+    <div className={cn('flex flex-col', m.mine ? 'items-end' : 'items-start', grouped ? 'mt-0.5' : 'mt-3')}>
       {m.kind === 'OFFER' && m.offer ? (
         <OfferCard offer={m.offer} busy={busy} onAnswer={(a) => onAnswer(m.offer!.id, a)} />
       ) : m.kind === 'IMAGE' && m.imageUrl ? (
-        <a href={m.imageUrl} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-2xl border">
-          <img src={m.imageUrl} alt={t('Photo in chat')} className="max-h-64 max-w-[16rem] object-cover" />
+        <a href={m.imageUrl} target="_blank" rel="noreferrer" className={cn('block max-w-[80%] overflow-hidden rounded-2xl shadow-sm', tail)}>
+          <img src={m.imageUrl} alt={t('Photo in chat')} className="max-h-72 max-w-[18rem] object-cover" />
         </a>
       ) : (
         <p
           className={cn(
-            'max-w-[78%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-[15px] leading-snug',
-            m.mine ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md border bg-card',
+            'max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2 text-[15px] leading-relaxed shadow-sm',
+            m.mine ? 'bg-primary text-primary-foreground' : 'border bg-card',
+            tail,
           )}
         >
           {m.body}
         </p>
       )}
       {m.flagged && !m.mine && (
-        <p className="flex max-w-[78%] items-start gap-1.5 text-xs font-medium text-destructive">
+        <p className="mt-1 flex max-w-[80%] items-start gap-1.5 text-xs font-medium text-destructive">
           <ShieldAlert className="mt-0.5 size-3.5 shrink-0" /> {t('Careful: never pay outside Sodo Gebeya or before you get the item.')}
         </p>
       )}
-      <span className="px-1 text-[11px] text-muted-foreground">{chatTime(m.createdAt)}</span>
+      {last && <span className="mt-1 px-1 text-[11px] text-muted-foreground">{chatTime(m.createdAt)}</span>}
     </div>
   )
 }
@@ -111,6 +123,7 @@ export function ChatPage() {
   const [details, setDetails] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const live = useLiveConnected()
   // when the other side is typing: the server says so on each poll, and a live "typing" event shows it at once
@@ -158,6 +171,13 @@ export function ChatPage() {
   }, [newestIncoming])
 
   // tell the other side we are typing, at most every 2.5 s
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`
+  }, [text])
+
   const lastTyping = useRef(0)
   const typingPing = () => {
     const now = Date.now()
@@ -220,6 +240,15 @@ export function ChatPage() {
   const lastMineId = [...(th?.messages ?? [])].reverse().find((m) => m.mine && m.kind !== 'SYSTEM')?.id
   const lastMine = th?.messages.find((m) => m.id === lastMineId)
   const seen = !!lastMine && !!th?.other?.readAt && new Date(th.other.readAt).getTime() >= new Date(lastMine.createdAt).getTime()
+  const typingNow = !!th?.other?.typing || typingUntil > Date.now()
+  const dayLabel = (iso: string) => {
+    const d = new Date(iso)
+    const today = new Date()
+    const yesterday = new Date(today.getTime() - 86_400_000)
+    if (d.toDateString() === today.toDateString()) return t('Today')
+    if (d.toDateString() === yesterday.toDateString()) return t('Yesterday')
+    return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })
+  }
 
   return (
     <div className="mx-auto flex h-[calc(100svh-8rem)] max-w-2xl flex-col md:h-[calc(100svh-5rem)] md:py-4">
@@ -239,7 +268,7 @@ export function ChatPage() {
             </p>
             {th?.other && !iBlocked && (
               <p className="truncate text-xs font-semibold">
-                {th.other.typing || typingUntil > Date.now() ? (
+                {typingNow ? (
                   <span className="text-primary">{t('typing…')}</span>
                 ) : th.other.online ? (
                   <span className="text-primary">● {t('Online')}</span>
@@ -249,7 +278,7 @@ export function ChatPage() {
               </p>
             )}
           </div>
-          <ChatSoundToggle />
+          <ChatAlertSettings />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-11" aria-label={t('More options')}><MoreVertical /></Button>
@@ -280,22 +309,40 @@ export function ChatPage() {
         )}
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto bg-background px-3 py-4 md:border-x">
+      <div className="flex-1 overflow-y-auto bg-muted/30 px-3 py-3 md:border-x">
         <div role="note" className="flex gap-2 rounded-xl bg-amber-soft p-3 text-xs leading-relaxed text-amber-ink">
           <ShieldAlert className="size-4 shrink-0" />
           {t("Keep payments on Sodo Gebeya so you're protected. Never send money by phone transfer before you receive the item.")}
         </div>
         {thread.isLoading && <Loader2 className="mx-auto animate-spin text-muted-foreground" />}
-        {th?.messages.map((m) => (
-          <Fragment key={m.id}>
-            <Bubble m={m} busy={answer.isPending} onAnswer={(offerId, a) => answer.mutate({ offerId, a })} />
-            {m.id === lastMineId && (
-              <p className={cn('-mt-2 text-[11px] font-semibold', seen ? 'text-primary' : 'text-muted-foreground', m.mine ? 'text-right' : '')}>
-                {seen ? t('Seen') : t('Sent')}
-              </p>
-            )}
-          </Fragment>
-        ))}
+        {th?.messages.map((m, i, all) => {
+          const prev = all[i - 1]
+          const next = all[i + 1]
+          const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString()
+          const grouped = !newDay && !!prev && prev.kind !== 'SYSTEM' && m.kind !== 'SYSTEM' && prev.mine === m.mine
+          const last = !next || next.kind === 'SYSTEM' || m.kind === 'SYSTEM' || next.mine !== m.mine || new Date(next.createdAt).toDateString() !== new Date(m.createdAt).toDateString()
+          return (
+            <Fragment key={m.id}>
+              {newDay && <p className="my-3 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{dayLabel(m.createdAt)}</p>}
+              <Bubble m={m} grouped={grouped} last={last} busy={answer.isPending} onAnswer={(offerId, a) => answer.mutate({ offerId, a })} />
+              {m.id === lastMineId && (
+                <p className={cn('mt-1 flex items-center justify-end gap-1 text-[11px] font-semibold', seen ? 'text-primary' : 'text-muted-foreground')}>
+                  {seen ? <CheckCheck className="size-3.5" /> : <Check className="size-3.5" />}
+                  {seen ? t('Seen') : t('Sent')}
+                </p>
+              )}
+            </Fragment>
+          )
+        })}
+        {typingNow && (
+          <div className="mt-3 flex items-start">
+            <span aria-label={t('typing…')} className="flex items-center gap-1 rounded-2xl rounded-bl-md border bg-card px-3.5 py-3 shadow-sm">
+              {[0, 1, 2].map((dot) => (
+                <span key={dot} className="size-1.5 animate-bounce rounded-full bg-muted-foreground" style={{ animationDelay: `${dot * 150}ms` }} />
+              ))}
+            </span>
+          </div>
+        )}
         <div ref={endRef} />
       </div>
 
@@ -304,7 +351,7 @@ export function ChatPage() {
           {iBlocked ? t('You blocked this conversation. Unblock it from the menu to write again.') : t('This conversation is blocked.')}
         </p>
       ) : (
-        <div className="space-y-2 border-t bg-card p-3 md:rounded-b-2xl md:border">
+        <div className="space-y-2 border-t bg-card p-2.5 md:rounded-b-2xl md:border">
           {offerOpen && (
             <form
               className="flex flex-wrap items-end gap-2 rounded-xl border border-warning bg-amber-soft/50 p-2"
@@ -325,7 +372,7 @@ export function ChatPage() {
             </form>
           )}
           <form
-            className="flex items-center gap-2"
+            className="flex items-end gap-1.5"
             onSubmit={(e) => {
               e.preventDefault()
               if (text.trim()) send.mutate()
@@ -342,27 +389,51 @@ export function ChatPage() {
                 e.target.value = ''
               }}
             />
-            <Button type="button" variant="ghost" size="icon" className="size-11 shrink-0" aria-label={t('Send a photo')} disabled={photo.isPending} onClick={() => fileRef.current?.click()}>
-              {photo.isPending ? <Loader2 className="animate-spin" /> : <Camera />}
+            <Button type="button" variant="ghost" size="icon" className="size-10 shrink-0 rounded-full text-muted-foreground" aria-label={t('Send a photo')} disabled={photo.isPending} onClick={() => fileRef.current?.click()}>
+              {photo.isPending ? <Loader2 className="animate-spin" /> : <Camera className="size-5" />}
             </Button>
-            <Button type="button" variant="outline" className="h-11 shrink-0 border-warning" aria-expanded={offerOpen} onClick={() => setOfferOpen(!offerOpen)}>
-              <HandCoins /> {t('Offer')}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn('size-10 shrink-0 rounded-full', offerOpen ? 'bg-amber-soft text-amber-ink' : 'text-muted-foreground')}
+              aria-label={t('Make an offer')}
+              title={t('Make an offer')}
+              aria-expanded={offerOpen}
+              onClick={() => setOfferOpen(!offerOpen)}
+            >
+              <HandCoins className="size-5" />
             </Button>
-            <label className="min-w-0 flex-1">
+            <label className="flex min-w-0 flex-1 items-end rounded-3xl border bg-background px-4 transition-shadow focus-within:ring-2 focus-within:ring-ring/40">
               <span className="sr-only">{t('Message')}</span>
-              <Input
+              <textarea
+                ref={inputRef}
+                rows={1}
                 value={text}
                 onChange={(e) => {
                   setText(e.target.value)
                   if (e.target.value) typingPing()
                 }}
+                onKeyDown={(e) => {
+                  // Enter sends; Shift+Enter starts a new line
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    if (text.trim() && !send.isPending) send.mutate()
+                  }
+                }}
                 placeholder={t('Write a message…')}
                 maxLength={2000}
-                className="h-11 rounded-full"
+                className="block max-h-32 min-h-11 w-full resize-none bg-transparent py-3 text-[15px] leading-snug outline-none placeholder:text-muted-foreground"
               />
             </label>
-            <Button type="submit" size="icon" className="size-11 shrink-0 rounded-full" aria-label={t('Send')} disabled={send.isPending || !text.trim()}>
-              {send.isPending ? <Loader2 className="animate-spin" /> : <Send />}
+            <Button
+              type="submit"
+              size="icon"
+              className={cn('size-10 shrink-0 rounded-full transition-colors', text.trim() ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}
+              aria-label={t('Send')}
+              disabled={send.isPending || !text.trim()}
+            >
+              {send.isPending ? <Loader2 className="animate-spin" /> : <Send className="size-[18px]" />}
             </Button>
           </form>
         </div>

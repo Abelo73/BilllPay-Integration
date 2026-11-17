@@ -1,18 +1,29 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Volume2, VolumeX } from 'lucide-react'
+import { Vibrate, Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { chatApi } from '@/lib/chat-api'
 import { startLive, stopLive, subscribeLive, useLiveConnected } from '@/lib/live'
 import {
   askForNotifications,
+  buzz,
   notifyIfHidden,
   playChime,
   setChatSoundOn,
+  setChatVibrateOn,
   unlockChatSound,
   useChatSoundOn,
+  useChatVibrateOn,
 } from '@/lib/chat-sound'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -109,27 +120,46 @@ export function MessageAlerts() {
   return null
 }
 
-/** The speaker button: sound on or off for chat, remembered on this device. */
-export function ChatSoundToggle({ className }: { className?: string }) {
+/** The alerts menu: Sound and Vibrate, each on or off, remembered on this device. */
+export function ChatAlertSettings({ className }: { className?: string }) {
   const t = useT()
-  const on = useChatSoundOn()
+  const sound = useChatSoundOn()
+  const vibrate = useChatVibrateOn()
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className={cn('size-11', className)}
-      aria-pressed={on}
-      aria-label={on ? t('Turn message sound off') : t('Turn message sound on')}
-      title={on ? t('Message sound: on') : t('Message sound: off')}
-      onClick={() => {
-        unlockChatSound()
-        if (!on) askForNotifications()
-        setChatSoundOn(!on)
-        if (!on) playChime() // a short chime, so they know it works
-      }}
-    >
-      {on ? <Volume2 /> : <VolumeX />}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className={cn('size-11', className)} aria-label={t('Message alerts')}>
+          {sound ? <Volume2 /> : <VolumeX />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel>{t('Message alerts')}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={sound}
+          onCheckedChange={(on) => {
+            unlockChatSound()
+            if (on) {
+              askForNotifications()
+              setChatSoundOn(true)
+              playChime()
+            } else {
+              setChatSoundOn(false)
+            }
+          }}
+        >
+          <Volume2 className="size-4" /> {t('Sound')}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={vibrate}
+          onCheckedChange={(on) => {
+            setChatVibrateOn(!!on)
+            if (on) buzz()
+          }}
+        >
+          <Vibrate className="size-4" /> {t('Vibrate')}
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
