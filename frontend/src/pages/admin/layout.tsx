@@ -435,6 +435,17 @@ export function AdminLayout() {
                 </p>
               </div>
             )}
+            {/* the shop, in a new tab, to see it as a customer does; visible on phones too (the sidebar is hidden there) */}
+            <a
+              href="/"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View store"
+              title="View the store as a customer sees it (opens in a new tab)"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <ExternalLink className="size-4" /> <span className="hidden sm:inline">View store</span>
+            </a>
             <ThemeToggle />
             <Button variant="ghost" size="icon-sm" onClick={logout} aria-label="Log out" title="Log out">
               <LogOut />
