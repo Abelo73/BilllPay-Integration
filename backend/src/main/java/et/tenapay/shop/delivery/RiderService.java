@@ -36,6 +36,7 @@ public class RiderService {
 	private final OrderParcelRepository parcels;
 	private final OrderService orderService;
 	private final InboxService inbox;
+	private final RiderShareService riderShare;
 
 	public record RiderRow(Long id, String name, String phone, String note, boolean active) {
 
@@ -105,6 +106,7 @@ public class RiderService {
 		parcel.setRiderId(riderId);
 		parcel.setRiderAssignedAt(Instant.now());
 		if (changed) {
+			riderShare.issueFor(parcel, r.getId(), r.getPhone(), orderNumber); // their personal location link, by SMS
 			orderService.note(order, "RIDER_ASSIGNED", "Parcel " + number + ": " + r.getName() + " (" + r.getPhone() + ")");
 			inbox.notify(order.getUserId(), InboxItem.Kind.DELIVERY, "A rider is bringing your order",
 					r.getName() + " (" + r.getPhone() + ") will bring " + number + ".", "/orders/track?order=" + orderNumber,

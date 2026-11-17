@@ -33,6 +33,7 @@ import { OrderTrackingPage } from '@/pages/order-tracking'
 import { ProductPage } from '@/pages/product'
 import { PublicProfilePage } from '@/pages/people'
 import { ForgotPasswordPage } from '@/pages/forgot-password'
+import { RiderTrackPage } from '@/pages/rider-track'
 import { ShopPage } from '@/pages/shop'
 import { CategoriesPage } from '@/pages/categories'
 import { ShopPublicPage } from '@/pages/shop-page'
@@ -86,6 +87,7 @@ const router = createBrowserRouter([
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
+      { path: '/rider/track/:secret', element: <RiderTrackPage /> },
       { path: '/account', element: <AccountPage /> },
       { path: '/chats', element: <ChatsPage /> },
       { path: '/chats/:id', element: <ChatPage /> },

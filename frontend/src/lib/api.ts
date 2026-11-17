@@ -143,6 +143,9 @@ export type Address = {
   longitude: number | null
 }
 
+/** Where the rider is right now, for the buyer's order (only while the parcel is on the way and the point is fresh). */
+export type RiderLive = { parcelNo: number; latitude: number; longitude: number; travelMode: 'CAR' | 'WALK'; updatedAt: string }
+
 export type AddressInput = Omit<Address, 'id' | 'isDefault' | 'notes' | 'latitude' | 'longitude'> & {
   notes?: string
   makeDefault?: boolean
@@ -276,6 +279,8 @@ export async function request<T>(path: string, init?: RequestInit, retried = fal
 export type PublicProfile = { id: string; firstName: string; avatarUrl: string | null; bio: string | null; area: string | null; joinedAt: string }
 
 export const api = {
+  /** The rider's live position on a signed-in buyer's order (empty when none). */
+  riderLocation: (orderNumber: string) => request<RiderLive[]>(`/orders/${encodeURIComponent(orderNumber)}/rider-location`),
   /** `spec.<key>`: detail filters, e.g. { 'spec.brand': 'Samsung' } */
   products: (params: { category?: string; q?: string; sort?: string; page?: number; size?: number; shop?: string; minPrice?: string; maxPrice?: string; area?: string; near?: string; condition?: string; [spec: `spec.${string}`]: string }) => {
     const qs = new URLSearchParams()

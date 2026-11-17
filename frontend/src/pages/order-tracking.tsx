@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
+import { api } from '@/lib/api'
+import { useSession } from '@/store/session'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -122,7 +124,7 @@ function ParcelCard({ p, orderNumber, multi }: { p: ParcelTracking; orderNumber:
       </div>
       <div className="grid lg:grid-cols-[1.25fr_1fr]">
         <div className="relative min-w-0">
-          <DeliveryMap p={p} />
+          <DeliveryMap p={p} orderNumber={orderNumber} />
           <p className="absolute bottom-2 left-2 z-[400] flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-full bg-background/90 px-2.5 py-1 text-[11px] text-muted-foreground shadow backdrop-blur">
             <Info className="size-3 shrink-0" /> {t('Rider position is estimated from the delivery steps, not live GPS.')}
           </p>
@@ -189,9 +191,19 @@ function ParcelCard({ p, orderNumber, multi }: { p: ParcelTracking; orderNumber:
 const pin = (html: string, size = 36) =>
   L.divIcon({ html, className: 'sodo-pin', iconSize: [size, size], iconAnchor: [size / 2, size / 2] })
 
-function DeliveryMap({ p }: { p: ParcelTracking }) {
+function DeliveryMap({ p, orderNumber }: { p: ParcelTracking; orderNumber: string }) {
   const t = useT()
   const el = useRef<HTMLDivElement>(null)
+  // the rider's live point, for a signed-in buyer, while the parcel is on the way
+  const session = useSession((s) => s.session)
+  const live = useQuery({
+    queryKey: ['rider-live', orderNumber],
+    queryFn: () => api.riderLocation(orderNumber),
+    enabled: !!session && p.fulfilmentStatus === 'SHIPPED',
+    refetchInterval: 10_000,
+    retry: false,
+    select: (list) => list.find((x) => x.parcelNo === p.parcelNo) ?? null,
+  }).data ?? null
   // the rider pin moves on every half minute while the parcel is on the way
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -216,20 +228,37 @@ function DeliveryMap({ p }: { p: ParcelTracking }) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map)
     const { from, to } = ends
-    const riderAt: [number, number] = [from[0] + (to[0] - from[0]) * progress, from[1] + (to[1] - from[1]) * progress]
+    // the real point when the rider shares it; otherwise an estimate along the route
+    const estimate: [number, number] = [from[0] + (to[0] - from[0]) * progress, from[1] + (to[1] - from[1]) * progress]
+    const liveAt: [number, number] | null = live ? [live.latitude, live.longitude] : null
+    const riderAt = liveAt ?? estimate
     L.polyline([from, to], { className: 'sodo-route', weight: 4, dashArray: '6 8' }).addTo(map)
-    if (progress > 0) L.polyline([from, riderAt], { className: 'sodo-route-done', weight: 5 }).addTo(map)
+    if (progress > 0 || liveAt) L.polyline([from, riderAt], { className: 'sodo-route-done', weight: 5 }).addTo(map)
     L.marker(from, { icon: pin('<span class="sodo-pin-dot sodo-pin-shop">🏪</span>'), title: p.from.label }).addTo(map)
       .bindTooltip(p.from.label, { direction: 'top', offset: [0, -16] })
     L.marker(to, { icon: pin('<span class="sodo-pin-dot sodo-pin-home">🏠</span>'), title: p.to.label }).addTo(map)
       .bindTooltip(p.to.exact ? p.to.label : `${p.to.label} (${t('approximate')})`, { direction: 'top', offset: [0, -16] })
-    if (p.fulfilmentStatus !== 'CANCELLED' && progress > 0 && progress < 1) {
+    if (liveAt) {
+      const icon = live!.travelMode === 'CAR' ? '🚗' : '🚶'
+      L.marker(liveAt, { icon: pin(`<span class="sodo-pin-dot sodo-pin-rider">${icon}</span>`, 44), zIndexOffset: 1000 }).addTo(map)
+        .bindTooltip(p.riderName ?? t('Rider'), { direction: 'top', offset: [0, -20], permanent: true })
+    } else if (p.fulfilmentStatus !== 'CANCELLED' && progress > 0 && progress < 1) {
       L.marker(riderAt, { icon: pin('<span class="sodo-pin-dot sodo-pin-rider">🛵</span>', 44), zIndexOffset: 1000 }).addTo(map)
         .bindTooltip(p.riderName ?? t('Rider'), { direction: 'top', offset: [0, -20], permanent: true })
     }
-    map.fitBounds(L.latLngBounds([from, to]), { padding: [48, 48], maxZoom: 16 })
+    map.fitBounds(L.latLngBounds(liveAt ? [from, to, liveAt] : [from, to]), { padding: [48, 48], maxZoom: 16 })
     return () => { map.remove() }
-  }, [ends, progress, p.from.label, p.to.label, p.to.exact, p.fulfilmentStatus, p.riderName, t])
+  }, [ends, progress, live?.latitude, live?.longitude, live?.travelMode, p.from.label, p.to.label, p.to.exact, p.fulfilmentStatus, p.riderName, t])
 
-  return <div ref={el} className="sodo-map h-72 w-full bg-muted sm:h-96 lg:h-full lg:min-h-[26rem]" role="img" aria-label={t('Map of the delivery route')} />
+  const ageSeconds = live ? Math.max(0, Math.round((Date.now() - new Date(live.updatedAt).getTime()) / 1000)) : 0
+  return (
+    <div className="space-y-1">
+      <div ref={el} className="sodo-map h-72 w-full bg-muted sm:h-96 lg:h-full lg:min-h-[26rem]" role="img" aria-label={t('Map of the delivery route')} />
+      <p className="text-xs text-muted-foreground" role="status">
+        {live
+          ? t('Live: {mode}, updated {s} seconds ago', { mode: live.travelMode === 'CAR' ? t('driving') : t('walking'), s: ageSeconds })
+          : t('Estimated position on the route')}
+      </p>
+    </div>
+  )
 }
