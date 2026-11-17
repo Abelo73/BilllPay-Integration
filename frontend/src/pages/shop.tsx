@@ -15,6 +15,8 @@ import { recordInterest } from '@/lib/interests'
 import { specsApi } from '@/lib/specs-api'
 import { cn } from '@/lib/utils'
 import { PriceRange, SaveSearchButton } from '@/components/save-search'
+import { SearchSuggestions } from '@/components/search-suggestions'
+import { rememberSearch } from '@/lib/recent-searches'
 
 export function ShopPage() {
   const t = useT()
@@ -30,6 +32,7 @@ export function ShopPage() {
   const [near, setNear] = useMyArea()
   const areas = useQuery({ queryKey: ['areas'], queryFn: publicTrustApi.areas, staleTime: 10 * 60_000 })
   const [search, setSearch] = useState(q)
+  const [typing, setTyping] = useState(false)
 
   const update = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(params)
@@ -43,7 +46,10 @@ export function ShopPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (search !== q) update({ q: search || null })
+      if (search !== q) {
+        update({ q: search || null })
+        rememberSearch(search)
+      }
     }, 300)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,7 +122,36 @@ export function ShopPage() {
         <div className="flex gap-2 lg:ml-auto">
           <div className="relative flex-1 lg:w-64">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Search products')} className="pl-8" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setTyping(false)
+                  update({ q: search.trim() || null })
+                  rememberSearch(search)
+                }
+                if (e.key === 'Escape') setTyping(false)
+              }}
+              placeholder={t('Search products')}
+              className="pl-8"
+              role="combobox"
+              aria-expanded={typing}
+              aria-autocomplete="list"
+            />
+            {typing && (
+              <SearchSuggestions
+                term={search}
+                onPick={(picked) => {
+                  setSearch(picked)
+                  setTyping(false)
+                  update({ q: picked || null })
+                  rememberSearch(picked)
+                }}
+              />
+            )}
           </div>
           <Select value={sort} onValueChange={(v) => update({ sort: v === 'newest' ? null : v })}>
             <SelectTrigger className="w-40" aria-label={t('Sort')}>
