@@ -99,11 +99,30 @@ final class EmailTemplates {
 	/** Forgot password: a code to type on the reset page. Only the person who owns the email gets it. */
 	static Email resetCode(String code) {
 		String title = "Reset your password";
-		String body = "Use this code to set a new password for your Sodo Gebeya account. It works for 5 minutes. If you didn't ask"
-				+ " for this, ignore this email: your password stays the same. Never share the code, not even with our staff.";
-		String html = frame(title, "<p style=\"margin:0 0 16px\">" + esc(body) + "</p><p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:0\">"
-				+ esc(code) + "</p>");
-		return new Email("Your Sodo Gebeya password reset code", html, title + "\n\n" + body + "\n\n" + code + "\n\n— Sodo Gebeya");
+		String intro = "Someone asked to reset the password for your Sodo Gebeya account. Enter this code on the reset page to choose a new password.";
+		String html = frame(title, "<p style=\"margin:0 0 20px;line-height:1.6\">" + esc(intro) + "</p>"
+				+ codeBoxes(code)
+				+ "<p style=\"margin:20px 0 0;text-align:center\"><span style=\"display:inline-block;background:#FDF3E1;color:#8A5A00;border-radius:999px;padding:6px 14px;font-size:13px;font-weight:700\">Expires in 5 minutes</span></p>"
+				+ "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:24px 0 8px\"><tr><td style=\"background:#F3F7F5;border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.6;color:#374151\">"
+				+ "<strong style=\"color:#0B3F2F\">Didn't ask for this?</strong> Ignore this email. Your password stays the same, and nobody can use this code without it."
+				+ "</td></tr></table>"
+				+ "<p style=\"margin:16px 0 0;font-size:13px;color:#6b7280;line-height:1.6\">Never share this code. Sodo Gebeya staff will never ask for it.</p>");
+		String text = title + "\n\n" + intro + "\n\nYour code: " + code + "\n\nIt expires in 5 minutes. Didn't ask for this? Ignore this email; your password stays the same. Never share the code.\n\n— Sodo Gebeya";
+		return new Email("Your Sodo Gebeya password reset code", html, text);
+	}
+
+	/** The six digits in separate boxes, so the code is easy to read and to copy by hand. */
+	private static String codeBoxes(String code) {
+		StringBuilder row = new StringBuilder("<table role=\"presentation\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" style=\"margin:0 auto\"><tr>");
+		for (int i = 0; i < code.length(); i++) {
+			if (i > 0) {
+				row.append("<td style=\"width:8px\"></td>");
+			}
+			row.append("<td align=\"center\" style=\"width:46px;height:58px;border:2px solid #14734F;border-radius:12px;background:#F3FAF7;"
+					+ "font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:28px;font-weight:800;color:#0B3F2F\">")
+					.append(esc(String.valueOf(code.charAt(i)))).append("</td>");
+		}
+		return row.append("</tr></table>").toString();
 	}
 
 	/** No code in the subject: subjects are stored in the notifications table and shown in the admin. */
