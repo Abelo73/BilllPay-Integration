@@ -6,6 +6,7 @@ import { Link, Navigate } from 'react-router'
 import { ChatSoundToggle } from '@/components/message-alerts'
 import { Button } from '@/components/ui/button'
 import { chatApi, type Conversation } from '@/lib/chat-api'
+import { useLiveConnected } from '@/lib/live'
 import { t as tNow, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
@@ -76,12 +77,13 @@ export function ChatsPage() {
   const t = useT()
   const session = useSession((s) => s.session)
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>('all')
+  const live = useLiveConnected()
   const { data, isLoading } = useQuery({
     queryKey: ['chats', filter],
     queryFn: () => chatApi.list(filter),
     enabled: !!session,
     placeholderData: keepPreviousData,
-    refetchInterval: 10_000,
+    refetchInterval: live ? 60_000 : 10_000,
   })
   if (!session) return <Navigate to="/login?next=/chats" replace />
 

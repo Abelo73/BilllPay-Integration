@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Ban, Camera, Flag, HandCoins, Loader2, MoreVertical, Send, ShieldAlert } from 'lucide-react'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useReducer, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
 import { ChatSoundToggle } from '@/components/message-alerts'
+import { subscribeLive, useLiveConnected } from '@/lib/live'
 import { chatApi, type ChatMessage, type ChatOffer, type ReportReason } from '@/lib/chat-api'
 import { playChime } from '@/lib/chat-sound'
 import { formatETB } from '@/lib/format'
@@ -111,11 +112,32 @@ export function ChatPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
 
+  const live = useLiveConnected()
+  // when the other side is typing: the server says so on each poll, and a live "typing" event shows it at once
+  const [typingUntil, setTypingUntil] = useState(0)
+  const [, repaint] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    return subscribeLive(({ type, data }) => {
+      if (type === 'typing' && data.conversationId === id) {
+        setTypingUntil(Date.now() + 4000)
+        qc.invalidateQueries({ queryKey: ['chat', id] })
+      }
+      if (type === 'chat' && data.conversationId === id) qc.invalidateQueries({ queryKey: ['chat', id] })
+    })
+  }, [id, qc])
+  useEffect(() => {
+    const ms = typingUntil - Date.now()
+    if (ms <= 0) return
+    const timer = window.setTimeout(repaint, ms + 50)
+    return () => window.clearTimeout(timer)
+  }, [typingUntil])
+
   const thread = useQuery({
     queryKey: ['chat', id],
     queryFn: () => chatApi.thread(id),
     enabled: !!session && Number.isFinite(id),
-    refetchInterval: 2500,
+    // new messages, typing and read receipts arrive live; the timer is only a safety net while the stream is up
+    refetchInterval: live ? 15_000 : 2500,
     retry: (n, e) => !(e instanceof ApiError && e.status === 404) && n < 2,
   })
   const count = thread.data?.messages.length ?? 0
@@ -217,7 +239,7 @@ export function ChatPage() {
             </p>
             {th?.other && !iBlocked && (
               <p className="truncate text-xs font-semibold">
-                {th.other.typing ? (
+                {th.other.typing || typingUntil > Date.now() ? (
                   <span className="text-primary">{t('typing…')}</span>
                 ) : th.other.online ? (
                   <span className="text-primary">● {t('Online')}</span>

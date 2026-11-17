@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useLiveConnected } from '@/lib/live'
 import { Bell } from 'lucide-react'
 import { Link } from 'react-router'
 
@@ -12,7 +13,8 @@ export function InboxBell() {
   const t = useT()
   const session = useSession((s) => s.session)
   const enabled = !!session && session.user.role === 'CUSTOMER'
-  const { data } = useQuery({ queryKey: ['inbox-unread', session?.user.id], queryFn: inboxApi.unread, enabled, refetchInterval: 30_000 })
+  const live = useLiveConnected()
+  const { data } = useQuery({ queryKey: ['inbox-unread', session?.user.id], queryFn: inboxApi.unread, enabled, refetchInterval: live ? 120_000 : 30_000 })
   if (!enabled) return null
   const n = data?.unread ?? 0
   return (

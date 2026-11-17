@@ -1,10 +1,11 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Volume2, VolumeX } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
 import { chatApi } from '@/lib/chat-api'
+import { startLive, stopLive, subscribeLive, useLiveConnected } from '@/lib/live'
 import {
   askForNotifications,
   notifyIfHidden,
@@ -30,13 +31,37 @@ export function MessageAlerts() {
   const session = useSession((s) => s.session)
   const customer = session?.user.role === 'CUSTOMER'
   const seen = useRef<number | null>(null)
+  const qc = useQueryClient()
+  const token = session?.token ?? null
+  const live = useLiveConnected()
 
   const unread = useQuery({
     queryKey: ['chat-unread'],
     queryFn: chatApi.unread,
     enabled: customer,
-    refetchInterval: 15_000,
+    // the live stream announces new messages; the timer is only a safety net while it is up
+    refetchInterval: live ? 60_000 : 15_000,
   })
+
+  // the live stream for this sign-in; new messages and notifications refresh the screens that show them
+  useEffect(() => {
+    if (token) startLive(token)
+    else stopLive()
+  }, [token])
+  useEffect(
+    () =>
+      subscribeLive(({ type, data }) => {
+        if (type === 'inbox') {
+          qc.invalidateQueries({ queryKey: ['inbox-unread'] })
+          qc.invalidateQueries({ queryKey: ['inbox'] })
+        } else if (type === 'chat') {
+          qc.invalidateQueries({ queryKey: ['chat-unread'] })
+          qc.invalidateQueries({ queryKey: ['chats'] })
+          if (data.conversationId) qc.invalidateQueries({ queryKey: ['chat', data.conversationId] })
+        }
+      }),
+    [qc],
+  )
 
   // the first tap or key press unlocks sound (browsers block it until the person has interacted)
   useEffect(() => {

@@ -74,12 +74,15 @@ public class ChatService {
 	private final TransactionTemplate tx;
 	private final et.tenapay.shop.inbox.InboxService inbox;
 	private final ChatPresence presence;
+	private final et.tenapay.shop.live.LiveHub live;
 
 	public ChatService(ConversationRepository conversations, ChatMessageRepository messages, ChatOfferRepository offers,
 			ChatReportRepository reports, ShopRepository shops, ProductRepository products, UserRepository users,
 			ImageProcessor images, MediaStorage storage, MediaProperties media, SmsService sms, AppProperties app,
-			TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox, ChatPresence presence) {
+			TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox, ChatPresence presence,
+			et.tenapay.shop.live.LiveHub live) {
 		this.presence = presence;
+		this.live = live;
 		this.conversations = conversations;
 		this.messages = messages;
 		this.offers = offers;
@@ -180,14 +183,22 @@ public class ChatService {
 
 	/** Messages after {@code afterId} (0 = the latest 50), and marks the conversation read. */
 	public Thread thread(UUID userId, Long conversationId, long afterId) {
-		return tx.execute(s -> {
+		record Opened(Thread thread, UUID tellOther) {
+		}
+		Opened opened = tx.execute(s -> {
 			Party p = party(userId, conversationId);
 			List<ChatMessage> list = afterId > 0 ? messages.after(conversationId, afterId, PageRequest.of(0, 200))
 					: messages.latest(conversationId, PageRequest.of(0, 50)).reversed();
+			Instant read = p.c().lastReadAt(p.side());
+			boolean hadUnread = read == null || read.isBefore(p.c().getLastMessageAt());
 			p.c().markRead(p.side(), Instant.now());
 			presence.touch(userId);
-			return new Thread(view(p, userId), messageViews(list, userId, p), p.c().getBlockedBy() == null, otherStatus(p));
+			Thread t = new Thread(view(p, userId), messageViews(list, userId, p), p.c().getBlockedBy() == null, otherStatus(p));
+			return new Opened(t, hadUnread ? recipientOf(p) : null);
 		});
+		// the other side's "Seen" changes: tell them, after the read is saved
+		tell(opened.tellOther(), "chat", conversationId);
+		return opened.thread();
 	}
 
 	/** The app pings this while it is open, so the other side sees this person as online. */
@@ -197,13 +208,28 @@ public class ChatService {
 
 	/** This person is typing in the conversation. Shown to the other side for a few seconds. */
 	public void typing(UUID userId, Long conversationId) {
-		tx.executeWithoutResult(s -> {
+		UUID to = tx.execute(s -> {
 			Party p = party(userId, conversationId);
-			if (p.c().getBlockedBy() == null) {
-				presence.typing(conversationId, p.side());
+			if (p.c().getBlockedBy() != null) {
+				return null;
 			}
+			presence.typing(conversationId, p.side());
+			return recipientOf(p);
 		});
 		presence.touch(userId);
+		tell(to, "typing", conversationId);
+	}
+
+	/** The person on the other side of this party, or null if the shop has no owner on record. */
+	private static UUID recipientOf(Party p) {
+		return p.side() == Conversation.Side.BUYER ? (p.shop() == null ? null : p.shop().getOwnerId()) : p.c().getBuyerId();
+	}
+
+	/** Live event to one person; ids only, the browser loads the content through the normal calls. */
+	private void tell(UUID to, String type, Long conversationId) {
+		if (to != null) {
+			live.publish(to, type, "{\"conversationId\":" + conversationId + "}");
+		}
 	}
 
 	private OtherStatus otherStatus(Party p) {
@@ -268,6 +294,7 @@ public class ChatService {
 		});
 		notifyInbox(saved.party(), userId, saved.preview());
 		nudgeBySms(saved.party(), userId);
+		tell(recipientOf(saved.party()), "chat", conversationId);
 		return saved.view();
 	}
 

@@ -12,6 +12,7 @@ import { useT } from '@/lib/i18n'
 import { inboxApi, type InboxItem, type InboxKind, type NotificationPrefs } from '@/lib/inbox-api'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/store/session'
+import { useLiveConnected } from '@/lib/live'
 
 const ICON: Record<InboxKind, typeof Bell> = {
   ORDER: Package,
@@ -90,7 +91,8 @@ export function NotificationsPage() {
   const session = useSession((s) => s.session)
   const qc = useQueryClient()
   const [page, setPage] = useState(0)
-  const { data } = useQuery({ queryKey: ['inbox', page], queryFn: () => inboxApi.list(page), enabled: !!session, placeholderData: keepPreviousData, refetchInterval: 30_000 })
+  const live = useLiveConnected()
+  const { data } = useQuery({ queryKey: ['inbox', page], queryFn: () => inboxApi.list(page), enabled: !!session, placeholderData: keepPreviousData, refetchInterval: live ? 120_000 : 30_000 })
   const readAll = useMutation({
     mutationFn: () => inboxApi.read(),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['inbox'] }); qc.invalidateQueries({ queryKey: ['inbox-unread'] }) },

@@ -3,10 +3,22 @@ package et.tenapay.shop.it;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -219,5 +231,55 @@ class ChatIntegrationTest extends IntegrationTest {
 		// a stranger can neither type in it nor learn anything from it
 		assertThat(post("/api/chats/" + id + "/typing", Map.of(), stranger).status()).isEqualTo(404);
 		assertThat(post("/api/chats/presence", Map.of(), stranger).status()).isEqualTo(200);
+	}
+
+	/** Waits for an event of this name on a stream read in the background. */
+	private static boolean sawEvent(BlockingQueue<String> lines, String name) throws InterruptedException {
+		long until = System.currentTimeMillis() + 10_000;
+		while (System.currentTimeMillis() < until) {
+			String line = lines.poll(300, TimeUnit.MILLISECONDS);
+			if (line != null && line.startsWith("event:") && line.substring(6).trim().equals(name)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	@Test
+	void liveStreamTellsTheOtherSideWhenSomethingHappens() throws Exception {
+		Seller s = seller("0912000030");
+		String buyer = customer("Lili Buyer", "0922000030");
+
+		// signed out: no stream
+		assertThat(get("/api/live/stream").status()).isEqualTo(401);
+
+		// the seller opens the live stream with their sign-in
+		HttpResponse<InputStream> stream = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(baseUrl() + "/api/live/stream"))
+				.header("Authorization", "Bearer " + s.token()).header("Accept", "text/event-stream").build(),
+				HttpResponse.BodyHandlers.ofInputStream());
+		assertThat(stream.statusCode()).isEqualTo(200);
+		BlockingQueue<String> lines = new LinkedBlockingQueue<>();
+		Thread reader = Thread.ofVirtual().start(() -> {
+			try (BufferedReader r = new BufferedReader(new InputStreamReader(stream.body(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = r.readLine()) != null) {
+					lines.add(line);
+				}
+			} catch (IOException closed) {
+				// the test closed the stream
+			}
+		});
+		try {
+			// a new message from the buyer reaches the seller's stream
+			long id = start(buyer, s.productId(), "Is this still available?");
+			assertThat(sawEvent(lines, "chat")).isTrue();
+
+			// typing reaches the seller's stream too
+			assertThat(post("/api/chats/" + id + "/typing", Map.of(), buyer).status()).isEqualTo(200);
+			assertThat(sawEvent(lines, "typing")).isTrue();
+		} finally {
+			stream.body().close();
+			reader.join(2000);
+		}
 	}
 }
