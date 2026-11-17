@@ -22,15 +22,16 @@ export function PriceRange({ min, max, onChange }: { min: string; max: string; o
   const apply = () => {
     if (a !== min || b !== max) onChange(a, b)
   }
-  const box = 'h-9 w-28 bg-card'
+  const box = 'h-10 w-full bg-card'
+  // "contents": the two boxes are items of the filter grid, so they line up with the other filters
   return (
-    <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); apply() }}>
-      <label className="space-y-1 text-xs font-medium text-muted-foreground">
-        {t('Price from')}
+    <form className="contents" onSubmit={(e) => { e.preventDefault(); apply() }}>
+      <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+        {t('Price from (birr)')}
         <Input type="number" min={0} inputMode="numeric" value={a} onChange={(e) => setA(e.target.value)} onBlur={apply} placeholder="0" className={box} />
       </label>
-      <label className="space-y-1 text-xs font-medium text-muted-foreground">
-        {t('to (birr)')}
+      <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+        {t('Price to (birr)')}
         <Input type="number" min={0} inputMode="numeric" value={b} onChange={(e) => setB(e.target.value)} onBlur={apply} placeholder={t('Any')} className={box} />
       </label>
       <button type="submit" className="sr-only">{t('Apply')}</button>

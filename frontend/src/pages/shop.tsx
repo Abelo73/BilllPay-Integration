@@ -110,17 +110,9 @@ export function ShopPage() {
         <p className="text-muted-foreground">{t('Everything in stock, priced in Ethiopian Birr.')}</p>
       </div>
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="flex flex-wrap gap-2">
-          <Chip active={!category} onClick={() => pickCategory(null)}>{t('All')}</Chip>
-          {all.filter((c) => !c.parentId).map((c) => (
-            <Chip key={c.slug} active={main?.id === c.id} onClick={() => pickCategory(c.slug)}>
-              {c.name}
-            </Chip>
-          ))}
-        </div>
-        <div className="flex gap-2 lg:ml-auto">
-          <div className="relative flex-1 lg:w-64">
+      <div className="mt-6 space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
@@ -154,7 +146,7 @@ export function ShopPage() {
             )}
           </div>
           <Select value={sort} onValueChange={(v) => update({ sort: v === 'newest' ? null : v })}>
-            <SelectTrigger className="w-40" aria-label={t('Sort')}>
+            <SelectTrigger className="h-10 w-44 shrink-0 bg-card sm:w-52" aria-label={t('Sort')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -165,56 +157,68 @@ export function ShopPage() {
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      {subs.length > 0 && main && (
-        <div className="mt-4 flex flex-wrap gap-2" aria-label={t('{name} types', { name: main.name })}>
-          <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>{t('All {name}', { name: main.name.toLowerCase() })}</SubChip>
-          {subs.map((s) => (
-            <SubChip key={s.slug} active={current?.id === s.id} onClick={() => pickCategory(s.slug)}>{s.name}</SubChip>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <Chip active={!category} onClick={() => pickCategory(null)}>{t('All')}</Chip>
+          {all.filter((c) => !c.parentId).map((c) => (
+            <Chip key={c.slug} active={main?.id === c.id} onClick={() => pickCategory(c.slug)}>
+              {c.name}
+            </Chip>
           ))}
         </div>
-      )}
 
-      <div className="mt-4 flex flex-wrap items-end gap-3">
-        <PriceRange min={minPrice} max={maxPrice} onChange={(a, b) => update({ minPrice: a || null, maxPrice: b || null })} />
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          {t('Condition')}
-          <select value={condition} onChange={(e) => update({ condition: e.target.value || null })}
-            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', condition && 'border-primary')}>
-            <option value="">{t('Any condition')}</option>
-            <option value="NEW">{t('New')}</option>
-            <option value="LIKE_NEW">{t('Like new')}</option>
-            <option value="USED">{t('Used')}</option>
-          </select>
-        </label>
-        <label className="space-y-1 text-xs font-medium text-muted-foreground">
-          {t('Area')}
-          <select value={area} onChange={(e) => update({ area: e.target.value || null })}
-            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', area && 'border-primary')}>
-            <option value="">{t('Anywhere in Sodo')}</option>
-            {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </label>
-        <label className="space-y-1 text-xs font-medium text-muted-foreground" title={t('Listings from your area come first')}>
-          {t('I am in (near me first)')}
-          <select value={near} onChange={(e) => setNear(e.target.value)}
-            className={cn('block h-9 min-w-32 rounded-lg border bg-card px-2 text-sm text-foreground', near && 'border-primary')}>
-            <option value="">{t('Not set')}</option>
-            {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </label>
-        <SaveSearchButton
-          className="ml-auto"
-          input={{
-            q: q || undefined,
-            category: category || undefined,
-            specs: Object.fromEntries(Object.entries(specFilters).map(([k, v]) => [k.slice(5), v])),
-            minPrice: minPrice ? Number(minPrice) : null,
-            maxPrice: maxPrice ? Number(maxPrice) : null,
-          }}
-          disabled={!q && !category}
-        />
+        {subs.length > 0 && main && (
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&>*]:shrink-0 [&>*]:whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label={t('{name} types', { name: main.name })}>
+            <SubChip active={current?.id === main.id} onClick={() => pickCategory(main.slug)}>{t('All {name}', { name: main.name.toLowerCase() })}</SubChip>
+            {subs.map((s) => (
+              <SubChip key={s.slug} active={current?.id === s.id} onClick={() => pickCategory(s.slug)}>{s.name}</SubChip>
+            ))}
+          </div>
+        )}
+
+        <div className="rounded-2xl border bg-card p-3 sm:p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <PriceRange min={minPrice} max={maxPrice} onChange={(a, b) => update({ minPrice: a || null, maxPrice: b || null })} />
+            <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+              {t('Condition')}
+              <select value={condition} onChange={(e) => update({ condition: e.target.value || null })}
+                className={cn('block h-10 w-full rounded-lg border bg-card px-3 text-sm text-foreground', condition && 'border-primary')}>
+                <option value="">{t('Any condition')}</option>
+                <option value="NEW">{t('New')}</option>
+                <option value="LIKE_NEW">{t('Like new')}</option>
+                <option value="USED">{t('Used')}</option>
+              </select>
+            </label>
+            <label className="space-y-1.5 text-xs font-semibold text-muted-foreground">
+              {t('Area')}
+              <select value={area} onChange={(e) => update({ area: e.target.value || null })}
+                className={cn('block h-10 w-full rounded-lg border bg-card px-3 text-sm text-foreground', area && 'border-primary')}>
+                <option value="">{t('Anywhere in Sodo')}</option>
+                {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1.5 text-xs font-semibold text-muted-foreground" title={t('Listings from your area come first')}>
+              {t('I am in (near me first)')}
+              <select value={near} onChange={(e) => setNear(e.target.value)}
+                className={cn('block h-10 w-full rounded-lg border bg-card px-3 text-sm text-foreground', near && 'border-primary')}>
+                <option value="">{t('Not set')}</option>
+                {areas.data?.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className="mt-3 flex justify-end">
+            <SaveSearchButton
+              input={{
+                q: q || undefined,
+                category: category || undefined,
+                specs: Object.fromEntries(Object.entries(specFilters).map(([k, v]) => [k.slice(5), v])),
+                minPrice: minPrice ? Number(minPrice) : null,
+                maxPrice: maxPrice ? Number(maxPrice) : null,
+              }}
+              disabled={!q && !category}
+            />
+          </div>
+        </div>
       </div>
 
       {!!facets.data?.facets.length && (
