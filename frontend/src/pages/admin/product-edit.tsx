@@ -12,12 +12,13 @@ import {
   Loader2,
   Minus,
   Plus,
+  Check,
   Save,
   Star,
   Trash2,
 } from 'lucide-react'
-import { createContext, useContext, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
@@ -548,7 +549,12 @@ function EditorPage() {
   const id = Number(productId)
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const [params] = useSearchParams()
   const { data, isLoading } = useQuery({ queryKey: [`${keyPrefix}-product`, id], queryFn: () => client.product(id), enabled: !isNew })
+  // a new product is made in guided steps; an existing one opened at a step (?step=) continues the same way
+  const wizard = isNew || params.has('step')
+  const step = params.get('step') ?? 'details'
+  const goto = (s: string) => navigate(`${basePath}/${id}?step=${s}`)
 
   const refresh = (d: ProductDetail) => {
     qc.setQueryData([`${keyPrefix}-product`, d.product.id], d)
@@ -569,6 +575,13 @@ function EditorPage() {
   if (!isNew && (isLoading || !data)) return <Skeleton className="h-96 rounded-xl" />
   const p = data?.product
 
+  const detailsSaved = (d: ProductDetail) => {
+    refresh(d)
+    toast.success(isNew ? t('Product created. Now add photos.') : t('Saved'))
+    if (isNew) navigate(`${basePath}/${d.product.id}?step=photos`, { replace: true })
+    else if (wizard) goto('photos')
+  }
+
   return (
     <>
       <Button asChild variant="ghost" size="sm" className="-ml-2 w-fit">
@@ -576,7 +589,7 @@ function EditorPage() {
       </Button>
       <PageHeader
         title={isNew ? t('New product') : p!.name}
-        description={isNew ? t('Save the details first, then add photos.') : `${p!.categoryName} · ${formatETB(p!.price)}`}
+        description={isNew ? t('Four short steps. Each one is saved when you press Next.') : `${p!.categoryName} · ${formatETB(p!.price)}`}
         actions={
           !isNew && (
             <div className="flex flex-wrap items-center gap-2">
@@ -604,16 +617,25 @@ function EditorPage() {
           {t("Shoppers can't see this yet: it shows in the store once Sodo Gebeya approves your shop.")}
         </p>
       )}
+      {wizard ? (
+        <ProductWizard
+          step={step}
+          isNew={isNew}
+          data={data}
+          basePath={basePath}
+          refresh={refresh}
+          goto={goto}
+          onDetailsSaved={detailsSaved}
+          onPublish={() => toggle.mutate()}
+          publishing={toggle.isPending}
+        />
+      ) : (
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
           <DetailsForm
             key={p ? `${p.id}-${p.updatedAt}` : 'new'}
             detail={data}
-            onSaved={(d) => {
-              refresh(d)
-              toast.success(isNew ? t('Product created. Now add photos.') : t('Saved'))
-              if (isNew) navigate(`${basePath}/${d.product.id}`, { replace: true })
-            }}
+            onSaved={detailsSaved}
           />
           {data && <Photos detail={data} onChange={refresh} />}
         </div>
@@ -624,6 +646,7 @@ function EditorPage() {
           </div>
         )}
       </div>
+      )}
     </>
   )
 }
@@ -653,6 +676,181 @@ function BlockedNote({ id, reason, seller }: { id: number; reason: string; selle
       {!seller && isAdmin() && (
         <Button size="sm" variant="outline" disabled={putBack.isPending} onClick={() => putBack.mutate()}>{t('Put back in the store')}</Button>
       )}
+    </div>
+  )
+}
+
+const WIZARD_STEPS = [
+  { key: 'details', label: 'Details', hint: 'Name, category, price and description' },
+  { key: 'photos', label: 'Photos', hint: 'At least one photo' },
+  { key: 'stock', label: 'Stock & price', hint: 'How many you have' },
+  { key: 'publish', label: 'Publish', hint: 'Show it in the store' },
+] as const
+type WizardStep = (typeof WIZARD_STEPS)[number]['key']
+
+/**
+ * New product, in four steps. Each step is saved as you go (details on Next, photos and stock as they change). Once a
+ * step is complete, the box under it names the next step and takes you there.
+ */
+function ProductWizard({
+  step,
+  isNew,
+  data,
+  basePath,
+  refresh,
+  goto,
+  onDetailsSaved,
+  onPublish,
+  publishing,
+}: {
+  step: string
+  isNew: boolean
+  data?: ProductDetail
+  basePath: string
+  refresh: (d: ProductDetail) => void
+  goto: (s: string) => void
+  onDetailsSaved: (d: ProductDetail) => void
+  onPublish: () => void
+  publishing: boolean
+}) {
+  const t = useT()
+  const p = data?.product
+  const current = Math.max(0, WIZARD_STEPS.findIndex((s) => s.key === step))
+  const current_ = WIZARD_STEPS[current]
+  const photos = data?.images.length ?? 0
+  const done: Record<WizardStep, boolean> = {
+    details: !!p,
+    photos: photos > 0,
+    stock: !!p && p.stock > 0,
+    publish: !!p?.active,
+  }
+  const next = WIZARD_STEPS[current + 1]
+  const prev = WIZARD_STEPS[current - 1]
+
+  // "saved at" follows every change the server confirms (details, photos, stock, visibility)
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
+  useEffect(() => {
+    if (p) setSavedAt(new Date())
+  }, [p?.updatedAt, data?.images.length, p?.stock, p?.active]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const canNext = current_.key === 'details' ? true : done[current_.key]
+  const nextAction = () => {
+    if (current_.key === 'details') {
+      // the form checks its required fields first, then saves
+      ;(document.getElementById('product-form') as HTMLFormElement | null)?.requestSubmit()
+      return
+    }
+    if (next) goto(next.key)
+  }
+
+  return (
+    <div className="space-y-6">
+      <ol className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3 sm:gap-3 sm:p-4" aria-label={t('Steps')}>
+        {WIZARD_STEPS.map((s, i) => {
+          const isDone = done[s.key] && i < current
+          const isNow = i === current
+          return (
+            <li key={s.key} className="flex min-w-0 flex-1 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => (isNew && i > current ? undefined : goto(s.key))}
+                disabled={isNew && i > current}
+                aria-current={isNow ? 'step' : undefined}
+                className={cn(
+                  'flex min-w-0 items-center gap-2 rounded-xl px-2 py-1.5 text-left transition disabled:opacity-50',
+                  isNow && 'bg-accent',
+                )}
+              >
+                <span
+                  className={cn(
+                    'grid size-7 shrink-0 place-items-center rounded-full text-xs font-bold',
+                    isDone || (done[s.key] && i < current) ? 'bg-success text-white' : isNow ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                  )}
+                >
+                  {done[s.key] && i !== current ? <Check className="size-4" /> : i + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className={cn('block truncate text-sm', isNow ? 'font-bold' : 'font-medium')}>{t(s.label)}</span>
+                  <span className="hidden text-xs text-muted-foreground lg:block">{t(s.hint)}</span>
+                </span>
+              </button>
+              {i < WIZARD_STEPS.length - 1 && <span className="hidden h-px flex-1 bg-border sm:block" aria-hidden />}
+            </li>
+          )
+        })}
+      </ol>
+
+      {savedAt && (
+        <p className="text-right text-xs text-muted-foreground" role="status">
+          {t('Saved at {time}', { time: savedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}
+        </p>
+      )}
+
+      {step === 'details' && (
+        <DetailsForm key={p ? `${p.id}-${p.updatedAt}` : 'new'} detail={data} onSaved={onDetailsSaved} />
+      )}
+      {step === 'photos' && data && <Photos detail={data} onChange={refresh} />}
+      {step === 'stock' && data && <Stock detail={data} onChange={refresh} />}
+      {step === 'publish' && data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Ready to show?')}</CardTitle>
+            <CardDescription>{t('Check the details. Shoppers see it once you show it and your shop is approved.')}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <div><dt className="text-muted-foreground">{t('Name')}</dt><dd className="font-medium">{p!.name}</dd></div>
+              <div><dt className="text-muted-foreground">{t('Price')}</dt><dd className="font-medium tabular-nums">{formatETB(p!.price)}</dd></div>
+              <div><dt className="text-muted-foreground">{t('Category')}</dt><dd className="font-medium">{p!.categoryName}</dd></div>
+              <div><dt className="text-muted-foreground">{t('Photos')}</dt><dd className="font-medium">{photos}</dd></div>
+              <div><dt className="text-muted-foreground">{t('In stock')}</dt><dd className="font-medium tabular-nums">{p!.stock}</dd></div>
+              <div><dt className="text-muted-foreground">{t('Shown in the store')}</dt><dd className="font-medium">{p!.active ? t('Yes') : t('No')}</dd></div>
+            </dl>
+            {p!.active ? (
+              <div className="rounded-xl border border-success/40 bg-success/10 p-4">
+                <p className="flex items-center gap-2 font-bold text-success"><Check className="size-5" /> {t('Your product is ready')}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button asChild><Link to={`${basePath}/new`}><Plus /> {t('Add another product')}</Link></Button>
+                  <Button asChild variant="outline"><Link to={basePath}>{t('Back to products')}</Link></Button>
+                </div>
+              </div>
+            ) : (
+              <Button onClick={onPublish} disabled={publishing || p!.stock <= 0}>
+                {publishing ? <Loader2 className="animate-spin" /> : <Check />} {t('Show it in the store')}
+              </Button>
+            )}
+            {p!.stock <= 0 && !p!.active && <p className="text-xs text-muted-foreground">{t('Add some stock first, in the step before.')}</p>}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* once the step is complete, say what comes next */}
+      {done[current_.key] && next && (
+        <div className="flex flex-col gap-3 rounded-xl border border-success/40 bg-success/10 p-4 sm:flex-row sm:items-center">
+          <p className="flex-1 text-sm">
+            <span className="font-bold text-success">{t('{step} is done', { step: t(current_.label) })}.</span>{' '}
+            {t('Next: {step}.', { step: t(next.label) })}
+          </p>
+          <Button onClick={() => goto(next.key)} className="sm:shrink-0">
+            {t('Next: {step}', { step: t(next.label) })} <ArrowRight />
+          </Button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 border-t pt-4">
+        {prev ? (
+          <Button variant="outline" onClick={() => goto(prev.key)}>
+            <ArrowLeft /> {t('Back')}
+          </Button>
+        ) : (
+          <span />
+        )}
+        {current_.key !== 'publish' && (
+          <Button onClick={nextAction} disabled={!canNext}>
+            {current_.key === 'details' ? t('Save and continue') : t('Next')} <ArrowRight />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
