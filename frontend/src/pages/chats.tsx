@@ -3,6 +3,7 @@ import { MessageCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router'
 
+import { ChatSoundToggle } from '@/components/message-alerts'
 import { Button } from '@/components/ui/button'
 import { chatApi, type Conversation } from '@/lib/chat-api'
 import { t as tNow, useT } from '@/lib/i18n'
@@ -86,7 +87,10 @@ export function ChatsPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6">
-      <h1 className="text-2xl font-extrabold tracking-tight">{t('Chats')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-extrabold tracking-tight">{t('Chats')}</h1>
+        <ChatSoundToggle />
+      </div>
       <div className="flex gap-2" role="group" aria-label={t('Show')}>
         {FILTERS.map((f) => (
           <Button

@@ -195,4 +195,29 @@ class ChatIntegrationTest extends IntegrationTest {
 		String body = jdbc.queryForObject("select body from sms_messages where kind = 'CHAT' and recipient = '+251912000005'", String.class);
 		assertThat(body).contains("new message from Abel Buyer").contains("/chats/" + id).hasSizeLessThanOrEqualTo(160);
 	}
+
+	@Test
+	void typingOnlineAndSeenShowToTheOtherSideOnly() {
+		Seller s = seller("0912000020");
+		String buyer = customer("Mekdes Buyer", "0922000020");
+		String stranger = customer("Nobody Here", "0922000021");
+		long id = start(buyer, s.productId(), "Is this still available?");
+
+		// the seller has not opened the chat yet: the buyer sees no read time
+		assertThat(thread(buyer, id).path("other").path("readAt").isNull()).isTrue();
+
+		// the buyer types: the seller sees it and sees the buyer online; the buyer does not see their own typing
+		assertThat(post("/api/chats/" + id + "/typing", Map.of(), buyer).status()).isEqualTo(200);
+		JsonNode sellerView = thread(s.token(), id);
+		assertThat(sellerView.path("other").path("typing").asBoolean()).isTrue();
+		assertThat(sellerView.path("other").path("online").asBoolean()).isTrue();
+		assertThat(thread(buyer, id).path("other").path("typing").asBoolean()).isFalse();
+
+		// the seller has opened it: the buyer now sees a read time, which is the "Seen" tick
+		assertThat(thread(buyer, id).path("other").path("readAt").isNull()).isFalse();
+
+		// a stranger can neither type in it nor learn anything from it
+		assertThat(post("/api/chats/" + id + "/typing", Map.of(), stranger).status()).isEqualTo(404);
+		assertThat(post("/api/chats/presence", Map.of(), stranger).status()).isEqualTo(200);
+	}
 }

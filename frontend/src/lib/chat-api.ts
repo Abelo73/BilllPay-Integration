@@ -49,7 +49,10 @@ export type Conversation = {
   blockedBy: ChatSide | null
 }
 
-export type ChatThread = { conversation: Conversation; messages: ChatMessage[]; canWrite: boolean }
+/** The other person: online now, last active, typing right now, and when they last read the chat ("Seen"). */
+export type ChatOtherStatus = { online: boolean; lastActiveAt: string | null; typing: boolean; readAt: string | null }
+
+export type ChatThread = { conversation: Conversation; messages: ChatMessage[]; canWrite: boolean; other: ChatOtherStatus | null }
 
 export type ReportReason = 'SCAM' | 'OFF_PLATFORM_PAYMENT' | 'ABUSE' | 'SPAM' | 'OTHER'
 
@@ -61,6 +64,10 @@ export const chatApi = {
   start: (productId: number, text?: string) => request<Conversation>('/chats', json({ productId, text })),
   thread: (id: number, after = 0) => request<ChatThread>(`/chats/${id}?after=${after}`),
   send: (id: number, text: string) => request<ChatMessage>(`/chats/${id}/messages`, json({ text })),
+  /** Tells the other side this person is typing (they see it for a few seconds). */
+  typing: (id: number) => request<{ ok: boolean }>(`/chats/${id}/typing`, json({})),
+  /** Marks this person as online; sent every 30 s while the app is open. */
+  presence: () => request<{ ok: boolean }>('/chats/presence', json({})),
   offer: (id: number, unitPrice: number, quantity = 1, productId?: number) =>
     request<ChatMessage>(`/chats/${id}/offers`, json({ unitPrice, quantity, productId })),
   answer: (offerId: number, action: 'accept' | 'decline' | 'withdraw') =>

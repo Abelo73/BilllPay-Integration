@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Ban, Camera, Flag, HandCoins, Loader2, MoreVertical, Send, ShieldAlert } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 
@@ -12,7 +12,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ApiError } from '@/lib/api'
+import { ChatSoundToggle } from '@/components/message-alerts'
 import { chatApi, type ChatMessage, type ChatOffer, type ReportReason } from '@/lib/chat-api'
+import { playChime } from '@/lib/chat-sound'
 import { formatETB } from '@/lib/format'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -113,13 +115,34 @@ export function ChatPage() {
     queryKey: ['chat', id],
     queryFn: () => chatApi.thread(id),
     enabled: !!session && Number.isFinite(id),
-    refetchInterval: 4000,
+    refetchInterval: 2500,
     retry: (n, e) => !(e instanceof ApiError && e.status === 404) && n < 2,
   })
   const count = thread.data?.messages.length ?? 0
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [count])
+
+  // a chime when a new message from the other side arrives while this chat is open
+  const lastIncoming = useRef<number | null>(null)
+  const newestIncoming = [...(thread.data?.messages ?? [])].reverse().find((m) => !m.mine && m.kind !== 'SYSTEM')?.id ?? null
+  useEffect(() => {
+    lastIncoming.current = null
+  }, [id])
+  useEffect(() => {
+    if (newestIncoming === null) return
+    if (lastIncoming.current !== null && newestIncoming > lastIncoming.current) playChime()
+    lastIncoming.current = newestIncoming
+  }, [newestIncoming])
+
+  // tell the other side we are typing, at most every 2.5 s
+  const lastTyping = useRef(0)
+  const typingPing = () => {
+    const now = Date.now()
+    if (now - lastTyping.current < 2500) return
+    lastTyping.current = now
+    chatApi.typing(id).catch(() => {})
+  }
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['chat', id] })
@@ -171,6 +194,10 @@ export function ChatPage() {
   const th = thread.data
   const c = th?.conversation
   const iBlocked = c?.blockedBy === c?.side
+  // "Seen" under my latest message once the other side has opened the chat after it was sent
+  const lastMineId = [...(th?.messages ?? [])].reverse().find((m) => m.mine && m.kind !== 'SYSTEM')?.id
+  const lastMine = th?.messages.find((m) => m.id === lastMineId)
+  const seen = !!lastMine && !!th?.other?.readAt && new Date(th.other.readAt).getTime() >= new Date(lastMine.createdAt).getTime()
 
   return (
     <div className="mx-auto flex h-[calc(100svh-8rem)] max-w-2xl flex-col md:h-[calc(100svh-5rem)] md:py-4">
@@ -188,7 +215,19 @@ export function ChatPage() {
               {c?.side === 'BUYER' ? t('Seller') : t('Buyer')}
               {c?.shopSlug && c.side === 'BUYER' && <> · <Link to={`/shops/${c.shopSlug}`} className="text-brand hover:underline">{t('view shop')}</Link></>}
             </p>
+            {th?.other && !iBlocked && (
+              <p className="truncate text-xs font-semibold">
+                {th.other.typing ? (
+                  <span className="text-primary">{t('typing…')}</span>
+                ) : th.other.online ? (
+                  <span className="text-primary">● {t('Online')}</span>
+                ) : th.other.lastActiveAt ? (
+                  <span className="text-muted-foreground">{t('Last seen {time}', { time: chatTime(th.other.lastActiveAt) })}</span>
+                ) : null}
+              </p>
+            )}
           </div>
+          <ChatSoundToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="size-11" aria-label={t('More options')}><MoreVertical /></Button>
@@ -226,7 +265,14 @@ export function ChatPage() {
         </div>
         {thread.isLoading && <Loader2 className="mx-auto animate-spin text-muted-foreground" />}
         {th?.messages.map((m) => (
-          <Bubble key={m.id} m={m} busy={answer.isPending} onAnswer={(offerId, a) => answer.mutate({ offerId, a })} />
+          <Fragment key={m.id}>
+            <Bubble m={m} busy={answer.isPending} onAnswer={(offerId, a) => answer.mutate({ offerId, a })} />
+            {m.id === lastMineId && (
+              <p className={cn('-mt-2 text-[11px] font-semibold', seen ? 'text-primary' : 'text-muted-foreground', m.mine ? 'text-right' : '')}>
+                {seen ? t('Seen') : t('Sent')}
+              </p>
+            )}
+          </Fragment>
         ))}
         <div ref={endRef} />
       </div>
@@ -282,7 +328,16 @@ export function ChatPage() {
             </Button>
             <label className="min-w-0 flex-1">
               <span className="sr-only">{t('Message')}</span>
-              <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={t('Write a message…')} maxLength={2000} className="h-11 rounded-full" />
+              <Input
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value)
+                  if (e.target.value) typingPing()
+                }}
+                placeholder={t('Write a message…')}
+                maxLength={2000}
+                className="h-11 rounded-full"
+              />
             </label>
             <Button type="submit" size="icon" className="size-11 shrink-0 rounded-full" aria-label={t('Send')} disabled={send.isPending || !text.trim()}>
               {send.isPending ? <Loader2 className="animate-spin" /> : <Send />}

@@ -82,6 +82,20 @@ public class ChatController {
 		return chat.thread(me(), id, after);
 	}
 
+	/** Sent every 30 s while the app is open: marks this person as online for the other side. */
+	@PostMapping("/presence")
+	public Map<String, Boolean> presence() {
+		chat.presence(me());
+		return Map.of("ok", true);
+	}
+
+	/** Sent while this person types (at most every 2.5 s). Nothing is stored. */
+	@PostMapping("/{id}/typing")
+	public Map<String, Boolean> typing(@PathVariable Long id) {
+		chat.typing(me(), id);
+		return Map.of("ok", true);
+	}
+
 	@PostMapping("/{id}/messages")
 	public MessageView send(@PathVariable Long id, @Valid @RequestBody TextRequest req) {
 		return chat.sendText(me(), id, req.text());

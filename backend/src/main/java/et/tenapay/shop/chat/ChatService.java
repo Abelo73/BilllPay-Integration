@@ -73,11 +73,13 @@ public class ChatService {
 	private final AppProperties app;
 	private final TransactionTemplate tx;
 	private final et.tenapay.shop.inbox.InboxService inbox;
+	private final ChatPresence presence;
 
 	public ChatService(ConversationRepository conversations, ChatMessageRepository messages, ChatOfferRepository offers,
 			ChatReportRepository reports, ShopRepository shops, ProductRepository products, UserRepository users,
 			ImageProcessor images, MediaStorage storage, MediaProperties media, SmsService sms, AppProperties app,
-			TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox) {
+			TransactionTemplate tx, et.tenapay.shop.inbox.InboxService inbox, ChatPresence presence) {
+		this.presence = presence;
 		this.conversations = conversations;
 		this.messages = messages;
 		this.offers = offers;
@@ -112,7 +114,14 @@ public class ChatService {
 			ProductCard product, String lastMessagePreview, Instant lastMessageAt, boolean unread, String blockedBy) {
 	}
 
-	public record Thread(ConversationView conversation, List<MessageView> messages, boolean canWrite) {
+	/**
+	 * The other person in this conversation, as far as chat shows it: online now, when last active, typing right now, and
+	 * when they last read the conversation (so the sender can show "Seen"). Empty when the conversation is blocked.
+	 */
+	public record OtherStatus(boolean online, Instant lastActiveAt, boolean typing, Instant readAt) {
+	}
+
+	public record Thread(ConversationView conversation, List<MessageView> messages, boolean canWrite, OtherStatus other) {
 	}
 
 	private record Party(Conversation c, Conversation.Side side, Shop shop) {
@@ -176,8 +185,36 @@ public class ChatService {
 			List<ChatMessage> list = afterId > 0 ? messages.after(conversationId, afterId, PageRequest.of(0, 200))
 					: messages.latest(conversationId, PageRequest.of(0, 50)).reversed();
 			p.c().markRead(p.side(), Instant.now());
-			return new Thread(view(p, userId), messageViews(list, userId, p), p.c().getBlockedBy() == null);
+			presence.touch(userId);
+			return new Thread(view(p, userId), messageViews(list, userId, p), p.c().getBlockedBy() == null, otherStatus(p));
 		});
+	}
+
+	/** The app pings this while it is open, so the other side sees this person as online. */
+	public void presence(UUID userId) {
+		presence.touch(userId);
+	}
+
+	/** This person is typing in the conversation. Shown to the other side for a few seconds. */
+	public void typing(UUID userId, Long conversationId) {
+		tx.executeWithoutResult(s -> {
+			Party p = party(userId, conversationId);
+			if (p.c().getBlockedBy() == null) {
+				presence.typing(conversationId, p.side());
+			}
+		});
+		presence.touch(userId);
+	}
+
+	private OtherStatus otherStatus(Party p) {
+		Conversation.Side other = p.side() == Conversation.Side.BUYER ? Conversation.Side.SELLER : Conversation.Side.BUYER;
+		UUID otherId = other == Conversation.Side.BUYER ? p.c().getBuyerId() : (p.shop() == null ? null : p.shop().getOwnerId());
+		Instant readAt = p.c().lastReadAt(other);
+		if (p.c().getBlockedBy() != null || otherId == null) {
+			return new OtherStatus(false, null, false, readAt);
+		}
+		return new OtherStatus(presence.online(otherId), presence.lastActive(otherId).orElse(null),
+				presence.isTyping(p.c().getId(), other), readAt);
 	}
 
 	// ---------- writing ----------
@@ -390,7 +427,7 @@ public class ChatService {
 			Conversation c = conversations.findById(r.getConversationId()).orElseThrow();
 			Party p = new Party(c, Conversation.Side.BUYER, shops.findById(c.getShopId()).orElse(null));
 			List<ChatMessage> list = messages.latest(c.getId(), PageRequest.of(0, 500)).reversed();
-			return new Thread(view(p, null), messageViews(list, null, p), false);
+			return new Thread(view(p, null), messageViews(list, null, p), false, null);
 		});
 	}
 
