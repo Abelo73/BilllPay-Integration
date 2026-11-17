@@ -320,7 +320,7 @@ export function ChatPage() {
         setTypingUntil(Date.now() + 4000)
         qc.invalidateQueries({ queryKey: ['chat', id] })
       }
-      if (type === 'chat' && data.conversationId === id) qc.invalidateQueries({ queryKey: ['chat', id] })
+      if ((type === 'chat' || type === 'presence') && data.conversationId === id) qc.invalidateQueries({ queryKey: ['chat', id] })
     })
   }, [id, qc])
   useEffect(() => {

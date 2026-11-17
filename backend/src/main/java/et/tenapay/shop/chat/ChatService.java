@@ -217,9 +217,26 @@ public class ChatService {
 		return opened.thread();
 	}
 
-	/** The app pings this while it is open, so the other side sees this person as online. */
+	/**
+	 * The app pings this while it is open, so the other side sees this person as online. When someone comes online
+	 * (was offline until now), each person they have a chat with is told, so their chat shows it at once.
+	 */
 	public void presence(UUID userId) {
+		boolean wasOnline = presence.online(userId);
 		presence.touch(userId);
+		if (wasOnline) {
+			return;
+		}
+		Long shopId = shops.findByOwnerId(userId).map(Shop::getId).orElse(null);
+		for (Conversation c : conversations.forUser(userId, true, shopId, PageRequest.of(0, 200)).getContent()) {
+			if (c.getBlockedBy() != null) {
+				continue;
+			}
+			UUID other = c.getBuyerId().equals(userId)
+					? shops.findById(c.getShopId()).map(Shop::getOwnerId).orElse(null)
+					: c.getBuyerId();
+			tell(other, "presence", c.getId());
+		}
 	}
 
 	/** This person is typing in the conversation. Shown to the other side for a few seconds. */

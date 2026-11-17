@@ -348,4 +348,34 @@ class ChatIntegrationTest extends IntegrationTest {
 		// a stranger learns nothing about the conversation
 		assertThat(get("/api/chats/" + id + "/contact", stranger).status()).isEqualTo(404);
 	}
+
+	@Test
+	void comingOnlineIsPushedToTheirChatPartners() throws Exception {
+		Seller s = seller("0912000060");
+		String buyer = customer("Eyob Buyer", "0922000060");
+		long id = start(buyer, s.productId(), "Hi");
+		// the seller's live stream
+		HttpResponse<InputStream> stream = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(baseUrl() + "/api/live/stream"))
+				.header("Authorization", "Bearer " + s.token()).header("Accept", "text/event-stream").build(),
+				HttpResponse.BodyHandlers.ofInputStream());
+		BlockingQueue<String> lines = new LinkedBlockingQueue<>();
+		Thread reader = Thread.ofVirtual().start(() -> {
+			try (BufferedReader r = new BufferedReader(new InputStreamReader(stream.body(), StandardCharsets.UTF_8))) {
+				String line;
+				while ((line = r.readLine()) != null) {
+					lines.add(line);
+				}
+			} catch (IOException closed) {
+				// closed by the test
+			}
+		});
+		try {
+			// the buyer's app pings: they come online, and the seller is told
+			assertThat(post("/api/chats/presence", Map.of(), buyer).status()).isEqualTo(200);
+			assertThat(sawEvent(lines, "presence")).isTrue();
+		} finally {
+			stream.body().close();
+			reader.join(2000);
+		}
+	}
 }
