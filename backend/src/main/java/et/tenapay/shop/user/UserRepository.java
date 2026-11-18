@@ -30,4 +30,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 			       or lower(u.fullName) like lower(concat('%', cast(:q as string), '%')))
 			""")
 	Page<User> search(@Param("roles") Collection<Role> roles, @Param("q") String q, Pageable pageable);
+
+	java.util.Optional<User> findByGoogleSub(String googleSub);
 }

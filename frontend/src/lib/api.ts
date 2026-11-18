@@ -332,6 +332,10 @@ export const api = {
     request<EmailCodeSent>('/auth/email/resend', { method: 'POST', body: JSON.stringify({ email }) }),
   login: (email: string, password: string) =>
     request<Session>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  /** Whether "Continue with Google" is on, and the public client id for its button. */
+  googleConfig: () => request<{ enabled: boolean; clientId: string | null }>('/auth/google/config'),
+  /** Signs in with the token Google gave the browser. */
+  googleSignIn: (credential: string) => request<Session>('/auth/google', { method: 'POST', body: JSON.stringify({ credential }) }),
   /** Confirms an email that was never confirmed (the code is emailed at sign-in), then signs in. */
   confirmEmail: (email: string, password: string, code: string) =>
     request<Session>('/auth/email/confirm', { method: 'POST', body: JSON.stringify({ email, password, code }) }),

@@ -51,6 +51,9 @@ public class User {
 	/** When the email was confirmed with a code; null means the person still has to confirm it at sign-in. */
 	private Instant emailVerifiedAt;
 
+	/** Google's id for this person, once they signed in with Google (null otherwise). */
+	private String googleSub;
+
 	/** Site language, "en" or "am"; SMS and alerts follow it. */
 	private String language = "en";
 

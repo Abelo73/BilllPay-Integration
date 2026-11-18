@@ -151,6 +151,50 @@ public class AuthService {
 		return session(user);
 	}
 
+	/**
+	 * Signs in (or makes) the customer account for a Google identity that Google has verified. The email is the link to
+	 * an existing account; a staff account is never signed in this way.
+	 */
+	public Session signInWithGoogle(String googleSub, String email, String name, ClientInfo client) {
+		String normalized = normalizeEmail(email);
+		Instant now = Instant.now();
+		User user = tx.execute(s -> {
+			User u = users.findByGoogleSub(googleSub).or(() -> users.findByEmail(normalized)).orElse(null);
+			if (u == null) {
+				User made = new User();
+				made.setEmail(normalized);
+				made.setFullName(name == null || name.isBlank() ? normalized.substring(0, normalized.indexOf('@')) : name.trim());
+				made.setRole(Role.CUSTOMER);
+				made.setGoogleSub(googleSub);
+				made.setEmailVerifiedAt(now); // Google has verified the address
+				made.setLastLoginAt(now);
+				users.save(made);
+				record(made, normalized, Portal.SHOP, true, "REGISTERED_GOOGLE", client);
+				return made;
+			}
+			if (u.getRole().isStaff()) {
+				throw new ApiException(HttpStatus.FORBIDDEN, "USE_ADMIN_PAGE", "Admin accounts sign in on the admin page.");
+			}
+			if (!u.isEnabled()) {
+				throw new ApiException(HttpStatus.FORBIDDEN, "ACCOUNT_DISABLED", "This account is disabled. Contact support.");
+			}
+			if (u.isLocked()) {
+				throw new ApiException(HttpStatus.LOCKED, "ACCOUNT_LOCKED", "Too many failed sign-in attempts. Try again later.");
+			}
+			if (u.getGoogleSub() != null && !u.getGoogleSub().equals(googleSub)) {
+				throw new ApiException(HttpStatus.CONFLICT, "GOOGLE_ACCOUNT_MISMATCH", "This email is linked to a different Google account.");
+			}
+			u.setGoogleSub(googleSub);
+			if (u.getEmailVerifiedAt() == null) {
+				u.setEmailVerifiedAt(now);
+			}
+			u.setLastLoginAt(now);
+			record(u, normalized, Portal.SHOP, true, "SUCCESS_GOOGLE", client);
+			return u;
+		});
+		return session(user);
+	}
+
 	/** Changes the password, signs out every other session, and returns a fresh token for this one. */
 	/** After a reset code was checked: sets the new password and ends every other session. */
 	public void setPasswordAfterReset(UUID userId, String newPassword) {

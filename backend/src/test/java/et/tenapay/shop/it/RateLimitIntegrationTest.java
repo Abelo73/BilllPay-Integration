@@ -15,12 +15,21 @@ class RateLimitIntegrationTest extends IntegrationTest {
 
 	@Test
 	void signInTriesAreLimitedPerVisitor() {
+		// The limit counts per minute. If a minute ends part way through, the count starts again, so keep going
+		// until the limit shows (within two minutes), and check that at least 20 tries went through before it did.
 		List<Integer> statuses = new ArrayList<>();
-		for (int i = 0; i < 25; i++) {
-			statuses.add(postRaw("/api/auth/login", BODY, Map.of("X-Forwarded-For", "203.0.113.9")).status());
+		long until = System.currentTimeMillis() + 130_000;
+		while (System.currentTimeMillis() < until) {
+			int status = postRaw("/api/auth/login", BODY, Map.of("X-Forwarded-For", "203.0.113.9")).status();
+			statuses.add(status);
+			if (status == 429) {
+				break;
+			}
 		}
-		assertThat(statuses.subList(0, 20)).doesNotContain(429);
-		assertThat(statuses.subList(20, 25)).containsOnly(429);
+		assertThat(statuses).contains(429);
+		int firstLimited = statuses.indexOf(429);
+		assertThat(firstLimited).isGreaterThanOrEqualTo(20);
+		assertThat(statuses.subList(0, firstLimited)).doesNotContain(429);
 		Res limited = postRaw("/api/auth/login", BODY, Map.of("X-Forwarded-For", "203.0.113.9"));
 		assertThat(limited.text("code")).isEqualTo("RATE_LIMITED");
 

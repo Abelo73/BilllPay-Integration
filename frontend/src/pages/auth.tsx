@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { IconInput, PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { api, ApiError, type EmailCodeSent } from '@/lib/api'
+import { GoogleSignInButton } from '@/components/google-sign-in'
 import { useT } from '@/lib/i18n'
 import { type Session, useSession } from '@/store/session'
 
@@ -210,6 +211,7 @@ export function LoginPage() {
 
   return (
     <AuthShell title={t('Sign in')} description={t('Use your email and password.')}>
+      <GoogleSignInButton onSignedIn={(s) => finish(s)} />
       <EmailSignIn onSignedIn={(s) => finish(s)} />
       <p className="text-center text-sm text-muted-foreground">
         {t('New here?')}{' '}
@@ -236,6 +238,7 @@ export function RegisterPage() {
   if (!role) {
     return (
       <AuthShell title={t('Create an account')} description={t('What do you want to do?')}>
+        <GoogleSignInButton onSignedIn={(s) => finish(s, true)} />
         <div className="grid gap-3">
           <Button asChild size="lg" className="h-auto justify-start whitespace-normal py-4 text-left">
             <Link to={`/register?role=buyer${nextQuery(params).replace('?', '&')}`}>

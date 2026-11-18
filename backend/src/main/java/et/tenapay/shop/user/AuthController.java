@@ -31,6 +31,7 @@ public class AuthController {
 	private boolean phoneSignIn;
 	private final StaffTwoStepService twoStep;
 	private final UserRepository users;
+	private final GoogleSignInService google;
 
 	/** {@code deviceToken}: staff only, a device trusted after a 2-step sign-in (skips the code). */
 	public record LoginRequest(@NotBlank @Email String email, @NotBlank @Size(max = 200) String password, @Size(max = 200) String deviceToken) {
@@ -166,6 +167,24 @@ public class AuthController {
 		}
 		throw new et.tenapay.shop.common.ApiException(HttpStatus.FORBIDDEN, "EMAIL_NOT_VERIFIED",
 				"Confirm your email first. Enter the 6-digit code we sent you.", details);
+	}
+
+	/** Whether "Continue with Google" is on, and the public client id the button needs. */
+	@org.springframework.web.bind.annotation.GetMapping("/api/auth/google/config")
+	public Map<String, Object> googleConfig() {
+		java.util.HashMap<String, Object> out = new java.util.HashMap<>();
+		out.put("enabled", google.enabled());
+		out.put("clientId", google.clientId());
+		return out;
+	}
+
+	public record GoogleRequest(@NotBlank @Size(max = 4096) String credential) {
+	}
+
+	/** Signs in with the token Google gave the browser. */
+	@PostMapping("/api/auth/google")
+	public Session google(@Valid @RequestBody GoogleRequest req, HttpServletRequest http) {
+		return google.signIn(req.credential(), client(http));
 	}
 
 	public record ConfirmEmailRequest(@NotBlank @Email @Size(max = 200) String email, @NotBlank @Size(max = 200) String password,
